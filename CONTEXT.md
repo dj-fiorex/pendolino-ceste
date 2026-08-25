@@ -69,8 +69,8 @@ _Avoid_: Deleted, cancelled, inactive
 
 ### Roles
 
-**Operatore** (counter operator):
-Mill staff who register Ritiri and Rientri at the counter during a Campagna. Holds an account in the app, which a Cliente never does.
+**Operatore** (operator):
+Mill staff who register the Movimenti of a Campagna: Ritiri and Rientri at the counter, Svuotamenti where the Ceste are tipped out. Holds an account in the app, which a Cliente never does; whatever is recorded from a signed-in device is attributed to that account.
 _Avoid_: Utente, user, staff
 
 **Admin**:
@@ -92,7 +92,7 @@ Ceste come back to the mill loaded with olives. Fuori → Attesa molitura.
 _Avoid_: Restituzione, entrata, dropoff
 
 **Svuotamento** (emptying):
-The Cesta is tipped out at the mill and its paper tape comes off. Attesa molitura -> Disponibile.
+The Cesta is tipped out at the mill and its paper tape comes off. Attesa molitura → Disponibile.
 _Avoid_: Scarico, unload, release, cesta vuota
 
 **Rettifica** (adjustment):
