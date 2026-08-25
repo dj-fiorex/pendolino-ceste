@@ -12,8 +12,8 @@ The mill's central problem is Ceste that never come back, and they have never ha
 
 ## Consequences
 
-Identity has to come from somewhere, and today it does not exist: **no Cesta is marked or numbered**. The owner has bought the numbers and will label the fleet himself, with a printed number plus a QR code on each Cesta. That labelling is a hard prerequisite — until the whole fleet is labelled the app has nothing to track, so it belongs on the schedule as a blocking task before the Campagna opens, not as a nice-to-have.
+Identity has to come from somewhere, and today it does not exist: **no Cesta is marked or numbered**. The app assigns each Cesta its identity at Censimento and produces the Etichette as a PDF, which a tipografia prints (ADR-0007). That labelling is a hard prerequisite — until the whole fleet is labelled the app has nothing to track, so it belongs on the schedule as a blocking task before the Campagna opens, not as a nice-to-have.
 
 Individual identity also puts pressure on the counter. On a peak day around 150 Clienti pass through and a Ritiro has to take seconds. Capturing identity for each Cesta is inherently more work than typing a count, and how much more depends on how many Ceste a single Cliente takes at once — still an open question with the mill.
 
-This decision fixes *that* Ceste are identified, not *how* identity is captured at the counter. Scanning each QR one at a time, entering a range of numbers, and scanning one Cesta then confirming a count are all still open, and any of them can be chosen later without reopening this ADR.
+This decision fixes *that* Ceste are identified, not *how*. What the identity is and how it reaches the label is decided in ADR-0007; how it is captured at the counter — a continuous scan, with the numero typed by hand whenever a label cannot be read — is fixed in the spec (#1). Neither needed to reopen this ADR.

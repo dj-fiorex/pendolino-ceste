@@ -9,7 +9,7 @@ _Terms are the mill staff's own Italian words and are not translated in code. Th
 ### Core
 
 **Cesta** (basket):
-A reusable container owned by the mill, in which a Cliente harvests and brings back olives. Tracked individually. Comes in two sizes, 400 kg and 250 kg; the square and rectangular shapes of the 400 kg are interchangeable at the counter and are not modelled.
+A reusable container owned by the mill, in which a Cliente harvests and brings back olives. Tracked individually, identified by a `numero` unique across the whole fleet and worn on an Etichetta. Has a Portata and a Forma; the counter counts and hands out Ceste by Portata alone, and the Forma changes nothing there.
 _Avoid_: Bin, bins, cassetta, crate
 
 **Cliente** (customer):
@@ -27,6 +27,28 @@ _Avoid_: ERP, management system, billing software, accounting system
 **Campagna** (season):
 One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one").
 _Avoid_: Stagione, season, annata, year
+
+### Fleet
+
+**Censimento** (fleet registration):
+The act of entering Ceste into the app, one or more at a time of the same Portata and Forma. A Cesta receives its numero and its Codice here, once and for good; a Cesta bought mid-Campagna goes through the same act.
+_Avoid_: Registrazione, registration, creazione, import, onboarding
+
+**Portata** (capacity):
+The weight of olives a Cesta carries: 400 kg or 250 kg. The unit the counter counts Ceste in.
+_Avoid_: Tipo, taglia, size, peso, capacità, dimensione
+
+**Forma** (shape):
+Quadrata or rettangolare, written `Q` or `R` in the Codice. It exists to be read off the Etichetta; it never filters a list or splits a count.
+_Avoid_: Shape (in code), formato, modello
+
+**Codice** (speaking code):
+The string printed on a Cesta's Etichetta and carried by its QR code: Portata, Forma and numero, as in `400-R-017`. Readable by a person as much as by a camera; at the counter one types only the numero.
+_Avoid_: ID, identificativo, matricola, sigla, targa
+
+**Etichetta** (label):
+The printed label each Cesta wears, carrying its QR code and its Codice in large type. Not the paper tape, which is the mill's own record of a Rientro and is never touched by the app.
+_Avoid_: Targhetta, adesivo, sticker, tag, nastro
 
 ### Cesta states
 
