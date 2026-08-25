@@ -29,7 +29,7 @@ import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { Keypad } from "@/components/prototype/keypad"
 import { Tile } from "@/components/prototype/tile"
 import { formatRientro } from "@/lib/prototype-data"
-import { useSvuotamento } from "@/lib/use-svuotamento"
+import { cesteLabel, useSvuotamento } from "@/lib/use-svuotamento"
 
 export const name = "Per Cliente 80"
 
@@ -109,7 +109,7 @@ export function VariantC() {
             ))}
           </span>
           <span className="text-sm text-muted-foreground">
-            {active.ceste.length} Ceste
+            {cesteLabel(active.ceste.length)}
             {active.oldest && ` · dal ${formatRientro(active.oldest)}`}
           </span>
         </div>

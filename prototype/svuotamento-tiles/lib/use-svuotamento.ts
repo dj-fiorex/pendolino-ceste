@@ -165,3 +165,7 @@ export function useSvuotamento() {
 export function confirmLabel(count: number) {
   return count === 1 ? "Svuota 1 Cesta" : `Svuota ${count} Ceste`
 }
+
+export function cesteLabel(count: number) {
+  return count === 1 ? "1 Cesta" : `${count} Ceste`
+}

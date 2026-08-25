@@ -26,7 +26,7 @@ import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { Keypad } from "@/components/prototype/keypad"
 import { Tile } from "@/components/prototype/tile"
 import { formatRientro } from "@/lib/prototype-data"
-import { useSvuotamento } from "@/lib/use-svuotamento"
+import { cesteLabel, useSvuotamento } from "@/lib/use-svuotamento"
 
 export const name = "Griglia 64"
 
@@ -71,7 +71,7 @@ export function VariantA() {
                     ))}
                   </span>
                   <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
-                    <span>{g.ceste.length} Ceste</span>
+                    <span>{cesteLabel(g.ceste.length)}</span>
                     {g.oldest && <span>dal {formatRientro(g.oldest)}</span>}
                     {state === "all" ? <SquareCheckIcon /> : <SquareIcon />}
                   </span>

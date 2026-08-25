@@ -34,7 +34,7 @@ import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { Keypad } from "@/components/prototype/keypad"
 import { Tile } from "@/components/prototype/tile"
 import { formatRientro } from "@/lib/prototype-data"
-import { useSvuotamento } from "@/lib/use-svuotamento"
+import { cesteLabel, useSvuotamento } from "@/lib/use-svuotamento"
 
 export const name = "Schede 96"
 
@@ -70,7 +70,7 @@ export function VariantB() {
                     ))}
                   </CardTitle>
                   <CardDescription>
-                    {g.ceste.length} Ceste
+                    {cesteLabel(g.ceste.length)}
                     {g.oldest && ` · dal ${formatRientro(g.oldest)}`}
                   </CardDescription>
                   <CardAction>
