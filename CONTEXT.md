@@ -21,8 +21,8 @@ A further name a Cliente is known by at the counter, used to tell namesakes apar
 _Avoid_: Soprannome (in code), nickname, nomignolo, secondo nome
 
 **Gestionale** (management software):
-The invoicing software the mill already runs on an always-on PC, holding the customer registry they have always billed from. It sits upstream of this app and is never written to.
-_Avoid_: ERP, management system, billing software, accounting system
+The invoicing software the mill already runs on an always-on PC — OleaPlus, an Access-based product — holding the customer registry they have always billed from. It sits upstream of this app and is never written to.
+_Avoid_: ERP, management system, billing software, accounting system, OleaPlus (in code: the app knows a Gestionale, not a brand)
 
 **Campagna** (season):
 One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one").

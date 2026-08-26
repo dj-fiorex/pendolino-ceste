@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Preventivo · Pendolino Ceste</title>
+<!--
+  Commercial proposal for the mill. Customer-facing copy is Italian on purpose.
+  Export: see docs/preventivo/README.md (headless Chrome, A4).
+  Each <section class="page"> is one printed page with its own header and footer;
+  screenshots are referenced from docs/screenshots/. A missing screenshot is
+  replaced at load by a labelled placeholder so the PDF can be exported before
+  every prototype has been captured (#31).
+-->
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --red: #D4271C;
+    --ink: #111111;
+    --muted: #555555;
+    --light: #777777;
+    --line: #DADADA;
+    --pink: #FBEBEA;
+    --green: #E6F4EA;
+    --grey: #F2F2F2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: var(--ink); }
+  body { font-family: Verdana, "DejaVu Sans", Geneva, sans-serif; font-size: 9.6pt; line-height: 1.42; }
+
+  .page {
+    width: 210mm; height: 297mm;
+    padding: 12mm 18mm 14mm 18mm;
+    position: relative;
+    page-break-after: always;
+    break-after: page;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  .hdr {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 3mm; margin-bottom: 8mm;
+    font-size: 8pt; font-weight: bold; letter-spacing: 0.02em;
+  }
+  .hdr .brand { font-size: 9.5pt; }
+  .hdr .brand b { color: var(--red); }
+  .hdr .kind { color: var(--light); }
+  .ftr {
+    position: absolute; left: 18mm; right: 18mm; bottom: 8mm;
+    border-top: 1px solid var(--line); padding-top: 2.5mm;
+    display: flex; justify-content: space-between;
+    font-size: 7pt; color: var(--light);
+  }
+  .ftr .pn { color: var(--muted); }
+  .ftr .pn b { font-weight: normal; font-size: 8.5pt; color: var(--ink); }
+  .body { flex: 1; }
+
+  h1 { font-size: 26pt; line-height: 1.12; margin: 0 0 5mm; letter-spacing: -0.01em; }
+  h2 { font-size: 18.5pt; line-height: 1.15; margin: 0 0 3mm; }
+  h2 .n { color: var(--red); font-size: 10pt; margin-right: 3mm; vertical-align: 2pt; }
+  h3 { font-size: 12pt; margin: 6mm 0 2.5mm; }
+  h4 { font-size: 10pt; margin: 4mm 0 1.5mm; }
+  p { margin: 0 0 3mm; }
+  .lead { color: var(--muted); font-size: 10.5pt; margin-bottom: 5mm; }
+  ul { margin: 0 0 3mm; padding-left: 5.5mm; }
+  li { margin-bottom: 1.2mm; }
+  small, .small { font-size: 8.2pt; color: var(--muted); }
+  .note { font-size: 8.4pt; color: var(--muted); font-style: italic; }
+  em { font-style: italic; }
+  .term { font-weight: bold; }
+
+  .box { border-radius: 2mm; padding: 4mm 5mm; margin: 0 0 4mm; }
+  .box.pink { background: var(--pink); }
+  .box.green { background: var(--green); }
+  .box.grey { background: var(--grey); }
+  .box.frame { border: 1px solid var(--line); }
+  .box h4 { margin-top: 0; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+
+  .cols { display: grid; gap: 4mm; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .arch { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-radius: 2mm; overflow: hidden; margin-bottom: 5mm; }
+  .arch > div { padding: 4mm 3mm; text-align: center; }
+  .arch b { display: block; font-size: 10.5pt; margin-bottom: 1.5mm; }
+  .arch span { display: block; color: var(--muted); font-size: 8.6pt; line-height: 1.5; }
+  .arch .a { background: var(--pink); } .arch .b { background: var(--grey); } .arch .c { background: var(--green); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9pt; }
+  th { background: #111; color: #fff; text-align: left; padding: 2.6mm 3mm; font-size: 8.6pt; }
+  td { padding: 2.6mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: #FAFAFA; }
+  td.r, th.r { text-align: right; white-space: nowrap; }
+  tr.total td { background: #111; color: #fff; font-weight: bold; border: 0; }
+  .kv { display: grid; grid-template-columns: 38mm 1fr; row-gap: 2.2mm; margin-top: 12mm; }
+  .kv .k { font-size: 8pt; color: var(--light); font-weight: bold; letter-spacing: 0.06em; }
+  .kv .v { font-weight: bold; }
+
+  .shots { display: grid; gap: 4mm; margin: 3mm 0 4mm; align-items: start; }
+  .shots.two { grid-template-columns: 44mm 1fr; }
+  .shots.three { grid-template-columns: repeat(3, 44mm); justify-content: space-between; }
+  .shots.label { grid-template-columns: 30mm 1fr; }
+  figure { margin: 0; }
+  figure img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 2mm; }
+  figcaption { font-size: 7.8pt; color: var(--muted); margin-top: 1.5mm; line-height: 1.35; }
+  .ph {
+    border: 1px dashed #B5B5B5; border-radius: 2mm; background: #FAFAFA;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--light); font-size: 8pt; padding: 4mm;
+  }
+  .ph.phone { aspect-ratio: 390 / 844; }
+  .ph.tablet { aspect-ratio: 1180 / 820; }
+  .ph.label { aspect-ratio: 100 / 150; }
+
+  .cover .body { padding-top: 8mm; }
+  .cover .eyebrow { color: var(--red); font-weight: bold; font-size: 10pt; letter-spacing: 0.05em; margin-bottom: 4mm; }
+  .cover h1 { font-size: 31pt; }
+  .cover .sub { color: var(--muted); font-size: 12pt; line-height: 1.45; max-width: 150mm; }
+
+  .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-top: 8mm; }
+  .sign .k { font-size: 8.5pt; color: var(--light); font-weight: bold; margin-bottom: 5mm; }
+  .sign .row { margin-bottom: 5mm; }
+  .closing { text-align: center; margin-top: 12mm; }
+  .closing .studio { color: var(--red); font-weight: bold; font-size: 8.5pt; letter-spacing: 0.08em; margin-bottom: 3mm; }
+  .closing .claim { font-weight: bold; font-size: 11pt; margin-bottom: 2mm; }
+  .closing .url { color: var(--muted); font-size: 8.5pt; }
+
+  .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; margin-bottom: 4mm; }
+  .step { border: 1px solid var(--line); border-radius: 2mm; padding: 3.5mm 4mm; }
+  .step .when { color: var(--red); font-weight: bold; font-size: 8.4pt; letter-spacing: 0.04em; }
+  .step b { display: block; font-size: 10.5pt; margin: 1mm 0 1.5mm; }
+  .step ul { padding-left: 4.5mm; margin: 0; font-size: 8.6pt; }
+  .price { font-size: 20pt; font-weight: bold; }
+  .price small { font-size: 9pt; font-weight: normal; color: var(--muted); }
+  .strike { text-decoration: line-through; color: var(--light); }
+  dl.gl { margin: 0; display: grid; grid-template-columns: 34mm 1fr; column-gap: 4mm; row-gap: 2mm; }
+  dl.gl dt { font-weight: bold; }
+  dl.gl dd { margin: 0; color: #222; }
+</style>
+</head>
+<body>
+
+<!-- ============================ 1 · COVER ============================ -->
+<section class="page cover">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <div class="eyebrow">PREVENTIVO</div>
+    <h1>Pendolino Ceste<br>Gestione delle ceste del frantoio</h1>
+    <p class="sub">Applicazione web per telefono e tablet che registra ogni cesta che esce dal frantoio e ogni cesta che rientra: chi ce l'ha, da quanto tempo, e quante sono davvero disponibili nella mattina di punta.</p>
+
+    <div class="kv">
+      <div class="k">CLIENTE</div><div class="v">Gabriele</div>
+      <div class="k">PROGETTO</div><div class="v">Pendolino Ceste · tracciamento delle ceste del frantoio</div>
+      <div class="k">RIFERIMENTO</div><div class="v">DB-2026-GB-001</div>
+      <div class="k">DATA</div><div class="v">26 agosto 2026</div>
+      <div class="k">VALIDITÀ</div><div class="v">30 giorni dalla data di emissione</div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>1</b></span></div>
+</section>
+
+<!-- ============================ 2 · PROBLEMA E SOLUZIONE ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">01</span>Il problema e la soluzione</h2>
+    <p class="lead">Oggi nessuno scrive niente nel momento in cui una cesta esce dal frantoio. Questa app lo fa in pochi secondi.</p>
+
+    <p>Il frantoio possiede circa <b>195 ceste</b>, 170 da 400 kg e una ventina da 250 kg, e le presta ai clienti, che le riempiono di olive e le riportano per la molitura. In una giornata di punta della campagna passano circa <b>150 clienti</b>, e un cliente prende in media 6 ceste alla volta.</p>
+    <p>Ogni anno qualche cesta non torna, e oggi non c'è modo di sapere quante, né di chi. Non esiste un registro né una ricevuta, e nessuno annota nulla quando una cesta lascia il piazzale. Il tempo che una cesta passa a casa del cliente è l'unico in cui può perdersi, ed è proprio quello di cui non resta traccia.</p>
+    <p>Perdere ceste costa più del prezzo d'acquisto. Con 195 ceste e 6 per ritiro, al massimo una trentina di clienti può avere ceste in mano nello stesso momento. La flotta è il limite reale del frantoio nella sua mattina più piena, e ogni cesta persa è capacità che manca proprio quando vale di più.</p>
+
+    <h3>Cosa proponiamo</h3>
+    <p>Un'applicazione web, in italiano, da usare al banco sul telefono e allo svuotamento su un telefono o su un tablet. Ogni cesta porta un'etichetta stampata con QR e un codice leggibile a occhio. L'app registra ogni ritiro, rientro e svuotamento sulla singola cesta, così in ogni momento il frantoio sa quali ceste sono disponibili, quali sono fuori e con chi, e quali aspettano la molitura.</p>
+
+    <div class="arch">
+      <div class="a"><b>Al banco</b><span>Ritiro con scansione continua<br>Rientro con una sola scansione<br>Avviso sulle ceste ancora fuori<br>Nuovo cliente in un secondo</span></div>
+      <div class="b"><b>Al frantoio</b><span>Svuotamento a bottoni grandi<br>Contatori per portata<br>Ricerca di una singola cesta<br>Censimento ed etichette PDF</span></div>
+      <div class="c"><b>Dietro le quinte</b><span>Lista di recupero con telefono<br>Rettifiche con motivo<br>Registro di ogni azione<br>Campagne e operatori</span></div>
+    </div>
+
+    <h3>Principi del progetto</h3>
+    <ul>
+      <li><b>Il banco non è mai bloccato.</b> L'app registra quello che succede, non lo autorizza. Con la fila fuori, nessuna schermata si mette in mezzo.</li>
+      <li><b>Niente di ciò che è successo viene cancellato.</b> Una cesta persa o rotta esce dalla flotta con un motivo scritto accanto.</li>
+      <li><b>Le parole sono quelle del banco.</b> Si chiamano Ritiro, Rientro, Attesa molitura e Svuotamento, e nessuno deve tradurre nulla in mezzo alla fila.</li>
+      <li><b>Telefono prima di tutto.</b> Si usa con una mano, nel piazzale. Il tablet per lo svuotamento è un'aggiunta possibile.</li>
+      <li><b>Il recupero è il punto.</b> Nessuna cauzione. Il deterrente è la visibilità, al banco e in una lista di chi ha cosa da quanto.</li>
+    </ul>
+
+    <div class="box green">
+      <h4>Decisione architetturale</h4>
+      <p>Software custom DigitalBorders. Interfaccia web installabile sul telefono (PWA) su Vercel, dati e logica su Convex, accessi con email e password. Il gestionale OleaPlus già in uso resta dov'è e non viene mai scritto; la fatturazione resta fuori dall'app.</p>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>2</b></span></div>
+</section>
+
+<!-- ============================ 3 · AL BANCO: RITIRO E RIENTRO ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">02</span>Come funziona al banco</h2>
+    <p class="lead">Tre gesti: Ritiro, Rientro, Svuotamento. Ognuno in pochi secondi, ognuno sulla singola cesta.</p>
+
+    <h3>Ritiro</h3>
+    <p>L'operatore cerca il cliente per nome, o per soprannome quando ci sono omonimi, oppure lo crea al volo con il solo nome, perché i dati fiscali servono alla molitura e non alla fila. Poi <b>la fotocamera resta aperta</b>. Ogni QR inquadrato suona e si aggiunge alla lista, e sei ceste sono un gesto solo. Se un'etichetta è sporca o coperta, si digita il numero della cesta. Si possono aggiungere la firma del cliente e una foto del carico; nessuna delle due è obbligatoria.</p>
+    <div class="box pink">
+      <h4>L'avviso al banco</h4>
+      <p>Se il cliente davanti all'operatore ha già ceste fuori, l'app lo dice subito: <em>quali</em> ceste e <em>da quando</em>. È il momento in cui gliele si chiede indietro prima di dargliene altre, e la risposta quando «ne avevo prese due» e l'app dice tre.</p>
+    </div>
+
+    <h3>Rientro</h3>
+    <p>Nessuna ricerca. Si scansiona <b>una qualsiasi</b> delle ceste del carico e l'app dice di chi sono. Se ne tornano quattro su sei, le altre due restano contate come fuori. Le ceste rientrate passano in <em>Attesa molitura</em>, con il nome del cliente addosso, finché non vengono svuotate.</p>
+
+    <div class="shots three">
+      <figure>
+        <img data-src="../screenshots/ritiro/ritiro-telefono-avviso.png" alt="Ritiro con avviso al banco" data-ph="phone" data-label="Ritiro · fotocamera aperta e avviso «ha già 3 ceste fuori»">
+        <figcaption><b>Ritiro.</b> Lista delle ceste scansionate e avviso sulle ceste ancora fuori.</figcaption>
+      </figure>
+      <figure>
+        <img data-src="../screenshots/rientro/rientro-telefono-parziale.png" alt="Rientro parziale" data-ph="phone" data-label="Rientro · «Ceste di Salvatore Russo», 4 su 5 spuntate">
+        <figcaption><b>Rientro.</b> Una scansione, il nome del cliente, le sue ceste da spuntare.</figcaption>
+      </figure>
+      <figure>
+        <img data-src="../screenshots/svuotamento/svuotamento-telefono-tastierino.png" alt="Tastierino numerico" data-ph="phone" data-label="Tastierino numero">
+        <figcaption><b>Per numero.</b> Tastierino a tasti grandi quando il QR non si legge. Se la cesta non è dove l'app credeva, passa lo stesso e resta una Rettifica.</figcaption>
+      </figure>
+    </div>
+    <p class="note">Anteprime indicative con dati di esempio. L'aspetto definitivo lo rifiniamo con il frantoio durante la consegna.</p>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>3</b></span></div>
+</section>
+
+<!-- ============================ 4 · SVUOTAMENTO ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h3 style="margin-top:0">Svuotamento</h3>
+    <p>Il momento più difficile di tutto il flusso. Con le parole del frantoio, chi svuota ha le mani sporche e non prenderà mai in mano il telefono. Per questo la schermata è fatta di <b>bottoni grandi</b>, una cesta per bottone, raggruppati per cliente, con il cliente rientrato da più tempo in cima. Un tocco seleziona una cesta, un tocco sul nome le seleziona tutte, un solo pulsante conferma. Funziona uguale sul telefono e su un eventuale tablet fisso nel punto di svuotamento.</p>
+
+    <div class="shots two">
+      <figure>
+        <img data-src="../screenshots/svuotamento/svuotamento-telefono-selezione.png" alt="Svuotamento sul telefono" data-ph="phone" data-label="Svuotamento · telefono">
+        <figcaption><b>Sul telefono.</b> Un gruppo intero selezionato con «Tutte», più una cesta di un altro cliente.</figcaption>
+      </figure>
+      <figure>
+        <img data-src="../screenshots/svuotamento/svuotamento-tablet-selezione.png" alt="Svuotamento sul tablet" data-ph="tablet" data-label="Svuotamento · tablet">
+        <figcaption><b>Sul tablet.</b> Stessa schermata, più ceste per riga. Il pulsante «Svuota 9 Ceste» è sempre a portata di pollice.</figcaption>
+      </figure>
+    </div>
+
+    <div class="cols cols-2">
+      <div class="box grey">
+        <h4>Contatori e ricerca</h4>
+        <p>In ogni momento si vede quante ceste sono disponibili per portata (400 e 250 kg), quante sono fuori e quante aspettano la molitura. Per una singola cesta, digitando il numero, si vede dove l'app crede che sia e tutta la sua storia.</p>
+      </div>
+      <div class="box grey">
+        <h4>Su qualsiasi telefono</h4>
+        <p>Nessuna app da installare dagli store. Si apre dal browser e si aggiunge alla schermata iniziale. L'accesso dura tutta la campagna senza richiedere la password. Un ritiro iniziato sopravvive a un calo di rete o a un telefono che si spegne.</p>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>4</b></span></div>
+</section>
+
+<!-- ============================ 5 · RECUPERO ED ETICHETTE ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">03</span>Il recupero delle ceste</h2>
+    <p>Una cauzione non è nelle abitudini del frantoio, e non serve. Il deterrente è che si vede. Una lista di tutti i clienti che hanno ceste fuori, ordinata per chi le tiene da più tempo, con il numero di telefono accanto. Il recupero comincia dal caso peggiore, e per chiamare basta un tocco. Il frantoio decide dopo quanti giorni una cesta è «in ritardo»; quella soglia evidenzia i ritardi e nessuno esce dalla lista per questo.</p>
+
+    <div class="shots two">
+      <figure>
+        <img data-src="../screenshots/recupero/recupero-telefono-elenco.png" alt="Lista di recupero sul telefono" data-ph="phone" data-label="Lista di recupero · telefono">
+        <figcaption><b>Lista di recupero.</b> Chi ha cosa, da quanti giorni, e il telefono da chiamare.</figcaption>
+      </figure>
+      <div>
+        <div class="box frame">
+          <h4>Quando una cesta non torna</h4>
+          <p>Una cesta persa da un cliente, una rotta al frantoio e una scansionata per sbaglio sono tre fatti diversi. Ognuno si chiude con una Rettifica che porta il suo motivo, così i numeri dei furti non si mischiano con quelli delle rotture, e una cesta che ricompare torna in flotta senza cancellare nulla.</p>
+        </div>
+        <div class="box frame">
+          <h4>Il Registro</h4>
+          <p>Il titolare può rileggere ogni azione fatta nell'app, con chi l'ha fatta, quando e cosa ha cambiato, filtrando per giorno, per cliente o per operatore. Un ritiro di sei ceste è una riga sola.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:4mm"><span class="n">04</span>Le etichette e il censimento</h2>
+    <p>Oggi nessuna cesta è marcata. L'app assegna a ogni cesta un numero unico per tutta la flotta e lo stampa dentro un codice parlante, <b>400-R-017</b>, cioè portata, forma e numero, leggibile da una persona quanto da una fotocamera. Il titolare inserisce la flotta a lotti («50 ceste da 400 kg rettangolari»), l'app genera i numeri e un PDF con le etichette da consegnare alla tipografia. Un'etichetta strappata si ristampa identica; una cesta comprata a stagione in corso entra nello stesso modo.</p>
+
+    <div class="shots label">
+      <figure>
+        <img data-src="../screenshots/etichetta/etichetta-stampa-400-R-017.png" alt="Etichetta 400-R-017" data-ph="label" data-label="Etichetta · 400-R-017 con QR">
+        <figcaption><b>L'etichetta</b>, 100 × 150 mm.</figcaption>
+      </figure>
+      <div>
+        <div class="box pink">
+          <h4>Prerequisito bloccante</h4>
+          <p>Senza etichette l'app non ha nulla da tracciare. Consegniamo per primi il censimento e il PDF, così la tipografia stampa e le etichette sono sulle ceste prima che apra la campagna. Tempi e materiali della tipografia sono a cura del frantoio (vedi 07).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>5</b></span></div>
+</section>
+
+<!-- ============================ 6 · PAROLE E DECISIONI ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">05</span>Le parole del banco</h2>
+    <p class="lead">Le parole dell'app sono quelle raccolte al frantoio. Queste sono le uniche che servono.</p>
+    <dl class="gl">
+      <dt>Cesta</dt><dd>Il contenitore del frantoio in cui il cliente raccoglie e riporta le olive. Ha una portata (400 o 250 kg), una forma e un numero unico. Non si contano i pezzi, si sa quale.</dd>
+      <dt>Cliente</dt><dd>Chi porta via ceste vuote e le riporta piene. Basta il nome; telefono e soprannomi quando servono.</dd>
+      <dt>Ritiro</dt><dd>Il cliente porta via una o più ceste vuote. La cesta diventa <em>Fuori</em>.</dd>
+      <dt>Rientro</dt><dd>Le ceste tornano piene. La cesta passa in <em>Attesa molitura</em>, ancora a nome del cliente.</dd>
+      <dt>Svuotamento</dt><dd>La cesta viene rovesciata al frantoio. Torna <em>Disponibile</em>.</dd>
+      <dt>Rettifica</dt><dd>Una correzione con motivo obbligatorio: cesta persa dal cliente, rotta al frantoio, ritrovata, o registrata per errore. È l'unica strada per cui una cesta diventa <em>Dismessa</em>.</dd>
+      <dt>Campagna</dt><dd>Una stagione di raccolta e molitura. Una sola aperta alla volta; chiuderla non sposta nessuna cesta.</dd>
+      <dt>Etichetta e Codice</dt><dd>L'etichetta stampata con QR e codice parlante (<b>400-R-017</b>). Il numero è l'identità; il codice lo descrive.</dd>
+      <dt>Registro</dt><dd>La cronologia di ogni azione fatta nell'app: chi, quando, cosa è cambiato. Leggibile dal titolare.</dd>
+      <dt>Operatore e Admin</dt><dd>Chi sta al banco ha un accesso e ogni movimento porta il suo nome. L'Admin in più gestisce flotta, campagne, rettifiche e inviti.</dd>
+    </dl>
+
+    <h2 style="margin-top:4mm"><span class="n">06</span>Decisioni progettuali</h2>
+    <p class="small" style="margin-bottom:2mm">Scelte già prese con il frantoio durante l'analisi. Valgono per tutta la consegna e non comportano maggiorazioni.</p>
+    <div class="cols cols-2">
+      <div>
+        <h4>Ogni cesta ha un'identità</h4>
+        <ul>
+          <li>Si traccia <em>quale</em> cesta, non quante. È l'unico modo per sapere chi ne ha una in più.</li>
+          <li>Numeri assegnati dall'app, mai riusati. Una cesta dismessa tiene il suo numero per sempre.</li>
+          <li>Al banco si digita solo il numero; l'app mostra il codice completo per il controllo a colpo d'occhio.</li>
+          <li>La forma è sull'etichetta per leggerla, ma i conteggi sono per portata.</li>
+        </ul>
+        <h4>Il banco non è mai bloccato</h4>
+        <ul>
+          <li>Se una cesta scansionata non è dove l'app credeva, il movimento passa e resta una Rettifica. La cesta «di Tizio» sul rimorchio di Caio è il fatto mai visto finora.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Niente si cancella</h4>
+        <ul>
+          <li>Ceste, clienti e operatori si disattivano, non si eliminano; i movimenti restano attribuiti a chi li ha fatti.</li>
+          <li>Un movimento sbagliato si corregge con una Rettifica che dice dov'è davvero la cesta, senza far finta che non sia successo.</li>
+        </ul>
+        <h4>Cosa resta fuori, per scelta</h4>
+        <ul>
+          <li>La fatturazione. Servono dati fiscali completi, mentre il banco ha bisogno di un nome in un secondo. Restano due strumenti.</li>
+          <li>Il gestionale OleaPlus non viene mai scritto dall'app.</li>
+          <li>Firme e foto si conservano senza scadenza, salvo diversa indicazione.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>6</b></span></div>
+</section>
+
+<!-- ============================ 7 · CONSEGNA E OFFERTA ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">07</span>Consegna e tempi</h2>
+    <p class="lead">L'app è in uso dall'apertura della campagna 2026. Le etichette arrivano per prime, perché la tipografia è il vero tempo lungo.</p>
+    <div class="steps">
+      <div class="step"><div class="when">ENTRO IL 15 SETTEMBRE</div><b>Le etichette</b>
+        <ul><li>Accessi e primo Admin</li><li>Censimento della flotta</li><li>PDF delle etichette per la tipografia</li></ul></div>
+      <div class="step"><div class="when">ENTRO IL 30 SETTEMBRE</div><b>Il banco</b>
+        <ul><li>Ritiro con scansione e avviso</li><li>Rientro e rientro parziale</li><li>Svuotamento, contatori, ricerca</li><li>Lista di recupero</li></ul></div>
+      <div class="step"><div class="when">APERTURA CAMPAGNA</div><b>Il resto e il go-live</b>
+        <ul><li>Campagne, Rettifiche, Registro</li><li>Firma e foto sul Ritiro</li><li>Inviti agli operatori</li><li>Formazione al banco e avvio</li></ul></div>
+    </div>
+    <div class="box grey">
+      <p>I tempi decorrono dalla firma e dalla conferma di tre informazioni da parte del frantoio: la forma delle ceste da 250 kg; formato e materiale dell'etichetta richiesti dalla tipografia; se nome e telefono del frantoio vanno sull'etichetta. La stampa e l'applicazione fisica delle etichette sono a cura del frantoio.</p>
+    </div>
+
+    <h2 style="margin-top:6mm"><span class="n">08</span>Offerta economica</h2>
+    <table>
+      <tr><th>Fornitura</th><th>Perimetro</th><th class="r">Importo</th></tr>
+      <tr><td><b>Pendolino Ceste</b><br><span class="small">Applicazione completa come descritta ai punti 01–07</span></td>
+          <td>Censimento ed etichette; Ritiro, Rientro, Svuotamento; avviso al banco e lista di recupero; Rettifiche, Campagne, Registro; operatori e inviti; formazione e avvio</td>
+          <td class="r"><span class="strike">€ 9.800</span></td></tr>
+      <tr class="total"><td colspan="2">CONDIZIONE RISERVATA</td><td class="r">€ 3.000</td></tr>
+    </table>
+    <div class="box green">
+      <h4>Condizione riservata</h4>
+      <p>Il valore ordinario del progetto è € 9.800. Trattandosi della prima installazione in un frantoio e di un rapporto diretto, viene proposto a <b>€ 3.000</b> se confermato entro la validità del preventivo.</p>
+    </div>
+    <div class="cols cols-2">
+      <div>
+        <h4>Modalità di pagamento</h4>
+        <ul>
+          <li>50% alla conferma, 50% al go-live.</li>
+          <li>Termini di pagamento: 15 giorni data fattura.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Costi non inclusi</h4>
+        <ul>
+          <li>Stampa delle etichette in tipografia (circa 195 più scorta).</li>
+          <li>Eventuale tablet dedicato allo svuotamento.</li>
+          <li>Eventuale dominio dedicato.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>7</b></span></div>
+</section>
+
+<!-- ============================ 8 · CANONE, IDEE, RESPONSABILITÀ ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">09</span>Canone di manutenzione e continuità</h2>
+    <p class="small">L'applicazione richiede hosting gestito, backup, monitoraggio e aggiornamenti continuativi. Un solo piano, dimensionato su un frantoio che lavora pochi mesi l'anno.</p>
+    <table>
+      <tr><th>Piano</th><th>Canone</th><th>Incluso</th></tr>
+      <tr><td><b>Care Campagna</b></td><td class="r"><b>€ 500/anno</b><br><span class="small">circa € 42 al mese</span></td>
+          <td>Hosting, database, backup giornalieri, monitoraggio e aggiornamenti di sicurezza; assistenza prioritaria da ottobre a gennaio; 4 ore/anno di piccoli interventi e configurazioni. Attività extra: € 75/ora, previa autorizzazione.</td></tr>
+    </table>
+    <p class="small">Il canone decorre dal 31° giorno successivo al go-live ed è previsto finché DigitalBorders mantiene la responsabilità operativa dell'ambiente di produzione. Le ore incluse non sono cumulative; nuove funzioni restano separate.</p>
+
+    <h2 style="margin-top:6mm"><span class="n">10</span>Idee per dopo</h2>
+    <p class="small">Non incluse in questa offerta. Nascono da richieste emerse durante l'analisi; l'app è già predisposta per accoglierle senza rifare nulla.</p>
+    <ul>
+      <li><b>Specchio del gestionale OleaPlus.</b> I clienti già in anagrafica arrivano da soli al banco, in sola lettura; il gestionale non viene mai scritto.</li>
+      <li><b>Confronto tra campagne.</b> Quante ceste sono girate nella campagna 2026 rispetto alla 2027. Ha senso dalla seconda stagione; i dati si raccolgono dal primo giorno.</li>
+      <li><b>Avviso al cliente in ritardo.</b> Un messaggio WhatsApp o SMS dalla lista di recupero, con un tocco.</li>
+      <li><b>Tablet dedicato allo svuotamento</b> bloccato sulla sola schermata, nel punto di svuotamento.</li>
+      <li><b>Area cliente.</b> Ogni cliente vede da casa quante ceste ha e da quando.</li>
+    </ul>
+
+    <h2 style="margin-top:6mm"><span class="n">11</span>Attività e responsabilità</h2>
+    <div class="cols cols-2">
+      <div>
+        <h4 style="margin-top:1mm">A cura di DigitalBorders</h4>
+        <ul>
+          <li>Progettazione, sviluppo, test e messa in produzione.</li>
+          <li>Ambiente gestito, backup e monitoraggio secondo il piano attivo.</li>
+          <li>Una sessione di formazione al banco e supporto all'avvio.</li>
+          <li>Due cicli di revisione sul perimetro approvato.</li>
+          <li>30 giorni di garanzia correttiva dal go-live per anomalie riproducibili nel perimetro.</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="margin-top:1mm">A cura del frantoio</h4>
+        <ul>
+          <li>Le tre informazioni del punto 07 e i rapporti con la tipografia.</li>
+          <li>Applicazione delle etichette sulle ceste prima dell'apertura.</li>
+          <li>Wi-Fi nel punto di svuotamento; i telefoni degli operatori.</li>
+          <li>Prove con operatori veri durante il collaudo e approvazioni tempestive.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>8</b></span></div>
+</section>
+
+<!-- ============================ 9 · FUORI PERIMETRO, PROPRIETÀ, ACCETTAZIONE ============================ -->
+<section class="page">
+  <div class="hdr"><span class="brand">DIGITAL<b>BORDERS</b></span><span class="kind">PROPOSTA COMMERCIALE</span></div>
+  <div class="body">
+    <h2><span class="n">12</span>Fuori perimetro, proprietà e accettazione</h2>
+    <h4>Non incluso salvo nuova offerta</h4>
+    <ul>
+      <li>Fatturazione, olive, pesature, rese e molitura di qualsiasi tipo.</li>
+      <li>Lettura o scrittura del gestionale OleaPlus (vedi Idee per dopo).</li>
+      <li>App native iOS/Android, hardware, tablet, stampanti, installazioni fisiche.</li>
+      <li>Funzionamento senza rete, oltre al ritiro in corso che è già protetto.</li>
+      <li>Funzionalità non descritte o variazioni sostanziali richieste dopo l'approvazione.</li>
+    </ul>
+    <h4>Dati e proprietà del software</h4>
+    <ul>
+      <li>I dati appartengono al frantoio e possono essere esportati in formati ragionevoli.</li>
+      <li>A saldo, il cliente ottiene un diritto d'uso perpetuo del software <b>per il frantoio indicato</b>; l'uso in altre aziende o sedi è oggetto di un accordo separato.</li>
+      <li>Componenti generici, librerie, strumenti interni e know-how riutilizzabile restano di DigitalBorders.</li>
+      <li>L'eventuale consegna del repository completo o il subentro di terzi sarà regolato da un accordo specifico di handover.</li>
+    </ul>
+    <h4>Validità, garanzia e variazioni</h4>
+    <ul>
+      <li>Il preventivo è valido 30 giorni dalla data di emissione.</li>
+      <li>30 giorni di garanzia correttiva dal go-live per anomalie riproducibili riconducibili al perimetro; esclusi nuove funzioni, modifiche di terzi e variazioni dei servizi esterni.</li>
+      <li>Prima di attività fuori perimetro, DigitalBorders comunicherà impatto su prezzo e tempi e chiederà approvazione scritta.</li>
+      <li>L'avvio è subordinato alla firma, alla disponibilità delle informazioni necessarie e al pagamento dell'anticipo.</li>
+    </ul>
+
+    <div class="sign">
+      <div>
+        <div class="k">Per DigitalBorders</div>
+        <div class="row">Carmelo Fiorello</div>
+        <div class="row">26 agosto 2026</div>
+        <div class="row">Firma ______________________________</div>
+      </div>
+      <div>
+        <div class="k">Per il Cliente</div>
+        <div class="row">Gabriele</div>
+        <div class="row">Data ______________________________</div>
+        <div class="row">Firma ______________________________</div>
+      </div>
+    </div>
+
+    <div class="closing">
+      <div class="studio">DIGITALBORDERS / STUDIO</div>
+      <div class="claim">We build the products that don't fit one box.</div>
+      <div class="url">www.digitalborders.ai</div>
+    </div>
+  </div>
+  <div class="ftr"><span>digitalborders.ai · Software, hardware, AI &amp; immersive experiences</span><span class="pn">Pagina <b>9</b></span></div>
+</section>
+
+<script>
+  // Swap each screenshot in only if the file exists; otherwise show a labelled placeholder
+  // of the right proportions, so the PDF exports cleanly before #31 lands.
+  document.querySelectorAll('img[data-src]').forEach(function (img) {
+    var ph = document.createElement('div');
+    ph.className = 'ph ' + (img.dataset.ph || 'phone');
+    ph.textContent = 'Anteprima in preparazione · ' + (img.dataset.label || '');
+    img.addEventListener('error', function () { img.replaceWith(ph); });
+    img.src = img.dataset.src;
+  });
+</script>
+</body>
+</html>
