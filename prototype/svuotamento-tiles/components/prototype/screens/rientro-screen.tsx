@@ -8,7 +8,7 @@ import { CircleCheckIcon, CircleIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { CodiceRow } from "@/components/prototype/screens/codice-row"
-import { NumeroField } from "@/components/prototype/screens/numero-field"
+import { NumeroDialog } from "@/components/prototype/screens/numero-dialog"
 import { SCANSIONATA, useRientro } from "@/components/prototype/screens/use-rientro"
 import { Viewfinder } from "@/components/prototype/screens/viewfinder"
 import { cn } from "@/lib/utils"
@@ -29,7 +29,6 @@ export function RientroScreen() {
             ultimo={codiceOf(SCANSIONATA)}
             className="aspect-video md:aspect-4/3"
           />
-          <NumeroField onAdd={r.toggle} />
         </section>
 
         <section className="flex min-w-0 flex-col gap-2">
@@ -72,6 +71,25 @@ export function RientroScreen() {
             )
           })}
 
+          {r.rettifiche.map((n) => (
+            <CodiceRow
+              key={n}
+              numero={n}
+              onClick={() => r.toggle(n)}
+              className={cn(
+                r.spuntate.has(n) && "border-foreground bg-foreground text-background",
+                r.spuntate.has(n) && "[&_.text-muted-foreground]:text-background/70"
+              )}
+            >
+              <Badge variant="outline">Rettifica</Badge>
+              {r.spuntate.has(n) ? (
+                <CircleCheckIcon className="size-7" />
+              ) : (
+                <CircleIcon className="size-7 text-muted-foreground" />
+              )}
+            </CodiceRow>
+          ))}
+
           {r.restano.length > 0 && (
             <p className="px-1 text-sm text-muted-foreground">
               {cesteLabel(r.restano.length)}{" "}
@@ -89,7 +107,9 @@ export function RientroScreen() {
         count={r.spuntate.size}
         label={`Registra Rientro · ${cesteLabel(r.spuntate.size)}`}
         onConfirm={r.confirm}
-      />
+      >
+        <NumeroDialog onAdd={r.addByNumero} />
+      </ConfirmBar>
     </div>
   )
 }

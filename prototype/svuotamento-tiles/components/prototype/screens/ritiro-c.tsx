@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { CodiceRow } from "@/components/prototype/screens/codice-row"
+import { NumeroDialog } from "@/components/prototype/screens/numero-dialog"
 import { ScannerOverlay } from "@/components/prototype/screens/scanner-overlay"
 import { useRitiro } from "@/components/prototype/screens/use-ritiro"
 import { cesteLabel } from "@/lib/use-svuotamento"
@@ -23,7 +24,6 @@ export function RitiroC() {
     <div className="flex min-h-svh flex-col pb-28">
       <ScannerOverlay
         ultimo={r.ultimo ? codiceOf(r.ultimo) : undefined}
-        onAdd={r.add}
         title={
           <>
             <p className="text-xs tracking-wide uppercase text-white/70">Ritiro</p>
@@ -94,7 +94,9 @@ export function RitiroC() {
         count={r.lista.length}
         label={`Conferma Ritiro · ${cesteLabel(r.lista.length)}`}
         onConfirm={r.confirm}
-      />
+      >
+        <NumeroDialog onAdd={r.add} />
+      </ConfirmBar>
     </div>
   )
 }

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { CodiceRow } from "@/components/prototype/screens/codice-row"
-import { NumeroField } from "@/components/prototype/screens/numero-field"
+import { NumeroDialog } from "@/components/prototype/screens/numero-dialog"
 import { useRitiro } from "@/components/prototype/screens/use-ritiro"
 import { Viewfinder } from "@/components/prototype/screens/viewfinder"
 import { cesteLabel } from "@/lib/use-svuotamento"
@@ -56,7 +56,6 @@ export function RitiroScreen() {
             ultimo={r.ultimo ? codiceOf(r.ultimo) : undefined}
             className="aspect-4/3"
           />
-          <NumeroField onAdd={r.add} />
         </section>
 
         <section className="flex min-w-0 flex-col gap-2">
@@ -89,7 +88,9 @@ export function RitiroScreen() {
         count={r.lista.length}
         label={`Conferma Ritiro · ${cesteLabel(r.lista.length)}`}
         onConfirm={r.confirm}
-      />
+      >
+        <NumeroDialog onAdd={r.add} />
+      </ConfirmBar>
     </div>
   )
 }

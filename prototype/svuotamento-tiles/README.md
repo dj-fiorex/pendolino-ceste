@@ -23,9 +23,10 @@ on `?variant=A|B|C` (names in `lib/variants.ts`):
 
 - `/prototype/ritiro` — Ritiro with the warning at the counter (#16, #22, #23).
   **A** scanner on top, warning as an Alert, list as rows · **B** list as
-  96 px tiles, scanner and numero field docked at the bottom, warning as a
-  strip of chips · **C** camera edge to edge with the field over it, this
-  Ritiro and the Ceste already Fuori as two lists.
+  96 px tiles, scanner thumbnail docked at the bottom, warning as a strip
+  of chips · **C** camera edge to edge, this Ritiro and the Ceste already
+  Fuori as two lists. Manual entry everywhere is the "Numero" key of #18:
+  the keypad in a Dialog with the Codice echoed, never the device keyboard.
 - `/prototype/recupero` — the recovery list (#22, Admin). **A** one card per
   Cliente with Codici as chips · **B** a table, Codici behind a chevron ·
   **C** three bands by days Fuori, a days tile and a round call button per row.

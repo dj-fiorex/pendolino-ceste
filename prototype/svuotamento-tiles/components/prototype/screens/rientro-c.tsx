@@ -8,6 +8,7 @@ import { ArrowDownIcon, ArrowUpIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ConfirmBar } from "@/components/prototype/confirm-bar"
 import { CodiceRow } from "@/components/prototype/screens/codice-row"
+import { NumeroDialog } from "@/components/prototype/screens/numero-dialog"
 import { ScannerOverlay } from "@/components/prototype/screens/scanner-overlay"
 import { SCANSIONATA, useRientro } from "@/components/prototype/screens/use-rientro"
 import { cesteLabel } from "@/lib/use-svuotamento"
@@ -21,7 +22,6 @@ export function RientroC() {
     <div className="flex min-h-svh flex-col pb-28">
       <ScannerOverlay
         ultimo={codiceOf(SCANSIONATA)}
-        onAdd={r.toggle}
         title={
           <>
             <p className="text-xs tracking-wide uppercase text-white/70">Rientro</p>
@@ -41,6 +41,7 @@ export function RientroC() {
           {r.rientrano.map((n) => (
             <CodiceRow key={n} numero={n} onClick={() => r.toggle(n)}>
               {n === SCANSIONATA && <Badge variant="secondary">Scansionata</Badge>}
+              {r.rettifiche.includes(n) && <Badge variant="outline">Rettifica</Badge>}
               <ArrowDownIcon className="size-5 text-muted-foreground md:hidden" />
             </CodiceRow>
           ))}
@@ -87,7 +88,9 @@ export function RientroC() {
         count={r.spuntate.size}
         label={`Registra Rientro · ${cesteLabel(r.spuntate.size)}`}
         onConfirm={r.confirm}
-      />
+      >
+        <NumeroDialog onAdd={r.addByNumero} />
+      </ConfirmBar>
     </div>
   )
 }

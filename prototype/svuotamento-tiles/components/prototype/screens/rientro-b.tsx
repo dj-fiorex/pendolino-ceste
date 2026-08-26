@@ -43,7 +43,7 @@ export function RientroB() {
           <span>{cesteLabel(r.spuntate.size)}</span>
         </h2>
         <div className="flex flex-wrap gap-2">
-          {r.prestito.numeri.map((n) => (
+          {[...r.prestito.numeri, ...r.rettifiche].map((n) => (
             <Tile
               key={n}
               cesta={fleet[n - 1]}
@@ -74,7 +74,7 @@ export function RientroB() {
 
       <ScannerDock
         ultimo={codiceOf(SCANSIONATA)}
-        onAdd={r.toggle}
+        onAdd={r.addByNumero}
         label={`Registra Rientro · ${cesteLabel(r.spuntate.size)}`}
         disabled={r.spuntate.size === 0}
         onConfirm={r.confirm}
