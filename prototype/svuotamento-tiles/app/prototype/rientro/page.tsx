@@ -1,14 +1,32 @@
 "use client"
-// PROTOTYPE (#31) — bare Rientro screen. ?tema=scuro for dark, ?embed=1 from the harness.
+// PROTOTYPE (#31) — the Rientro screen, three variants on ?variant=A|B|C.
+// ?tema=scuro for dark, ?embed=1 hides the switcher (used by the harness).
 
 import * as React from "react"
 
+import { PrototypeSwitcher } from "@/components/prototype/switcher"
+import { RientroB } from "@/components/prototype/screens/rientro-b"
+import { RientroC } from "@/components/prototype/screens/rientro-c"
 import { RientroScreen } from "@/components/prototype/screens/rientro-screen"
-import { useTemaParam } from "@/components/prototype/screens/use-tema-param"
+import { useScreenParams } from "@/components/prototype/screens/use-screen-params"
+import { SCREEN_VARIANTS } from "@/lib/variants"
 
 function Screen() {
-  useTemaParam()
-  return <RientroScreen />
+  const { variant, setVariant, embed } = useScreenParams()
+  return (
+    <>
+      {variant === "A" && <RientroScreen />}
+      {variant === "B" && <RientroB />}
+      {variant === "C" && <RientroC />}
+      {!embed && (
+        <PrototypeSwitcher
+          current={variant}
+          onChange={setVariant}
+          variants={SCREEN_VARIANTS.rientro}
+        />
+      )}
+    </>
+  )
 }
 
 export default function Page() {

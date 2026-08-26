@@ -1,14 +1,32 @@
 "use client"
-// PROTOTYPE (#31) — bare Ritiro screen. ?tema=scuro for dark, ?embed=1 from the harness.
+// PROTOTYPE (#31) — the Ritiro screen, three variants on ?variant=A|B|C.
+// ?tema=scuro for dark, ?embed=1 hides the switcher (used by the harness).
 
 import * as React from "react"
 
+import { PrototypeSwitcher } from "@/components/prototype/switcher"
+import { RitiroB } from "@/components/prototype/screens/ritiro-b"
+import { RitiroC } from "@/components/prototype/screens/ritiro-c"
 import { RitiroScreen } from "@/components/prototype/screens/ritiro-screen"
-import { useTemaParam } from "@/components/prototype/screens/use-tema-param"
+import { useScreenParams } from "@/components/prototype/screens/use-screen-params"
+import { SCREEN_VARIANTS } from "@/lib/variants"
 
 function Screen() {
-  useTemaParam()
-  return <RitiroScreen />
+  const { variant, setVariant, embed } = useScreenParams()
+  return (
+    <>
+      {variant === "A" && <RitiroScreen />}
+      {variant === "B" && <RitiroB />}
+      {variant === "C" && <RitiroC />}
+      {!embed && (
+        <PrototypeSwitcher
+          current={variant}
+          onChange={setVariant}
+          variants={SCREEN_VARIANTS.ritiro}
+        />
+      )}
+    </>
+  )
 }
 
 export default function Page() {

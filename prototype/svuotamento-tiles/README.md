@@ -17,15 +17,27 @@ floating pill or the `←` `→` keys, on `?variant=A|B|C`:
 
 ## Reference screens for the preventivo (#31)
 
-Pictures for a document, not design research: one take each, same
-typography, tiles and themes as variant B above, fake data from
-`lib/prototype-fuori.ts`.
+Same typography, tiles and themes as variant B above, fake data from
+`lib/prototype-fuori.ts`. Three structurally different variants per screen,
+on `?variant=A|B|C` (names in `lib/variants.ts`):
 
 - `/prototype/ritiro` — Ritiro with the warning at the counter (#16, #22, #23).
-- `/prototype/recupero` — the recovery list (#22, Admin).
-- `/prototype/etichetta` — the Etichette PDF preview (#29); `/prototype/etichetta/stampa`
-  renders the single label at 300 dpi (1181 × 1772 px) for the print-proportion PNG.
+  **A** scanner on top, warning as an Alert, list as rows · **B** list as
+  96 px tiles, scanner and numero field docked at the bottom, warning as a
+  strip of chips · **C** camera edge to edge with the field over it, this
+  Ritiro and the Ceste already Fuori as two lists.
+- `/prototype/recupero` — the recovery list (#22, Admin). **A** one card per
+  Cliente with Codici as chips · **B** a table, Codici behind a chevron ·
+  **C** three bands by days Fuori, a days tile and a round call button per row.
+- `/prototype/etichetta` — the Etichette PDF preview (#29). **A** one page
+  centred · **B** the range as a sheet of labels with the Admin settings
+  beside it · **C** the fleet as a tick list with the ticked label previewed.
+  `/prototype/etichetta/stampa` renders the single label at 300 dpi
+  (1181 × 1772 px) for the print-proportion PNG.
 - `/prototype/rientro` — Rientro with a partial return (#17, story 24).
+  **A** scanner on top, Ceste as rows to tick · **B** Ceste as tiles, scanner
+  docked at the bottom · **C** camera edge to edge, "Rientrano" and "Restano
+  Fuori" as two lists a tap moves Ceste between.
 
 Every screen takes `?tema=scuro` for the dark theme and `?embed=1` to hide
 the switcher.

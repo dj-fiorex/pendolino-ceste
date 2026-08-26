@@ -1,24 +1,23 @@
 "use client"
-// PROTOTYPE (#30) — floating variant switcher. Top-centre rather than the
-// usual bottom-centre because the screen under test owns the bottom edge
-// with its fixed confirm bar.
+// PROTOTYPE (#30, #31) — floating variant switcher. Top-centre rather than
+// the usual bottom-centre because the screens under test own the bottom
+// edge with their fixed confirm bars.
 
 import * as React from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  isVariantKey,
+  SCREEN_VARIANTS,
+  type Variant,
+  type VariantKey,
+} from "@/lib/variants"
 
-export const VARIANTS = [
-  { key: "A", name: "Griglia 64" },
-  { key: "B", name: "Schede 96" },
-  { key: "C", name: "Per Cliente 80" },
-] as const
+export { isVariantKey, type VariantKey }
 
-export type VariantKey = (typeof VARIANTS)[number]["key"]
-
-export function isVariantKey(value: string | null): value is VariantKey {
-  return VARIANTS.some((v) => v.key === value)
-}
+/** The Svuotamento list, kept for the #30 page. */
+export const VARIANTS = SCREEN_VARIANTS.svuotamento
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
@@ -32,13 +31,18 @@ function isTypingTarget(target: EventTarget | null) {
 export function PrototypeSwitcher({
   current,
   onChange,
+  variants = VARIANTS,
 }: {
   current: VariantKey
   onChange: (key: VariantKey) => void
+  variants?: readonly Variant[]
 }) {
-  const index = VARIANTS.findIndex((v) => v.key === current)
-  const prev = VARIANTS[(index - 1 + VARIANTS.length) % VARIANTS.length].key
-  const next = VARIANTS[(index + 1) % VARIANTS.length].key
+  const index = Math.max(
+    0,
+    variants.findIndex((v) => v.key === current)
+  )
+  const prev = variants[(index - 1 + variants.length) % variants.length].key
+  const next = variants[(index + 1) % variants.length].key
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -64,7 +68,7 @@ export function PrototypeSwitcher({
         <span className="sr-only">Variante precedente</span>
       </Button>
       <span className="px-2 font-mono text-xs">
-        {current} ({VARIANTS[index].name})
+        {variants[index].key} ({variants[index].name})
       </span>
       <Button
         variant="ghost"

@@ -17,12 +17,14 @@ function mm(n: number) {
 export function Etichetta({
   codice,
   pxPerMm,
-  frantoio = true,
+  nome = true,
+  telefono = true,
 }: {
   codice: string
   pxPerMm: number
-  /** The Admin setting: mill's name and phone on the label. */
-  frantoio?: boolean
+  /** The Admin settings: mill's name and phone on the label. */
+  nome?: boolean
+  telefono?: boolean
 }) {
   const [portata, forma, numero] = codice.split("-")
   const qr = 52
@@ -63,12 +65,8 @@ export function Etichetta({
         className="flex flex-col items-center text-center leading-tight"
         style={{ fontSize: mm(4.5), minHeight: mm(11) }}
       >
-        {frantoio && (
-          <>
-            <span className="font-medium">{FRANTOIO.nome}</span>
-            <span className="tabular-nums">{FRANTOIO.telefono}</span>
-          </>
-        )}
+        {nome && <span className="font-medium">{FRANTOIO.nome}</span>}
+        {telefono && <span className="tabular-nums">{FRANTOIO.telefono}</span>}
       </div>
     </div>
   )

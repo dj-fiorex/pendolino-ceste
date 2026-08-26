@@ -1,8 +1,7 @@
 "use client"
 // PROTOTYPE (#30, #31) — harness: one prototype screen inside a phone or
-// tablet frame. The Svuotamento keeps its three variants and the switcher;
-// the #31 screens (Ritiro, recupero, Etichetta, Rientro) are single takes for
-// the preventivo. Open /prototype/<screen> for the bare screen.
+// tablet frame, with the variant switcher. Every screen has three variants
+// on ?variant=A|B|C. Open /prototype/<screen> for the bare screen.
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -10,11 +9,13 @@ import { ExternalLinkIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { PrototypeSwitcher } from "@/components/prototype/switcher"
 import {
   isVariantKey,
-  PrototypeSwitcher,
+  SCREEN_VARIANTS,
+  type ScreenKey,
   type VariantKey,
-} from "@/components/prototype/switcher"
+} from "@/lib/variants"
 
 const DEVICES = {
   phone: { label: "Telefono 390 × 844", width: 390, height: 844 },
@@ -23,18 +24,16 @@ const DEVICES = {
 
 type DeviceKey = keyof typeof DEVICES
 
-const SCREENS = {
-  svuotamento: { label: "Svuotamento", variants: true },
-  ritiro: { label: "Ritiro", variants: false },
-  recupero: { label: "Recupero", variants: false },
-  etichetta: { label: "Etichetta", variants: false },
-  rientro: { label: "Rientro", variants: false },
-} as const
-
-type ScreenKey = keyof typeof SCREENS
+const SCREEN_LABELS: Record<ScreenKey, string> = {
+  svuotamento: "Svuotamento",
+  ritiro: "Ritiro",
+  recupero: "Recupero",
+  etichetta: "Etichetta",
+  rientro: "Rientro",
+}
 
 function isScreenKey(value: string | null): value is ScreenKey {
-  return value !== null && value in SCREENS
+  return value !== null && value in SCREEN_VARIANTS
 }
 
 function Harness() {
@@ -60,9 +59,7 @@ function Harness() {
   )
 
   const { width, height } = DEVICES[device]
-  const query = new URLSearchParams({ tema })
-  if (SCREENS[screen].variants) query.set("variant", variant)
-  const bare = `/prototype/${screen}?${query.toString()}`
+  const bare = `/prototype/${screen}?variant=${variant}&tema=${tema}`
   const src = `${bare}&embed=1`
 
   return (
@@ -73,9 +70,9 @@ function Harness() {
           onValueChange={(v) => v[0] && set({ screen: String(v[0]) })}
           variant="outline"
         >
-          {Object.entries(SCREENS).map(([key, s]) => (
+          {Object.entries(SCREEN_LABELS).map(([key, label]) => (
             <ToggleGroupItem key={key} value={key}>
-              {s.label}
+              {label}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -107,24 +104,25 @@ function Harness() {
           Apri a schermo intero
         </Button>
         <span className="text-sm text-muted-foreground">
-          stato in memoria, si azzera al cambio
-          {SCREENS[screen].variants && " · ← → cambiano variante"}
+          ← → cambiano variante · stato in memoria, si azzera al cambio
         </span>
       </div>
       <div className="overflow-auto">
         <iframe
           key={`${screen}-${variant}-${device}-${tema}`}
           src={src}
-          title={`${SCREENS[screen].label}, ${DEVICES[device].label}`}
+          title={`${SCREEN_LABELS[screen]} — variante ${variant}, ${DEVICES[device].label}`}
           width={width}
           height={height}
           className="shrink-0 rounded-2xl border bg-background shadow-xl"
           style={{ width, height }}
         />
       </div>
-      {SCREENS[screen].variants && (
-        <PrototypeSwitcher current={variant} onChange={(key) => set({ variant: key })} />
-      )}
+      <PrototypeSwitcher
+        current={variant}
+        onChange={(key) => set({ variant: key })}
+        variants={SCREEN_VARIANTS[screen]}
+      />
     </div>
   )
 }
