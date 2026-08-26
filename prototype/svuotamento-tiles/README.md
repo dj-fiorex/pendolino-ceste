@@ -58,3 +58,10 @@ the bare screen at the window's own size.
 State is in memory and resets on reload or on switching variant. The
 `screenshots/` folder holds what was judged for #30; the #31 set is on
 `main` under `docs/screenshots/`.
+
+## Verdict (#31, 2026-08-26)
+
+Chosen for the preventivo, by the owner from the harness: **Ritiro B**,
+**recupero A**, **Etichette B**, **Rientro B**. The PNGs on `main` under
+`docs/screenshots/` come from these; the other variants stay here as the
+primary source.
