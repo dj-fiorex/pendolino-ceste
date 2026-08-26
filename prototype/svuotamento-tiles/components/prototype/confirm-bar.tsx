@@ -1,15 +1,19 @@
 "use client"
 // PROTOTYPE (#30) — the fixed, full-width "Svuota N Ceste" bar.
+// #31 adds `label`, so the same bar reads "Conferma Ritiro · 4 Ceste".
 
 import { Button } from "@/components/ui/button"
 import { confirmLabel } from "@/lib/use-svuotamento"
 
 export function ConfirmBar({
   count,
+  label,
   onConfirm,
   children,
 }: {
   count: number
+  /** Button text; defaults to the Svuotamento wording. */
+  label?: string
   onConfirm: () => void
   /** Optional extra control (e.g. the keypad trigger) beside the button. */
   children?: React.ReactNode
@@ -23,7 +27,7 @@ export function ConfirmBar({
         disabled={count === 0}
         onClick={onConfirm}
       >
-        {confirmLabel(count)}
+        {label ?? confirmLabel(count)}
       </Button>
     </div>
   )
