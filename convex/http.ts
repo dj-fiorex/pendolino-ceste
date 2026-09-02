@@ -2,8 +2,13 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { questionnairePage } from "./questionnairePage";
+import { authComponent, createAuth } from "./auth";
 
 const http = httpRouter();
+
+// Better Auth serves sign-in, sign-out and session refresh from this router
+// (ADR-0008).
+authComponent.registerRoutes(http, createAuth);
 
 // The /questionario paths stay Italian: the mill has this URL and it must not break.
 http.route({

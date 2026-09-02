@@ -1,0 +1,94 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* The app has no theme switch: the device decides, as the questionnaire did. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* The mill's palette, carried over from the requirements questionnaire so that
+   the app looks like the thing they have already seen. */
+:root {
+  --radius: 0.75rem;
+
+  --background: #faf8f3;
+  --foreground: #2a2e24;
+  --card: #ffffff;
+  --card-foreground: #2a2e24;
+  --popover: #ffffff;
+  --popover-foreground: #2a2e24;
+  --primary: #4a6741;
+  --primary-foreground: #faf8f3;
+  --secondary: #eef2ea;
+  --secondary-foreground: #35502f;
+  --muted: #eef2ea;
+  --muted-foreground: #5c6152;
+  --accent: #eef2ea;
+  --accent-foreground: #35502f;
+  --destructive: #a03024;
+  --border: #ddd8ca;
+  --input: #ddd8ca;
+  --ring: #4a6741;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1c1f18;
+    --foreground: #e9e6dc;
+    --card: #262a21;
+    --card-foreground: #e9e6dc;
+    --popover: #262a21;
+    --popover-foreground: #e9e6dc;
+    --primary: #8fae7e;
+    --primary-foreground: #1c1f18;
+    --secondary: #2e362a;
+    --secondary-foreground: #c9ddbc;
+    --muted: #2e362a;
+    --muted-foreground: #a8ac9c;
+    --accent: #2e362a;
+    --accent-foreground: #c9ddbc;
+    --destructive: #f2b8b5;
+    --border: #3a3f33;
+    --input: #3a3f33;
+    --ring: #8fae7e;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-source-sans);
+  --font-display: var(--font-bricolage);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* The counter uses this one-handed on a phone: never let it zoom-bounce. */
+    -webkit-text-size-adjust: 100%;
+  }
+}
