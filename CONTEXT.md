@@ -13,7 +13,7 @@ A reusable container owned by the mill, in which a Cliente harvests and brings b
 _Avoid_: Bin, bins, cassetta, crate
 
 **Cliente** (customer):
-Whoever takes empty Ceste away from the mill and brings them back loaded with olives for milling. Identified by name, by any Alias, and, where given, phone number. May or may not correspond to a record in the Gestionale; when it does, the two are tied by that record's `gestionaleId`.
+Whoever takes empty Ceste away from the mill and brings them back loaded with olives for milling. Identified by name, by any Alias, and, where given, phone number. Two Clienti never share the same name and Alias: a namesake is told apart by an Alias or is the same person. May or may not correspond to a record in the Gestionale; when it does, the two are tied by that record's `gestionaleId`.
 _Avoid_: Utente, user, client
 
 **Alias**:
@@ -25,7 +25,7 @@ The invoicing software the mill already runs on an always-on PC — OleaPlus, an
 _Avoid_: ERP, management system, billing software, accounting system, OleaPlus (in code: the app knows a Gestionale, not a brand)
 
 **Campagna** (season):
-One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one").
+One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one"). Opened, closed and, if need be, reopened by an Admin; at most one is open at a time, and closing it moves no Cesta. Every Movimento belongs to a Campagna: the open one, or, when none is open, the one the Operatore names on the spot, which stays closed.
 _Avoid_: Stagione, season, annata, year
 
 ### Fleet
@@ -74,7 +74,7 @@ Mill staff who register the Movimenti of a Campagna: Ritiri and Rientri at the c
 _Avoid_: Utente, user, staff
 
 **Admin**:
-An Operatore who can additionally act on the fleet, the registry and the staff rather than only on the day's movements — linking a Cliente to a Gestionale record, recording a Rettifica, and inviting further Operatori.
+An Operatore who can additionally act on the fleet, the registry, the Campagne and the staff rather than only on the day's movements — linking a Cliente to a Gestionale record, recording a Rettifica, opening and closing a Campagna, and inviting further Operatori or Admin.
 _Avoid_: Titolare, owner, superuser
 
 ### Movements
@@ -96,11 +96,23 @@ The Cesta is tipped out at the mill and its paper tape comes off. Attesa molitur
 _Avoid_: Scarico, unload, release, cesta vuota
 
 **Rettifica** (adjustment):
-A correction to a Cesta's whereabouts that no Ritiro or Rientro explains — a Cesta written off as lost, one that turns up again, or one whose last Movimento was registered wrongly. Carries a reason, because losing a Cesta to a Cliente, breaking one at the mill and mis-scanning one at the counter are different facts.
-_Avoid_: Fix, correction, writeoff, annullamento
+A correction to a Cesta's whereabouts that no Ritiro or Rientro explains. Carries one of five reasons, because they are different facts: *persa* (lost to a Cliente, the Cesta becomes Dismessa), *rotta* (broken at the mill, Dismessa), *ritrovata* (turned up again; the Admin says whether it is Disponibile or Fuori with a Cliente), *errore* (the last Movimento was registered wrongly, and the Admin says where the Cesta really is) and *discrepanza* (a scanned Cesta was not in the state the app expected; written by the app itself, under the Operatore at the counter, as the Movimento goes through). The first four are recorded by an Admin only. A note may accompany any of them.
+_Avoid_: Fix, correction, writeoff, annullamento, cancellazione
 
 ### Supervision
 
 **Registro** (activity record):
-The record of every action taken in the app — who did it, when, and what it changed. Read by Admin only.
+The record of every action taken in the app — who did it, when, and what it changed. A Ritiro of six Ceste is one entry, and so are the Rettifiche the app wrote while recording it. Read by Admin only.
 _Avoid_: Log, audit log, audit trail, storico, cronologia, diario, attività
+
+**Lista di recupero** (recovery list):
+Every Cliente holding Ceste Fuori, worst first: who has which Ceste, since when, and the phone to call. Nobody leaves the list for being late or for being deactivated; only a Rientro or a Rettifica takes a Cesta off it. Readable by every Operatore.
+_Avoid_: Solleciti, morosi, ritardatari, overdue list
+
+**In ritardo** (late):
+A Cesta Fuori for more days than the Soglia di ritardo. Highlighted on the Lista di recupero and nothing else: being late changes no state.
+_Avoid_: Scaduta, overdue, expired
+
+**Soglia di ritardo** (late threshold):
+The number of days after which a Cesta Fuori counts as In ritardo. One value for the whole mill, set by an Admin.
+_Avoid_: Timeout, scadenza, limite

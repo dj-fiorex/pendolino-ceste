@@ -23,3 +23,7 @@ The mirror's columns and the app's own columns are kept apart rather than reconc
 A Cliente that disappears from the Gestionale is marked inactive and nothing else about it is touched. It is never deleted, and least of all when it has Ceste Fuori: an archived old record in the mill's invoicing software says nothing about whether that person is currently holding three Ceste, and a cascading delete would drop them out of the count silently, which is the one failure this app cannot afford. The daemon treats an absence as *I no longer know*, never as *this person does not exist*.
 
 Which fields the mirror carries is not settled here, and waits on seeing the Gestionale's actual schema. The standing constraint is to carry the fewest that make the counter work — this is a third party's customer registry being copied into a cloud database, and every column copied is a column to account for.
+
+## Delivery note (2026-09-02)
+
+The daemon is not part of the first delivery (preventivo DB-2026-GB-001 lists it under "Idee per dopo"). The decision stands: the Cliente keeps its `gestionaleId` and the mirror's columns stay separate from the app's own, so that the daemon can arrive later without a migration. Until it does, `gestionaleId` is simply never set and the linking screen is not built.
