@@ -66,7 +66,7 @@ export const censimento = mutation({
         codice: codiceOf(args.portata, args.forma, numero),
         // Every Cesta starts at the mill, empty, ready for the next Cliente.
         stato: "disponibile",
-        attivo: true,
+        active: true,
       });
     }
 
@@ -132,10 +132,10 @@ export const disponibiliByPortata = query({
       .collect();
     // A Dismessa Cesta is not Disponibile anyway, but every count filters on
     // the active flag regardless (ADR-0004).
-    const active = disponibili.filter((cesta) => cesta.attivo);
+    const activeCeste = disponibili.filter((cesta) => cesta.active);
     return PORTATE.map((portata) => ({
       portata,
-      count: active.filter((cesta) => cesta.portata === portata).length,
+      count: activeCeste.filter((cesta) => cesta.portata === portata).length,
     }));
   },
 });

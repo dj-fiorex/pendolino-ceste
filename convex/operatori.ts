@@ -26,7 +26,7 @@ export async function currentOperatore(
     .query("operatori")
     .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
     .unique();
-  if (operatore === null || !operatore.attivo) {
+  if (operatore === null || !operatore.active) {
     return null;
   }
   return operatore;
@@ -105,7 +105,7 @@ export const create = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.db.insert("operatori", { ...args, attivo: true });
+    await ctx.db.insert("operatori", { ...args, active: true });
     return null;
   },
 });

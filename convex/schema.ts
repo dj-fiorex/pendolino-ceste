@@ -59,7 +59,7 @@ export default defineSchema({
     nome: v.string(),
     email: v.string(),
     ruolo,
-    attivo: v.boolean(),
+    active: v.boolean(),
   }).index("by_authUserId", ["authUserId"]),
 
   // The fleet. A Cesta's numero, portata, forma and codice are settled at
@@ -71,7 +71,7 @@ export default defineSchema({
     forma,
     codice: v.string(),
     stato,
-    attivo: v.boolean(),
+    active: v.boolean(),
   })
     // Also the sequence: the highest numero handed out so far is the first row
     // of this index read backwards.
