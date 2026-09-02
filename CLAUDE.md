@@ -2,11 +2,14 @@
 
 ## Language
 
-**All code, documentation and comments are written in English.** This includes identifiers, file names, commit messages, ADRs and `CONTEXT.md`.
+**All code, documentation and comments are written in English.** This includes identifiers, table and field names, route paths, file names, commit messages, ADRs and `CONTEXT.md`.
 
 Two deliberate exceptions:
 
 - **Domain terms stay Italian.** The terms in `CONTEXT.md` (`Cesta`, `Ritiro`, `Rientro`, `Attesa molitura`, `Campagna`) are the mill staff's own words, captured verbatim during requirements gathering. They are proper nouns: use them untranslated in identifiers, types and status values, so that what the app says matches what the counter says. Write the surrounding prose in English.
+
+  The exception covers those terms and nothing else. An Italian word `CONTEXT.md` does not define is not a domain term, it is a coinage — `flotta` for the set of Ceste, say — and a coinage gives the codebase a second vocabulary the mill never uses. Reach for the term the glossary already has (`Cesta`), or, where the concept is not a domain one at all, for the English word. A concept that is genuinely missing from the glossary is a gap to raise with `/domain-modeling`, not a licence to name it yourself.
+
 - **Text shown to the mill staff or to their customers is Italian.** UI copy, labels and error messages are written for an Italian-speaking frantoio. Their surrounding code and comments are still English.
 
 ## Agent skills
