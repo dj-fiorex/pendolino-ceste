@@ -4,8 +4,9 @@
 /* The app has no theme switch: the device decides, as the questionnaire did. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
-/* The mill's palette, carried over from the requirements questionnaire so that
-   the app looks like the thing they have already seen. */
+/* The mill's palette, carried over from the requirements questionnaire
+   (docs/questionario) so that the app looks like the thing they have already
+   seen. */
 :root {
   --radius: 0.75rem;
 

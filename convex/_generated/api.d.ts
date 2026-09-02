@@ -11,8 +11,6 @@
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as operatori from "../operatori.js";
-import type * as questionnaire from "../questionnaire.js";
-import type * as questionnairePage from "../questionnairePage.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -25,8 +23,6 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
   operatori: typeof operatori;
-  questionnaire: typeof questionnaire;
-  questionnairePage: typeof questionnairePage;
   seed: typeof seed;
 }>;
 

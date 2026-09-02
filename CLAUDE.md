@@ -7,7 +7,7 @@
 Two deliberate exceptions:
 
 - **Domain terms stay Italian.** The terms in `CONTEXT.md` (`Cesta`, `Ritiro`, `Rientro`, `Attesa molitura`, `Campagna`) are the mill staff's own words, captured verbatim during requirements gathering. They are proper nouns: use them untranslated in identifiers, types and status values, so that what the app says matches what the counter says. Write the surrounding prose in English.
-- **Text shown to the mill staff or to their customers is Italian.** UI copy, labels, error messages and the requirements questionnaire are written for an Italian-speaking frantoio. Their surrounding code and comments are still English.
+- **Text shown to the mill staff or to their customers is Italian.** UI copy, labels and error messages are written for an Italian-speaking frantoio. Their surrounding code and comments are still English.
 
 ## Agent skills
 
