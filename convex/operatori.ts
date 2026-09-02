@@ -6,7 +6,7 @@ import {
   query,
   type QueryCtx,
 } from "./_generated/server";
-import { ruolo } from "./schema";
+import { role } from "./schema";
 
 /**
  * The Operatore behind this request, or null when there is none.
@@ -50,7 +50,7 @@ export async function requireOperatore(
  */
 export async function requireAdmin(ctx: QueryCtx): Promise<Doc<"operatori">> {
   const operatore = await requireOperatore(ctx);
-  if (operatore.ruolo !== "admin") {
+  if (operatore.role !== "admin") {
     throw new Error("This action is reserved to an Admin.");
   }
   return operatore;
@@ -61,7 +61,7 @@ export const current = query({
   args: {},
   returns: v.union(
     v.null(),
-    v.object({ nome: v.string(), email: v.string(), ruolo }),
+    v.object({ name: v.string(), email: v.string(), role }),
   ),
   handler: async (ctx) => {
     const operatore = await currentOperatore(ctx);
@@ -69,9 +69,9 @@ export const current = query({
       return null;
     }
     return {
-      nome: operatore.nome,
+      name: operatore.name,
       email: operatore.email,
-      ruolo: operatore.ruolo,
+      role: operatore.role,
     };
   },
 });
@@ -99,9 +99,9 @@ export const exists = internalQuery({
 export const create = internalMutation({
   args: {
     authUserId: v.string(),
-    nome: v.string(),
+    name: v.string(),
     email: v.string(),
-    ruolo,
+    role,
   },
   returns: v.null(),
   handler: async (ctx, args) => {

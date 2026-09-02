@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
-import type { Forma, Stato } from "@/convex/schema";
+import type { Forma, State } from "@/convex/schema";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
 import { cn } from "@/lib/utils";
 
@@ -18,14 +18,14 @@ const formaLabel: Record<Forma, string> = {
   rettangolare: "Rettangolare",
 };
 
-const statoLabel: Record<Stato, string> = {
+const stateLabel: Record<State, string> = {
   disponibile: "Disponibile",
   fuori: "Fuori",
   attesa_molitura: "Attesa molitura",
   dismessa: "Dismessa",
 };
 
-const statoClass: Record<Stato, string> = {
+const stateClass: Record<State, string> = {
   disponibile: "bg-secondary text-secondary-foreground",
   fuori: "bg-primary text-primary-foreground",
   attesa_molitura: "bg-muted text-muted-foreground",
@@ -109,7 +109,7 @@ export default async function Ceste({
         </CardContent>
       </Card>
 
-      {operatore.ruolo === "admin" && (
+      {operatore.role === "admin" && (
         <Button asChild className="h-12 text-base">
           <Link href="/ceste/censimento">Nuovo Censimento</Link>
         </Button>
@@ -166,10 +166,10 @@ export default async function Ceste({
               <span
                 className={cn(
                   "rounded-full px-3 py-1 text-sm font-semibold",
-                  statoClass[cesta.stato],
+                  stateClass[cesta.state],
                 )}
               >
-                {statoLabel[cesta.stato]}
+                {stateLabel[cesta.state]}
               </span>
             </li>
           ))}

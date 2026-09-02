@@ -41,7 +41,7 @@ export const list = query({
           // Operatori are deactivated, never deleted (ADR-0004).
           throw new Error("A Registro row names an Operatore that is gone.");
         }
-        return { operatore: operatore.nome, action: row.action };
+        return { operatore: operatore.name, action: row.action };
       }),
     );
   },

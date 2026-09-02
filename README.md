@@ -37,7 +37,7 @@ opened by seeding one Admin, once:
 
 ```bash
 npx convex run seed:createFirstAdmin \
-  '{"nome":"Gabriele","email":"gabriele@example.com","password":"..."}'
+  '{"name":"Gabriele","email":"gabriele@example.com","password":"..."}'
 ```
 
 It refuses to run a second time.

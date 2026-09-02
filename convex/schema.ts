@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v, type Infer } from "convex/values";
 
 /** An Operatore is either plain counter staff or an Admin. */
-export const ruolo = v.union(v.literal("operatore"), v.literal("admin"));
+export const role = v.union(v.literal("operatore"), v.literal("admin"));
 
 /** The weight of olives a Cesta carries. The unit the counter counts in. */
 export const portata = v.union(v.literal(400), v.literal(250));
@@ -18,7 +18,7 @@ export const forma = v.union(v.literal("quadrata"), v.literal("rettangolare"));
  * because the counter is never blocked (ADR-0005) and so the Movimenti are a
  * record of events rather than a ledger that balances.
  */
-export const stato = v.union(
+export const state = v.union(
   v.literal("disponibile"),
   v.literal("fuori"),
   v.literal("attesa_molitura"),
@@ -27,7 +27,7 @@ export const stato = v.union(
 
 export type Portata = Infer<typeof portata>;
 export type Forma = Infer<typeof forma>;
-export type Stato = Infer<typeof stato>;
+export type State = Infer<typeof state>;
 
 /**
  * What a Registro row says was done, one member per kind of action. Every
@@ -50,15 +50,15 @@ export const action = v.union(
 export type Action = Infer<typeof action>;
 
 export default defineSchema({
-  // The app's own staff record. Better Auth owns the credentials; the ruolo and
+  // The app's own staff record. Better Auth owns the credentials; the role and
   // the active flag are the app's own concern and live here (ADR-0008).
   operatori: defineTable({
     // The Better Auth user this record belongs to, as it appears in the
     // identity subject of a signed-in request.
     authUserId: v.string(),
-    nome: v.string(),
+    name: v.string(),
     email: v.string(),
-    ruolo,
+    role,
     active: v.boolean(),
   }).index("by_authUserId", ["authUserId"]),
 
@@ -70,13 +70,13 @@ export default defineSchema({
     portata,
     forma,
     codice: v.string(),
-    stato,
+    state,
     active: v.boolean(),
   })
     // Also the sequence: the highest numero handed out so far is the first row
     // of this index read backwards.
     .index("by_numero", ["numero"])
-    .index("by_stato", ["stato"]),
+    .index("by_state", ["state"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   registro: defineTable({

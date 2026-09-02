@@ -38,10 +38,10 @@ export default async function Home() {
           <div className="space-y-2">
             <p className="text-muted-foreground">Sei entrato come</p>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              {operatore.nome}
+              {operatore.name}
             </h1>
             <p className="inline-flex rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground">
-              {roleLabel[operatore.ruolo]}
+              {roleLabel[operatore.role]}
             </p>
           </div>
           <Card>

@@ -26,7 +26,7 @@ describe("the Operatore signed in on a device", () => {
   test("the seeded first Admin is known by name and by role", async () => {
     const t = startApp();
     const { authUserId } = await t.action(internal.seed.createFirstAdmin, {
-      nome: "Gabriele",
+      name: "Gabriele",
       email: "gabriele@frantoio.example",
       password: "olive-di-ottobre",
     });
@@ -36,16 +36,16 @@ describe("the Operatore signed in on a device", () => {
       .query(api.operatori.current, {});
 
     expect(operatore).toEqual({
-      nome: "Gabriele",
+      name: "Gabriele",
       email: "gabriele@frantoio.example",
-      ruolo: "admin",
+      role: "admin",
     });
   });
 
   test("the mill gets only one first Admin", async () => {
     const t = startApp();
     const firstAdmin = {
-      nome: "Gabriele",
+      name: "Gabriele",
       email: "gabriele@frantoio.example",
       password: "olive-di-ottobre",
     };

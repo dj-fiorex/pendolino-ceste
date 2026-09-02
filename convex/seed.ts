@@ -8,7 +8,7 @@ import { createAuth } from "./auth";
  * somebody else. Run it once against a fresh deployment:
  *
  * ```bash
- * npx convex run seed:createFirstAdmin '{"nome":"Gabriele","email":"gabriele@example.com","password":"..."}'
+ * npx convex run seed:createFirstAdmin '{"name":"Gabriele","email":"gabriele@example.com","password":"..."}'
  * ```
  *
  * There is no public registration route, so this is the only way in until an
@@ -16,7 +16,7 @@ import { createAuth } from "./auth";
  */
 export const createFirstAdmin = internalAction({
   args: {
-    nome: v.string(),
+    name: v.string(),
     email: v.string(),
     password: v.string(),
   },
@@ -35,7 +35,7 @@ export const createFirstAdmin = internalAction({
     const authCtx = await auth.$context;
     const user = await authCtx.internalAdapter.createUser({
       email: args.email,
-      name: args.nome,
+      name: args.name,
       emailVerified: true,
     });
     await authCtx.internalAdapter.createAccount({
@@ -47,9 +47,9 @@ export const createFirstAdmin = internalAction({
 
     await ctx.runMutation(internal.operatori.create, {
       authUserId: user.id,
-      nome: args.nome,
+      name: args.name,
       email: args.email,
-      ruolo: "admin",
+      role: "admin",
     });
 
     return { authUserId: user.id };

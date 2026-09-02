@@ -20,7 +20,7 @@ const startApp = () => {
 /** The mill's Admin, signed in on a device. */
 const admin = async (t: TestConvex<typeof schema>) => {
   const { authUserId } = await t.action(internal.seed.createFirstAdmin, {
-    nome: "Gabriele",
+    name: "Gabriele",
     email: "gabriele@frantoio.example",
     password: "olive-di-ottobre",
   });
@@ -35,9 +35,9 @@ const admin = async (t: TestConvex<typeof schema>) => {
 const operatore = async (t: TestConvex<typeof schema>) => {
   await t.mutation(internal.operatori.create, {
     authUserId: "auth|marco",
-    nome: "Marco",
+    name: "Marco",
     email: "marco@frantoio.example",
-    ruolo: "operatore",
+    role: "operatore",
   });
   return t.withIdentity({ subject: "auth|marco" });
 };
@@ -59,21 +59,21 @@ describe("Censimento", () => {
         codice: "400-R-001",
         portata: 400,
         forma: "rettangolare",
-        stato: "disponibile",
+        state: "disponibile",
       },
       {
         numero: 2,
         codice: "400-R-002",
         portata: 400,
         forma: "rettangolare",
-        stato: "disponibile",
+        state: "disponibile",
       },
       {
         numero: 3,
         codice: "400-R-003",
         portata: 400,
         forma: "rettangolare",
-        stato: "disponibile",
+        state: "disponibile",
       },
     ]);
   });
@@ -103,14 +103,14 @@ describe("Censimento", () => {
       codice: "400-R-017",
       portata: 400,
       forma: "rettangolare",
-      stato: "disponibile",
+      state: "disponibile",
     });
     expect(ceste[170]).toEqual({
       numero: 171,
       codice: "250-Q-171",
       portata: 250,
       forma: "quadrata",
-      stato: "disponibile",
+      state: "disponibile",
     });
     // No two Ceste in the yard answer to the same Codice.
     expect(new Set(ceste.map((cesta) => cesta.codice)).size).toBe(195);
@@ -137,7 +137,7 @@ describe("Censimento", () => {
       codice: "250-Q-004",
       portata: 250,
       forma: "quadrata",
-      stato: "disponibile",
+      state: "disponibile",
     });
   });
 

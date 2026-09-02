@@ -9,7 +9,7 @@ export default async function Censimento() {
   if (!signedIn) {
     redirect("/accedi");
   }
-  if (operatore === null || operatore.ruolo !== "admin") {
+  if (operatore === null || operatore.role !== "admin") {
     redirect("/ceste");
   }
 

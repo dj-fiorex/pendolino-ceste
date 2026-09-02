@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
-import { forma, portata, stato, type Forma, type Portata } from "./schema";
+import { forma, portata, state, type Forma, type Portata } from "./schema";
 
 /**
  * The largest Censimento the mill can mean. Its whole fleet is about 195
@@ -65,7 +65,7 @@ export const censimento = mutation({
         forma: args.forma,
         codice: codiceOf(args.portata, args.forma, numero),
         // Every Cesta starts at the mill, empty, ready for the next Cliente.
-        stato: "disponibile",
+        state: "disponibile",
         active: true,
       });
     }
@@ -99,7 +99,7 @@ export const list = query({
       codice: v.string(),
       portata,
       forma,
-      stato,
+      state,
     }),
   ),
   handler: async (ctx) => {
@@ -110,7 +110,7 @@ export const list = query({
       codice: cesta.codice,
       portata: cesta.portata,
       forma: cesta.forma,
-      stato: cesta.stato,
+      state: cesta.state,
     }));
   },
 });
@@ -128,7 +128,7 @@ export const disponibiliByPortata = query({
     await requireOperatore(ctx);
     const disponibili = await ctx.db
       .query("ceste")
-      .withIndex("by_stato", (q) => q.eq("stato", "disponibile"))
+      .withIndex("by_state", (q) => q.eq("state", "disponibile"))
       .collect();
     // A Dismessa Cesta is not Disponibile anyway, but every count filters on
     // the active flag regardless (ADR-0004).
