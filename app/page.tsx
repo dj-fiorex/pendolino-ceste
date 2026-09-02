@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -44,12 +46,16 @@ export default async function Home() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Non c&apos;è ancora niente da fare qui</CardTitle>
+              <CardTitle>Le Ceste</CardTitle>
               <CardDescription>
-                Ritiri, Rientri e Svuotamenti arrivano nelle prossime versioni.
+                Quante Ceste ci sono, di che Portata, e dove sono. Ritiri,
+                Rientri e Svuotamenti arrivano nelle prossime versioni.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid gap-3">
+              <Button asChild className="h-12 text-base">
+                <Link href="/ceste">Vedi le Ceste</Link>
+              </Button>
               <SignOutButton />
             </CardContent>
           </Card>

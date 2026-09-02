@@ -1,14 +1,62 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
+import {
+  internalMutation,
+  internalQuery,
+  query,
+  type QueryCtx,
+} from "./_generated/server";
 import { ruolo } from "./schema";
 
 /**
- * The Operatore signed in on this device, or null when nobody is.
+ * The Operatore behind this request, or null when there is none.
  *
  * Everything the app records is attributed to whoever this returns, so a
  * deactivated Operatore reads as nobody: their account can no longer act,
  * whatever session their device still holds (#26).
  */
+export async function currentOperatore(
+  ctx: QueryCtx,
+): Promise<Doc<"operatori"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity === null) {
+    return null;
+  }
+  const operatore = await ctx.db
+    .query("operatori")
+    .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
+    .unique();
+  if (operatore === null || !operatore.attivo) {
+    return null;
+  }
+  return operatore;
+}
+
+/** The same, for the functions that have nothing to say to a stranger. */
+export async function requireOperatore(
+  ctx: QueryCtx,
+): Promise<Doc<"operatori">> {
+  const operatore = await currentOperatore(ctx);
+  if (operatore === null) {
+    throw new Error("No Operatore is signed in on this device.");
+  }
+  return operatore;
+}
+
+/**
+ * The Admin behind this request. Admin gates the fleet, the Rettifica, the
+ * Campagne, the staff and the Registro (spec #1); the screens hide those, and
+ * this is what actually refuses them.
+ */
+export async function requireAdmin(ctx: QueryCtx): Promise<Doc<"operatori">> {
+  const operatore = await requireOperatore(ctx);
+  if (operatore.ruolo !== "admin") {
+    throw new Error("This action is reserved to an Admin.");
+  }
+  return operatore;
+}
+
+/** The Operatore signed in on this device, or null when nobody is. */
 export const current = query({
   args: {},
   returns: v.union(
@@ -16,15 +64,8 @@ export const current = query({
     v.object({ nome: v.string(), email: v.string(), ruolo }),
   ),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      return null;
-    }
-    const operatore = await ctx.db
-      .query("operatori")
-      .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
-      .unique();
-    if (operatore === null || !operatore.attivo) {
+    const operatore = await currentOperatore(ctx);
+    if (operatore === null) {
       return null;
     }
     return {
