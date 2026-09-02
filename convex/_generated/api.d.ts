@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as ceste from "../ceste.js";
+import type * as etichette from "../etichette.js";
 import type * as http from "../http.js";
 import type * as operatori from "../operatori.js";
 import type * as registro from "../registro.js";
@@ -24,6 +25,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   ceste: typeof ceste;
+  etichette: typeof etichette;
   http: typeof http;
   operatori: typeof operatori;
   registro: typeof registro;

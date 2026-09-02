@@ -25,9 +25,59 @@ export const state = v.union(
   v.literal("dismessa"),
 );
 
+/**
+ * The size of the printed Etichetta, out of the sizes a print shop cuts as a
+ * matter of course. The Forma is not one of these: it belongs to the Cesta and
+ * is chosen at Censimento (ADR-0007).
+ */
+export const etichettaSize = v.union(
+  v.literal("100x150"),
+  v.literal("a6"),
+  v.literal("70x100"),
+);
+
 export type Portata = Infer<typeof portata>;
 export type Forma = Infer<typeof forma>;
 export type State = Infer<typeof state>;
+export type EtichettaSize = Infer<typeof etichettaSize>;
+
+/**
+ * The most a mill's name or telephone can be. They are printed across the foot
+ * of a label 70 mm wide: past this they no longer fit on one line.
+ */
+export const MAX_MILL_TEXT = 40;
+
+/**
+ * What an Etichetta says besides the Cesta's own Codice: how big it is printed,
+ * and whether the mill's name and telephone go on it. One set for the whole
+ * mill, so the table, the mutation that writes it and the browser that draws
+ * the label all take their shape from here.
+ */
+export const etichettaSettingsFields = {
+  etichettaSize,
+  millName: v.string(),
+  millNameOnEtichetta: v.boolean(),
+  millPhone: v.string(),
+  millPhoneOnEtichetta: v.boolean(),
+};
+
+export type EtichettaSettings = Infer<
+  ReturnType<typeof v.object<typeof etichettaSettingsFields>>
+>;
+
+/**
+ * The settings that decide what an Etichetta looks like, each one named so
+ * that a Registro row can say which of them an Admin changed.
+ */
+export const etichettaSettingField = v.union(
+  v.literal("etichettaSize"),
+  v.literal("millName"),
+  v.literal("millNameOnEtichetta"),
+  v.literal("millPhone"),
+  v.literal("millPhoneOnEtichetta"),
+);
+
+export type EtichettaSettingField = Infer<typeof etichettaSettingField>;
 
 /**
  * What a Registro row says was done, one member per kind of action. Every
@@ -44,6 +94,18 @@ export const action = v.union(
     count: v.number(),
     fromNumero: v.number(),
     toNumero: v.number(),
+  }),
+  v.object({
+    kind: v.literal("etichette_settings"),
+    // Only the settings that actually changed, each with what it said before
+    // and what it says now (#27).
+    changes: v.array(
+      v.object({
+        field: etichettaSettingField,
+        before: v.union(v.string(), v.boolean()),
+        after: v.union(v.string(), v.boolean()),
+      }),
+    ),
   }),
 );
 
@@ -77,6 +139,12 @@ export default defineSchema({
     // of this index read backwards.
     .index("by_numero", ["numero"])
     .index("by_state", ["state"]),
+
+  // What the whole mill has settled on, as one row and no more: the Etichetta
+  // the print shop prints, and, when #22 arrives, the Soglia di ritardo beside
+  // it. An empty table means nobody has changed anything yet, and every setting
+  // reads as the app's own.
+  settings: defineTable(etichettaSettingsFields),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   registro: defineTable({

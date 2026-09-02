@@ -69,9 +69,9 @@ export function CensimentoForm() {
         <CardContent className="grid gap-3">
           <Button asChild className="h-12 text-base">
             <Link
-              href={`/ceste?from=${censimento.fromNumero}&to=${censimento.toNumero}`}
+              href={`/ceste/etichette?from=${censimento.fromNumero}&to=${censimento.toNumero}`}
             >
-              Vedi le Etichette da stampare
+              Stampa le Etichette
             </Link>
           </Button>
           <Button
