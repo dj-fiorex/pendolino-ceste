@@ -53,8 +53,11 @@ export async function writeRegistroRow(
      * settled it: a Movimento at the counter, which stamps the same one on
      * every Cesta it moves, and an action on a Campagna herself, which is
      * about the one it names rather than the one that happens to be open.
-     * Every other action takes the Campagna the mill has open, and none where
-     * it has none.
+     *
+     * Every other action takes the Campagna the mill has open, and belongs to
+     * none while the mill has none open. Only the counter screens ask an
+     * Operatore which season their work belongs to, so only the Movimenti they
+     * record can carry a Campagna that is closed.
      */
     campagnaId?: Id<"campagne">;
     action: Action;

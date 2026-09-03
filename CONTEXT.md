@@ -25,7 +25,7 @@ The invoicing software the mill already runs on an always-on PC — OleaPlus, an
 _Avoid_: ERP, management system, billing software, accounting system, OleaPlus (in code: the app knows a Gestionale, not a brand)
 
 **Campagna** (season):
-One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one"). Opened, closed and, if need be, reopened by an Admin; at most one is open at a time, and closing it moves no Cesta. Every Movimento belongs to a Campagna: the open one, or, when none is open, the one the Operatore names on the spot, which stays closed.
+One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one"). Known by a name no other Campagna answers to, because naming one is how the counter picks it. Opened, closed and, if need be, reopened by an Admin; at most one is open at a time, and closing it moves no Cesta. Every Movimento belongs to a Campagna: the open one, or, when none is open, the one the Operatore names on the spot, which stays closed.
 _Avoid_: Stagione, season, annata, year
 
 ### Fleet

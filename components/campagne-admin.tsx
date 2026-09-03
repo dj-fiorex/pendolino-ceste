@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { comparableName } from "@/convex/schema";
 import { dateOf, openOf, type Campagna } from "@/lib/campagna";
 import { cesteCount } from "@/lib/ceste";
 import { clienteLabel } from "@/lib/cliente";
@@ -34,16 +35,25 @@ function CampagnaDates({ campagna }: { campagna: Campagna }) {
   );
 }
 
-/** The box a Campagna is opened or renamed in: one name, and a way back. */
+/**
+ * The box a Campagna is opened or renamed in: one name, and a way back.
+ *
+ * A name another Campagna already answers to is said so here as it is typed,
+ * and refused by the mutation regardless: the counter picks a season by her
+ * name, and two of one name is a choice nobody can make.
+ */
 function NameForm({
   label,
   initial,
+  taken,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   label: string;
   initial: string;
+  /** The names the other Campagne answer to. */
+  taken: string[];
   submitLabel: string;
   onSubmit: (name: string) => Promise<void>;
   onCancel?: () => void;
@@ -51,6 +61,9 @@ function NameForm({
   const [name, setName] = useState(initial);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isTaken = taken.some(
+    (other) => comparableName(other) === comparableName(name),
+  );
 
   return (
     <form
@@ -79,6 +92,11 @@ function NameForm({
           className="h-11"
         />
       </div>
+      {isTaken && (
+        <p role="alert" className="text-sm text-destructive">
+          C&rsquo;è già una Campagna con questo nome.
+        </p>
+      )}
       {error !== null && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -87,7 +105,7 @@ function NameForm({
       <Button
         type="submit"
         className="h-12 text-base"
-        disabled={pending || name.trim() === ""}
+        disabled={pending || name.trim() === "" || isTaken}
       >
         {pending ? "Un attimo…" : submitLabel}
       </Button>
@@ -236,6 +254,7 @@ export function CampagneAdmin() {
             <NameForm
               label="Come si chiama"
               initial=""
+              taken={campagne.map((campagna) => campagna.name)}
               submitLabel="Apri la Campagna"
               onSubmit={async (name) => {
                 await openTheCampagna({ name });
@@ -291,6 +310,11 @@ export function CampagneAdmin() {
                       <NameForm
                         label="Come si chiama"
                         initial={campagna.name}
+                        // A Campagna is never her own namesake: renaming her
+                        // is how a capital letter is put right.
+                        taken={campagne
+                          .filter((other) => other._id !== campagna._id)
+                          .map((other) => other.name)}
                         submitLabel="Salva il nome"
                         onSubmit={async (name) => {
                           await renameCampagna({

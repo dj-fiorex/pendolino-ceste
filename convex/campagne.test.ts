@@ -118,6 +118,29 @@ describe("opening a Campagna", () => {
     expect(await campagneOf(gabriele)).toEqual([]);
   });
 
+  test("is refused a name another Campagna already answers to", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    const campagnaId = await gabriele.mutation(api.campagne.open, {
+      name: "Raccolto 2025",
+    });
+    await gabriele.mutation(api.campagne.close, {
+      campagnaId,
+      confirmed: false,
+    });
+
+    // Neither case nor spacing tells two Campagne apart: the counter picks one
+    // by her name, and two rows nothing tells apart is the confusion this rule
+    // exists to prevent.
+    await expect(
+      gabriele.mutation(api.campagne.open, { name: "raccolto  2025" }),
+    ).rejects.toThrow();
+
+    expect(await campagneOf(gabriele)).toEqual([
+      { name: "Raccolto 2025", open: false },
+    ]);
+  });
+
   test("is refused to an Operatore who is not an Admin", async () => {
     const t = startApp();
     const gabriele = await admin(t);
@@ -430,6 +453,41 @@ describe("renaming a Campagna", () => {
     ]);
     expect(await historyOf(marco, "3")).toEqual([
       { kind: "ritiro", campagna: "2025/2026" },
+    ]);
+  });
+});
+
+describe("naming a Campagna", () => {
+  test("is refused another Campagna's name, and allowed her own written better", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    const closed = await gabriele.mutation(api.campagne.open, {
+      name: "Raccolto 2025",
+    });
+    await gabriele.mutation(api.campagne.close, {
+      campagnaId: closed,
+      confirmed: false,
+    });
+    const campagnaId = await gabriele.mutation(api.campagne.open, {
+      name: "2026",
+    });
+
+    await expect(
+      gabriele.mutation(api.campagne.rename, {
+        campagnaId,
+        name: "raccolto 2025",
+      }),
+    ).rejects.toThrow();
+    // A Campagna is never her own namesake: this is the capital letter the
+    // Admin meant the first time.
+    await gabriele.mutation(api.campagne.rename, {
+      campagnaId: closed,
+      name: "raccolto 2025",
+    });
+
+    expect(await campagneOf(gabriele)).toEqual([
+      { name: "2026", open: true },
+      { name: "raccolto 2025", open: false },
     ]);
   });
 });

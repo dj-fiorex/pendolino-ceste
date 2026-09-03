@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
-import { tidy } from "./schema";
+import { comparableName, tidy } from "./schema";
 
 /** A Campagna as the header at the counter and the Admin screen read her. */
 const campagnaShape = {
@@ -79,6 +79,34 @@ function requireName(name: string): string {
 }
 
 /**
+ * Refuses a name another Campagna already answers to. The counter picks a
+ * Campagna by her name when none is open, and two seasons of one name are two
+ * rows in that list that nothing tells apart — so the name has to be the
+ * Campagna herself, as it is for a Cliente (CONTEXT.md).
+ *
+ * Neither case nor spacing tells two apart, by the same rule the registry
+ * compares names by: «2025» typed again as «2025 » is the season already there.
+ * The mill has one Campagna a year, so the seasons are read whole rather than
+ * through an index.
+ */
+async function refuseANamesake(
+  ctx: QueryCtx,
+  name: string,
+  /** The Campagna being renamed, who is never her own namesake. */
+  itself?: Id<"campagne">,
+): Promise<void> {
+  const wanted = comparableName(name);
+  const campagne = await ctx.db.query("campagne").collect();
+  const taken = campagne.some(
+    (campagna) =>
+      campagna._id !== itself && comparableName(campagna.name) === wanted,
+  );
+  if (taken) {
+    throw new Error("A Campagna of this name is already one of the mill's.");
+  }
+}
+
+/**
  * The Ceste still out with somebody, by numero: what an Admin closing a
  * Campagna is shown, and what the row recording the close carries.
  */
@@ -121,6 +149,7 @@ export const open = mutation({
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
     const name = requireName(args.name);
+    await refuseANamesake(ctx, name);
     const alreadyOpen = await openCampagna(ctx);
     if (alreadyOpen !== null) {
       throw new Error(
@@ -144,8 +173,9 @@ export const open = mutation({
 
 /**
  * An Admin corrects what a Campagna is called. The name is the Campagna's
- * alone: the Movimenti recorded against her read under the new one, because
- * they belong to the season and not to the string it was typed as (spec #1).
+ * alone, and hers only: no other season answers to it, and the Movimenti
+ * recorded against her read under the new one, because they belong to the
+ * season and not to the string it was typed as (spec #1).
  *
  * The Registro row carries the name before and after (#27, ADR-0006), and a
  * name saved unchanged is nothing that happened.
@@ -160,6 +190,7 @@ export const rename = mutation({
     if (after === campagna.name) {
       return null;
     }
+    await refuseANamesake(ctx, after, campagna._id);
 
     await ctx.db.patch(campagna._id, { name: after });
     await writeRegistroRow(ctx, {
