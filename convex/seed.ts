@@ -55,3 +55,35 @@ export const createFirstAdmin = internalAction({
     return { authUserId: user.id };
   },
 });
+
+/**
+ * Sets an existing account's password, for a deployment somebody has to be able
+ * to sign in to and nobody can:
+ *
+ * ```bash
+ * npx convex run seed:setPassword \
+ *   '{"email":"gabriele@frantoio.example","password":"..."}'
+ * ```
+ *
+ * A scrypt hash gives nothing back, so a dev deployment whose one Admin was
+ * seeded months ago is otherwise a deployment with no way in. Internal, so it
+ * is reachable only by whoever can already deploy — and it is not the reset the
+ * mill uses, which an Admin sends by email and which is #26's (ADR-0008).
+ */
+export const setPassword = internalAction({
+  args: { email: v.string(), password: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const auth = createAuth(ctx);
+    const authCtx = await auth.$context;
+    const found = await authCtx.internalAdapter.findUserByEmail(args.email);
+    if (found === null) {
+      throw new Error(`No account answers to ${args.email}.`);
+    }
+    await authCtx.internalAdapter.updatePassword(
+      found.user.id,
+      await authCtx.password.hash(args.password),
+    );
+    return null;
+  },
+});
