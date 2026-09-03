@@ -3,6 +3,7 @@
 import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
+import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
 import { NumeroField } from "@/components/numero-field";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,11 @@ import { clienteLabel, type Cliente } from "@/lib/cliente";
 /**
  * The counter: the Cliente in front of the Operatore, then their Ceste one at
  * a time, then the Ritiro.
+ *
+ * Variant B of the prototype the mill chose (#31), the same shape as the
+ * Rientro: the Ceste of this Ritiro are tiles a tap takes back off, and the
+ * numero and the confirmation sit together in the bar at the bottom, where the
+ * camera docks beside them when #23 arrives.
  */
 export function RitiroFlow() {
   const recordRitiro = useMutation(api.movimenti.ritiro);
@@ -81,7 +87,7 @@ export function RitiroFlow() {
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-4 pb-4">
       <Card>
         <CardHeader>
           <CardTitle>{clienteLabel(cliente)}</CardTitle>
@@ -100,19 +106,10 @@ export function RitiroFlow() {
         </CardContent>
       </Card>
 
-      <NumeroField
-        label="Numero della Cesta"
-        submitLabel="Aggiungi"
-        onCesta={(cesta) => {
-          // The same Cesta added twice — typed after being scanned, say — is
-          // the one Cesta she already was, and saying so is all that is left.
-          if (ceste.some((added) => added._id === cesta._id)) {
-            return `${cesta.codice} è già nell'elenco.`;
-          }
-          setCeste([...ceste, cesta]);
-          return null;
-        }}
-      />
+      <div className="flex items-baseline justify-between text-sm text-muted-foreground">
+        <span>Questo Ritiro · tocca per togliere</span>
+        <span>{cesteCount(ceste.length)}</span>
+      </div>
 
       {ceste.length === 0 ? (
         <p className="text-muted-foreground">
@@ -120,24 +117,18 @@ export function RitiroFlow() {
           serve.
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-2">
+        <ul className="flex flex-wrap gap-2">
           {ceste.map((cesta) => (
             <li key={cesta._id}>
-              <button
-                type="button"
-                aria-label={`Togli la Cesta ${cesta.codice}`}
-                onClick={() =>
+              {/* Every tile here is a Cesta going out, so every one is filled:
+                  a tap is what takes her back out of the Ritiro. */}
+              <CestaTile
+                codice={cesta.codice}
+                selected
+                onToggle={() =>
                   setCeste(ceste.filter((added) => added._id !== cesta._id))
                 }
-                className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-primary bg-secondary text-secondary-foreground transition-colors hover:bg-accent"
-              >
-                <span className="font-display text-lg font-bold tabular-nums">
-                  {cesta.codice}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {cesta.portata} kg
-                </span>
-              </button>
+              />
             </li>
           ))}
         </ul>
@@ -150,19 +141,30 @@ export function RitiroFlow() {
         </p>
       )}
 
-      {ceste.length > 0 && (
-        <div className="sticky bottom-4 rounded-xl border bg-card p-3 shadow-lg">
-          <Button
-            className="h-12 w-full text-base"
-            disabled={pending}
-            onClick={confirm}
-          >
-            {pending
-              ? "Un attimo…"
-              : `Conferma Ritiro · ${cesteCount(ceste.length)}`}
-          </Button>
-        </div>
-      )}
+      <div className="sticky bottom-4 grid gap-3 rounded-xl border bg-card p-3 shadow-lg">
+        <NumeroField
+          label="Numero della Cesta"
+          submitLabel="Aggiungi"
+          onCesta={(cesta) => {
+            // The same Cesta added twice — typed after being scanned, say — is
+            // the one Cesta she already was, and saying so is all that is left.
+            if (ceste.some((added) => added._id === cesta._id)) {
+              return `${cesta.codice} è già nell'elenco.`;
+            }
+            setCeste([...ceste, cesta]);
+            return null;
+          }}
+        />
+        <Button
+          className="h-14 w-full text-lg"
+          disabled={pending || ceste.length === 0}
+          onClick={confirm}
+        >
+          {pending
+            ? "Un attimo…"
+            : `Conferma Ritiro · ${cesteCount(ceste.length)}`}
+        </Button>
+      </div>
     </div>
   );
 }
