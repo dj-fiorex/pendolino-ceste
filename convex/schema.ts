@@ -27,31 +27,55 @@ export const state = v.union(
 
 /**
  * What a Movimento is: one Cesta changing state on one occasion. Each ticket
- * adds its member here as it adds its mutation — the Rettifiche an Admin
- * records by hand follow with #20 and #28.
+ * adds its member here as it adds its mutation — the Rettifica of *errore*,
+ * which corrects a Movimento registered wrongly, follows with #28.
  */
-export const movimentoKind = v.union(
+const plainMovimentoKind = v.union(
   v.literal("ritiro"),
   v.literal("rientro"),
   v.literal("svuotamento"),
+);
+
+export const movimentoKind = v.union(
+  ...plainMovimentoKind.members,
   v.literal("rettifica"),
 );
 
 export type MovimentoKind = Infer<typeof movimentoKind>;
 
 /**
- * Why a Rettifica was written. Only *discrepanza* is here, because it is the
- * only one the app writes itself: a Movimento going through on a Cesta that
- * was not where the app believed writes one as it goes (ADR-0005). The four an
- * Admin chooses — persa, rotta, ritrovata, errore — arrive with #20 and #28,
- * and no Admin can ever choose this one.
+ * The causes an Admin chooses from, each a different fact about a Cesta: one
+ * lost to a Cliente, one broken at the mill, one that turned up again. Losing
+ * a Cesta and breaking one are counted apart because they are apart — a
+ * reason is what a Rettifica exists to attach (ADR-0004).
+ *
+ * *Errore*, which corrects a Movimento registered wrongly, arrives with #28.
  */
-export const rettificaCause = v.union(v.literal("discrepanza"));
+export const adminRettificaCause = v.union(
+  v.literal("persa"),
+  v.literal("rotta"),
+  v.literal("ritrovata"),
+);
+
+export type AdminRettificaCause = Infer<typeof adminRettificaCause>;
 
 /**
- * What a Rettifica records besides the Cesta it is written against: why, and
- * where the app believed the Cesta was at the moment the Movimento beside it
- * went through.
+ * Why a Rettifica was written: the three an Admin chooses, and *discrepanza*,
+ * the one the app writes itself as a Movimento goes through on a Cesta that
+ * was not where the app believed (ADR-0005). No Admin ever chooses that one,
+ * which is why the mutation they record a Rettifica through takes the narrower
+ * union and this one is what a Movimento carries.
+ */
+export const rettificaCause = v.union(
+  ...adminRettificaCause.members,
+  v.literal("discrepanza"),
+);
+
+export type RettificaCause = Infer<typeof rettificaCause>;
+
+/**
+ * What a Rettifica records besides the Cesta it is written against: why, where
+ * the app believed the Cesta was, and where the correction leaves her.
  *
  * That belief is the fact the mill has never been able to see (ADR-0005), and
  * it is gone from the Cesta the instant she moves — so it is written down here
@@ -59,8 +83,40 @@ export const rettificaCause = v.union(v.literal("discrepanza"));
  */
 export const rettificaFields = {
   cause: rettificaCause,
+  // Where the app had her: the state she was in when the Admin corrected her,
+  // and, on a discrepanza, the state the Movimento beside it went through on.
   believedState: state,
+  // Where she is left. A Ritiro or a Rientro says where it leaves a Cesta by
+  // being one; a Rettifica is the only Movimento whose name does not, so it
+  // says so itself — and a discrepanza says where the Movimento beside it left
+  // her, which is how "Fuori since" finds the correction that put her there.
+  becomes: state,
+  // What the Admin wrote beside the cause, where they wrote anything. Never in
+  // place of it: a Rettifica with no reason is a delete wearing a different hat
+  // (ADR-0004).
+  note: v.optional(v.string()),
 };
+
+export type Rettifica = Infer<
+  ReturnType<typeof v.object<typeof rettificaFields>>
+>;
+
+/**
+ * Where a Rettifica of each cause leaves the Cesta: one lost to a Cliente or
+ * broken at the mill is out of the fleet, and one that turned up is back in it
+ * — at the mill, or in the hands of the Cliente she turned up at.
+ *
+ * One rule in two voices, as the namesake rule is: the mutation moves the Cesta
+ * by it, and the form turns it into the sentence that says what confirming will
+ * do. It is also the whole of the way to Dismessa — no other mutation writes
+ * that state (spec #1, story 37).
+ */
+export const rettificaLeaves = (
+  cause: AdminRettificaCause,
+  /** Whether the Admin named the Cliente the Cesta turned up at. */
+  withCliente: boolean,
+): State =>
+  cause !== "ritrovata" ? "dismessa" : withCliente ? "fuori" : "disponibile";
 
 /**
  * The size of the printed Etichetta, out of the sizes a print shop cuts as a
@@ -298,6 +354,19 @@ export const action = v.union(
     numeri: v.array(v.number()),
   }),
   v.object({
+    kind: v.literal("rettifica"),
+    // The Cesta corrected, by numero, as every other row names its Ceste.
+    numero: v.number(),
+    // Only the causes an Admin chooses are here: the discrepanze the app
+    // writes itself share the row of the Movimento that produced them and
+    // never a row of their own (ADR-0006).
+    cause: adminRettificaCause,
+    // What became of her, which is what the row is read for: the cause says
+    // why, this says where it left her.
+    becomes: state,
+    note: v.optional(v.string()),
+  }),
+  v.object({
     kind: v.literal("cliente_disattivato"),
     name: v.string(),
     // The Ceste the Cliente was still holding when the Admin went ahead: the
@@ -341,6 +410,32 @@ export const action = v.union(
 );
 
 export type Action = Infer<typeof action>;
+
+/**
+ * What every Movimento carries, whatever kind it is: the Cesta that moved, who
+ * she moved to or from, who registered it, and which action it was part of.
+ */
+const movimentoFields = {
+  cestaId: v.id("ceste"),
+  // The Cliente the Cesta moved to or from, where there is one. A Ritiro and a
+  // Rientro always name the Cliente at the counter. A Svuotamento names nobody:
+  // the Cesta is tipped out at the mill and her tape comes off. A Rettifica
+  // names whoever the app believed was holding her, so that the correction
+  // turns up in that Cliente's own history, which is where the mill would go
+  // looking for why a Cesta stopped being counted against them.
+  clienteId: v.optional(v.id("clienti")),
+  operatoreId: v.id("operatori"),
+  // The Campagna this Movimento belongs to: the one open when it happened, or,
+  // when none was, the one the Operatore named on this device (#19). Absent on
+  // the Movimenti recorded before the app knew about Campagne, and on any
+  // recorded while the mill has none at all — the counter is never blocked by
+  // the calendar (ADR-0005), and no row is rewritten afterwards to say
+  // otherwise (ADR-0004).
+  campagnaId: v.optional(v.id("campagne")),
+  // The action this Movimento was part of, so that the Registro reads a Ritiro
+  // of six Ceste as the one thing a person did (ADR-0006).
+  registroId: v.id("registro"),
+};
 
 export default defineSchema({
   // The app's own staff record. Better Auth owns the credentials; the role and
@@ -426,30 +521,19 @@ export default defineSchema({
 
   // One row per Cesta per occasion: six Ceste leaving together are six
   // Movimenti (CONTEXT.md). Never edited and never deleted (ADR-0004).
-  movimenti: defineTable({
-    kind: movimentoKind,
-    cestaId: v.id("ceste"),
-    // The Cliente the Cesta moved to or from, where there is one. A Ritiro and
-    // a Rientro always name the Cliente at the counter. A Svuotamento names
-    // nobody: the Cesta is tipped out at the mill and her tape comes off. A
-    // Rettifica names whoever the app believed was holding her, so that the
-    // correction turns up in that Cliente's own history, which is where the
-    // mill would go looking for why a Cesta stopped being counted against them.
-    clienteId: v.optional(v.id("clienti")),
-    operatoreId: v.id("operatori"),
-    // The Campagna this Movimento belongs to: the one open when it happened,
-    // or, when none was, the one the Operatore named on this device (#19).
-    // Absent on the Movimenti recorded before the app knew about Campagne, and
-    // on any recorded while the mill has none at all — the counter is never
-    // blocked by the calendar (ADR-0005), and no row is rewritten afterwards
-    // to say otherwise (ADR-0004).
-    campagnaId: v.optional(v.id("campagne")),
-    // The action this Movimento was part of, so that the Registro reads a
-    // Ritiro of six Ceste as the one thing a person did (ADR-0006).
-    registroId: v.id("registro"),
-    // Only a Rettifica carries this, and every Rettifica does.
-    rettifica: v.optional(v.object(rettificaFields)),
-  })
+  movimenti: defineTable(
+    v.union(
+      v.object({ ...movimentoFields, kind: plainMovimentoKind }),
+      v.object({
+        ...movimentoFields,
+        kind: v.literal("rettifica"),
+        // Required here and nowhere else: a Rettifica without a reason is a
+        // delete wearing a different hat, and the table is what refuses one
+        // (ADR-0004). No mutation is trusted to remember.
+        rettifica: v.object(rettificaFields),
+      }),
+    ),
+  )
     .index("by_cliente", ["clienteId"])
     // One Cesta's own history, newest last.
     .index("by_cesta", ["cestaId"])

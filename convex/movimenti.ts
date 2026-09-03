@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   mutation,
   query,
@@ -7,11 +7,13 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { campagnaFor } from "./campagne";
-import { requireOperatore } from "./operatori";
+import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
+  adminRettificaCause,
   movimentoKind,
   rettificaFields,
+  rettificaLeaves,
   type MovimentoKind,
   type State,
 } from "./schema";
@@ -31,14 +33,49 @@ export async function lastMovimentoAt(
   cestaId: Id<"ceste">,
   kind: MovimentoKind,
 ): Promise<number | null> {
-  const movimento = await ctx.db
+  return (await lastMovimento(ctx, cestaId, kind))?._creationTime ?? null;
+}
+
+/** What a Rettifica corrected, and nothing on every other kind of Movimento. */
+const rettificaOf = (movimento: Doc<"movimenti">) =>
+  movimento.kind === "rettifica" ? movimento.rettifica : null;
+
+/** The newest Movimento of a kind against a Cesta, as a single indexed row. */
+async function lastMovimento(
+  ctx: QueryCtx,
+  cestaId: Id<"ceste">,
+  kind: MovimentoKind,
+): Promise<Doc<"movimenti"> | null> {
+  return await ctx.db
     .query("movimenti")
     .withIndex("by_cesta_and_kind", (q) =>
       q.eq("cestaId", cestaId).eq("kind", kind),
     )
     .order("desc")
     .first();
-  return movimento?._creationTime ?? null;
+}
+
+/**
+ * Since when a Cesta has been Fuori: what the counter reads as "Fuori dal 25
+ * ott" and what the Lista di recupero sorts on (#22).
+ *
+ * Her last Ritiro, ordinarily — and the Rettifica that says she turned up at a
+ * Cliente's, where that is newer, because a Cesta found in somebody's yard has
+ * been theirs since the Admin said so and not since a Ritiro that may never
+ * have happened (#20).
+ */
+export async function fuoriSince(
+  ctx: QueryCtx,
+  cestaId: Id<"ceste">,
+): Promise<number | null> {
+  const ritiro = await lastMovimentoAt(ctx, cestaId, "ritiro");
+  const rettifica = await lastMovimento(ctx, cestaId, "rettifica");
+  const putHerOut =
+    rettifica !== null && rettificaOf(rettifica)?.becomes === "fuori"
+      ? rettifica._creationTime
+      : null;
+  const since = [ritiro, putHerOut].filter((at) => at !== null);
+  return since.length === 0 ? null : Math.max(...since);
 }
 
 /**
@@ -65,6 +102,20 @@ type CounterMovimento = keyof typeof atTheCounter;
  */
 const campagnaArg = { campagnaId: v.optional(v.id("campagne")) };
 
+/**
+ * Whether a Cesta is one of the mill's. She is, unless an Admin has written her
+ * off: Dismessa and out of the fleet are one fact in two fields, the state and
+ * the active flag, and a Rettifica of *ritrovata* is what ever ends it (#20).
+ *
+ * No Movimento moves a Cesta that is out of the fleet, because putting her back
+ * into it is an Admin's to record and whoever is at the counter or emptying
+ * Ceste is not one. What happened is written down all the same: the Movimento
+ * says she was there, and the Rettifica of *discrepanza* beside it says the app
+ * did not have her, which is the whole of what it can honestly claim to know
+ * (ADR-0005).
+ */
+const inTheFleet = (cesta: Doc<"ceste">) => cesta.state !== "dismessa";
+
 /** What either movement at the counter is: a Cliente, and the Ceste added. */
 const counterArgs = {
   clienteId: v.id("clienti"),
@@ -83,7 +134,9 @@ const counterArgs = {
  * the yard and the Cliente is loading her: the app records what happens rather
  * than authorising it, and a Cesta on the wrong trailer is exactly the fact the
  * mill has never been able to see (ADR-0005). Reporting those mismatches as a
- * Rettifica is #21's.
+ * Rettifica is #21's — save for the one this ticket makes possible, a Cesta an
+ * Admin has written off, which is corrected here because nothing else would say
+ * she had turned up at all (#20).
  *
  * The Cliente moved to is always the one actually present, which is what makes
  * a Rientro of somebody else's Cesta come to rest under the name the paper tape
@@ -131,7 +184,27 @@ async function recordAtTheCounter(
   });
 
   for (const cesta of inFleet) {
-    await ctx.db.patch(cesta._id, { state: becomes, clienteId: cliente._id });
+    if (inTheFleet(cesta)) {
+      await ctx.db.patch(cesta._id, { state: becomes, clienteId: cliente._id });
+    } else {
+      // She is not the mill's to move, and she is standing at the counter all
+      // the same. Written before the Movimento and under the same Registro row,
+      // as the Svuotamento's is (ADR-0006), and saying she stays where she is:
+      // an Admin's *ritrovata* is what brings her back (#20).
+      await ctx.db.insert("movimenti", {
+        kind: "rettifica",
+        cestaId: cesta._id,
+        clienteId: cesta.clienteId,
+        operatoreId: operatore._id,
+        campagnaId,
+        registroId,
+        rettifica: {
+          cause: "discrepanza",
+          believedState: cesta.state,
+          becomes: cesta.state,
+        },
+      });
+    }
     await ctx.db.insert("movimenti", {
       kind,
       cestaId: cesta._id,
@@ -215,6 +288,12 @@ export const svuotamento = mutation({
     });
 
     for (const cesta of inFleet) {
+      // Where the Svuotamento leaves her: empty and at the mill, unless an
+      // Admin has written her off, in which case emptying her moves nothing.
+      // She is Dismessa, standing empty in the yard, and the Rettifica below is
+      // all that says she turned up at all — putting her back into the fleet is
+      // an Admin's *ritrovata* and nobody else's (#20).
+      const becomes = inTheFleet(cesta) ? "disponibile" : "dismessa";
       // Written before she moves, and under the same Registro row as the
       // Svuotamento that moved her: the correction and the movement are one
       // action a person took (ADR-0006).
@@ -226,18 +305,20 @@ export const svuotamento = mutation({
           operatoreId: operatore._id,
           campagnaId,
           registroId,
-          rettifica: { cause: "discrepanza", believedState: cesta.state },
+          rettifica: {
+            cause: "discrepanza",
+            believedState: cesta.state,
+            becomes,
+          },
         });
       }
       // Empty, at the mill, in nobody's hands: the Cliente goes with the tape.
-      // A Cesta the app had written off comes back Disponibile and still
-      // inactive, which is a row nothing yet reads and nothing yet writes:
-      // putting a Cesta back into the fleet is a Rettifica of ritrovata, and it
-      // is #20's to say whether emptying one counts as finding her.
-      await ctx.db.patch(cesta._id, {
-        state: "disponibile",
-        clienteId: undefined,
-      });
+      if (inTheFleet(cesta)) {
+        await ctx.db.patch(cesta._id, {
+          state: becomes,
+          clienteId: undefined,
+        });
+      }
       await ctx.db.insert("movimenti", {
         kind: "svuotamento",
         cestaId: cesta._id,
@@ -246,6 +327,97 @@ export const svuotamento = mutation({
         registroId,
       });
     }
+    return null;
+  },
+});
+
+/**
+ * A Rettifica: an Admin says what became of a Cesta that no Ritiro and no
+ * Rientro explains — she was lost to a Cliente, she broke at the mill, or she
+ * turned up again — and the fleet is corrected to match.
+ *
+ * The cause is the point of the whole thing. A Cesta that simply stopped being
+ * counted is a delete wearing a different hat, and losing one to a Cliente is a
+ * different fact from breaking one in the yard: the mill counts them apart, and
+ * asked for exactly that unprompted (ADR-0004). So the cause is required here
+ * and required again on the Movimento, where the schema refuses a Rettifica
+ * without one.
+ *
+ * An Admin only, like every act on the fleet — and the note is theirs to leave
+ * or not.
+ */
+export const rettifica = mutation({
+  args: {
+    cestaId: v.id("ceste"),
+    cause: adminRettificaCause,
+    // The Cliente a *ritrovata* Cesta turned up at, and nobody when she turned
+    // up at the mill. No other cause names one: whom a lost Cesta was with is
+    // what the app already believed, and the Rettifica reads it from there.
+    clienteId: v.optional(v.id("clienti")),
+    note: v.optional(v.string()),
+    ...campagnaArg,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const cesta = await ctx.db.get(args.cestaId);
+    if (cesta === null) {
+      throw new Error("This Cesta is not in the fleet.");
+    }
+    if (args.clienteId !== undefined && args.cause !== "ritrovata") {
+      throw new Error("Only a Cesta that turned up again names a Cliente.");
+    }
+    const found =
+      args.clienteId === undefined ? null : await ctx.db.get(args.clienteId);
+    if (args.clienteId !== undefined && found === null) {
+      throw new Error("This Cliente is not in the registry.");
+    }
+
+    const becomes = rettificaLeaves(args.cause, found !== null);
+    // A box the Admin left blank is no note, not an empty one.
+    const written = args.note?.trim();
+    const note = written === "" ? undefined : written;
+    // Whom the correction concerns: the Cliente she turned up at, or the one
+    // the app believed was holding her — which is where the mill would go
+    // looking for why a Cesta stopped being counted against somebody.
+    const clienteId = found?._id ?? cesta.clienteId;
+    const campagnaId = await campagnaFor(ctx, args.campagnaId);
+
+    const registroId = await writeRegistroRow(ctx, {
+      operatoreId: admin._id,
+      clienteId,
+      campagnaId,
+      action: {
+        kind: "rettifica",
+        numero: cesta.numero,
+        cause: args.cause,
+        becomes,
+        note,
+      },
+    });
+    await ctx.db.insert("movimenti", {
+      kind: "rettifica",
+      cestaId: cesta._id,
+      clienteId,
+      operatoreId: admin._id,
+      campagnaId,
+      registroId,
+      rettifica: {
+        cause: args.cause,
+        believedState: cesta.state,
+        becomes,
+        note,
+      },
+    });
+    // The state and the active flag are one fact in two fields, and this is the
+    // only mutation that ever parts a Cesta from the fleet or gives her back to
+    // it. A Cesta is in somebody's hands only while she is Fuori: at the mill,
+    // or out of the fleet, she is nobody's.
+    await ctx.db.patch(cesta._id, {
+      state: becomes,
+      clienteId: becomes === "fuori" ? found?._id : undefined,
+      active: becomes !== "dismessa",
+    });
     return null;
   },
 });
@@ -310,7 +482,7 @@ export const byCesta = query({
           at: movimento._creationTime,
           campagna: campagna?.name ?? null,
           registroId: movimento.registroId,
-          rettifica: movimento.rettifica ?? null,
+          rettifica: rettificaOf(movimento),
         };
       }),
     );

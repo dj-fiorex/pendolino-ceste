@@ -33,6 +33,10 @@ export default async function Ceste() {
 
   // Every Cesta a Cliente is holding: what the Disponibili have fallen by.
   const fuori = ceste.filter((cesta) => cesta.state === "fuori").length;
+  // And the ones an Admin has written off, which count nowhere else: they stay
+  // on this screen because they are part of what became of the fleet
+  // (ADR-0004), and saying how many says why the counts do not add up.
+  const dismesse = ceste.filter((cesta) => cesta.state === "dismessa").length;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
@@ -75,6 +79,11 @@ export default async function Ceste() {
               ? "Nessuna Cesta è Fuori."
               : `${cesteCount(fuori)} ${fuori === 1 ? "è Fuori" : "sono Fuori"}, con i Clienti.`}
           </p>
+          {dismesse > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {`${cesteCount(dismesse)} ${dismesse === 1 ? "è Dismessa: non conta" : "sono Dismesse: non contano"} più.`}
+            </p>
+          )}
         </CardContent>
       </Card>
 

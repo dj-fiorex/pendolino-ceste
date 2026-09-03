@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
-import { lastMovimentoAt } from "./movimenti";
+import { fuoriSince } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
@@ -255,8 +255,8 @@ export const get = query({
           codice: v.string(),
           portata,
           forma,
-          // When the Ritiro that took her out happened, so that the counter can
-          // say how long she has been gone (#17, #22).
+          // Since when she has been Fuori, so that the counter can say how
+          // long she has been gone (#17, #22).
           since: v.union(v.null(), v.number()),
         }),
       ),
@@ -278,9 +278,9 @@ export const get = query({
           codice: cesta.codice,
           portata: cesta.portata,
           forma: cesta.forma,
-          // When the Ritiro that took her out happened, which is what a Cesta
-          // being Fuori "since" means at the counter.
-          since: await lastMovimentoAt(ctx, cesta._id, "ritiro"),
+          // The Ritiro that took her out, or the Rettifica that says she
+          // turned up here — whichever last put her in his hands (#20).
+          since: await fuoriSince(ctx, cesta._id),
         })),
       ),
     };

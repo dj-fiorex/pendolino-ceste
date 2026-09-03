@@ -6,9 +6,10 @@ import type {
   EtichettaSize,
   Forma,
 } from "@/convex/schema";
-import { cesteCount } from "@/lib/ceste";
+import { cesteCount, stateLabel } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
 import { ETICHETTA_SIZE_LABELS } from "@/lib/etichetta";
+import { rettificaCauseLabel } from "@/lib/movimento";
 
 /** A Registro row as the screen receives it. */
 export type RegistroRow = {
@@ -151,6 +152,17 @@ export const registroSentence = ({
       return `${operatore} ha registrato un Rientro di ${cesteCount(action.numeri.length)} da ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
     case "svuotamento":
       return `${operatore} ha svuotato ${cesteCount(action.numeri.length)}: ${numeriInSentence(action.numeri)}.`;
+    case "rettifica": {
+      // Where the Rettifica left her, and, where that is a Cliente's hands,
+      // whose: the row already names him, and the sentence says why he is on
+      // it.
+      const becomes =
+        action.becomes === "fuori"
+          ? `Fuori con ${whom(cliente)}`
+          : stateLabel[action.becomes];
+      const note = action.note === undefined ? "" : ` Nota: «${action.note}»`;
+      return `${operatore} ha registrato una Rettifica sulla Cesta ${action.numero}: ${rettificaCauseLabel[action.cause].toLowerCase()}. Adesso è ${becomes}.${note}`;
+    }
     case "cliente_disattivato":
       return action.numeriFuori.length === 0
         ? `${operatore} ha disattivato il Cliente ${action.name}.`

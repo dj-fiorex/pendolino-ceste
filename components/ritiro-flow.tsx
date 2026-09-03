@@ -155,7 +155,14 @@ export function RitiroFlow() {
               return `${cesta.codice} è già nell'elenco.`;
             }
             setCeste([...ceste, cesta]);
-            return null;
+            // A Cesta an Admin has written off goes out with the Cliente all
+            // the same: she is in the yard and he is loading her, and the
+            // counter is never blocked (ADR-0005). The app says what it knows —
+            // she counts again only once an Admin records the Rettifica of
+            // ritrovata on her own page (#20).
+            return cesta.state === "dismessa"
+              ? `${cesta.codice} risulta Dismessa: la registro lo stesso, ma torna a contare solo con una Rettifica di un Admin.`
+              : null;
           }}
         />
         <Button

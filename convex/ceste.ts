@@ -149,51 +149,65 @@ const readNumero = (typed: string): number | null => {
 };
 
 /**
+ * The Cesta a typed numero answers to, or null when none does — including the
+ * one an Admin has written off: a Dismessa Cesta exists, and a screen saying
+ * what she is beats a screen pretending she never did (ADR-0005).
+ */
+async function cestaByNumero(
+  ctx: QueryCtx,
+  typed: string,
+): Promise<Doc<"ceste"> | null> {
+  const numero = readNumero(typed);
+  if (numero === null) {
+    return null;
+  }
+  return await ctx.db
+    .query("ceste")
+    .withIndex("by_numero", (q) => q.eq("numero", numero))
+    .unique();
+}
+
+/**
+ * A Cesta as the screens that work one at a time receive her: what is printed
+ * on her Etichetta, where the app believes she is, and whom it believes has
+ * her.
+ *
+ * The state is here so that a screen can say what it is about to correct —
+ * "400-R-005 risulta Fuori: verrà svuotata con una Rettifica" (#18) — and never
+ * so that anything can refuse her for it (ADR-0005).
+ */
+const foundCesta = v.object({
+  _id: v.id("ceste"),
+  numero: v.number(),
+  codice: v.string(),
+  portata,
+  state,
+  cliente: v.union(v.null(), v.object(clienteShape)),
+});
+
+/**
  * The Cesta answering to a typed numero, or null when none does, so that the
  * screen can say so and add nothing (spec #1, story 57). The full Codice comes
  * back with her: a glance at `400-R-017` confirms the right Cesta without
  * anybody typing the prefix.
  *
- * She comes back with the Cliente the app believes is holding her, which is how
- * a Rientro finds whose the load is without anybody being searched for: the
- * Operatore reads one numero off the trailer and the app names the Cliente
- * (#17).
+ * She comes back with the Cliente the app believes is holding her, and with
+ * nobody unless she is Fuori: a Cesta at the mill is in nobody's hands, and one
+ * in Attesa molitura wears a name on her tape rather than being held, so the
+ * Rientro falls back to the Cliente search (#16). That is how a Rientro finds
+ * whose the load is without anybody being searched for — the Operatore reads
+ * one numero off the trailer and the app names the Cliente (#17).
  *
  * Whatever state she is in, she comes back: the counter is never blocked
- * (ADR-0005). Saying so plainly on the counter screens, and writing the
- * Rettifica that records it there, is #21's — the Svuotamento already does
- * both (#18).
+ * (ADR-0005). Saying so plainly on the counter screens is #21's — the
+ * Svuotamento already does it (#18).
  */
 export const byNumero = query({
   args: { numero: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      _id: v.id("ceste"),
-      numero: v.number(),
-      codice: v.string(),
-      portata,
-      // Where the app believes she is. Nothing refuses her for it (ADR-0005);
-      // it comes back so that a screen can say what it is about to correct —
-      // "400-R-005 risulta Fuori: verrà svuotata con una Rettifica" (#18).
-      state,
-      // Whom the app believes is holding her, and nobody unless she is Fuori:
-      // a Cesta at the mill is in nobody's hands, and one in Attesa molitura
-      // wears a name on her tape rather than being held. Either way the
-      // Rientro falls back to the Cliente search (#16).
-      cliente: v.union(v.null(), v.object(clienteShape)),
-    }),
-  ),
+  returns: v.union(v.null(), foundCesta),
   handler: async (ctx, args) => {
     await requireOperatore(ctx);
-    const numero = readNumero(args.numero);
-    if (numero === null) {
-      return null;
-    }
-    const cesta = await ctx.db
-      .query("ceste")
-      .withIndex("by_numero", (q) => q.eq("numero", numero))
-      .unique();
+    const cesta = await cestaByNumero(ctx, args.numero);
     if (cesta === null) {
       return null;
     }
@@ -204,6 +218,38 @@ export const byNumero = query({
       portata: cesta.portata,
       state: cesta.state,
       cliente: cesta.state === "fuori" ? await clienteWith(ctx, cesta) : null,
+    };
+  },
+});
+
+/**
+ * One Cesta as her own page reads her: what is printed on her Etichetta, where
+ * she is, and whom the app believes has her — the tape's name while she waits
+ * in the yard, the Cliente's while she is Fuori.
+ *
+ * Found by her numero, because that is how the mill says which Cesta it means.
+ * A Dismessa Cesta reads back here like any other: her page and the history
+ * under it are exactly what nothing ever deletes (ADR-0004).
+ */
+export const get = query({
+  args: { numero: v.string() },
+  // The same Cesta the counter reads, and her Forma besides: her page is where
+  // the Etichetta is read back whole.
+  returns: v.union(v.null(), foundCesta.extend({ forma })),
+  handler: async (ctx, args) => {
+    await requireOperatore(ctx);
+    const cesta = await cestaByNumero(ctx, args.numero);
+    if (cesta === null) {
+      return null;
+    }
+    return {
+      _id: cesta._id,
+      numero: cesta.numero,
+      codice: cesta.codice,
+      portata: cesta.portata,
+      forma: cesta.forma,
+      state: cesta.state,
+      cliente: await clienteWith(ctx, cesta),
     };
   },
 });

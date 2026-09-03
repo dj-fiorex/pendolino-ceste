@@ -1,5 +1,5 @@
 import type { Id } from "@/convex/_generated/dataModel";
-import type { State } from "@/convex/schema";
+import type { Forma, State } from "@/convex/schema";
 import type { Cliente } from "@/lib/cliente";
 
 /** How many Ceste, as the counter says it. */
@@ -16,6 +16,20 @@ export const stateLabel: Record<State, string> = {
   fuori: "Fuori",
   attesa_molitura: "Attesa molitura",
   dismessa: "Dismessa",
+};
+
+/** How each state reads on a badge: the mill's colours for the mill's words. */
+export const stateClass: Record<State, string> = {
+  disponibile: "bg-secondary text-secondary-foreground",
+  fuori: "bg-primary text-primary-foreground",
+  attesa_molitura: "bg-muted text-muted-foreground",
+  dismessa: "bg-destructive/10 text-destructive",
+};
+
+/** The Forma as a screen writes it out, where the Codice writes it Q or R. */
+export const formaLabel: Record<Forma, string> = {
+  quadrata: "Quadrata",
+  rettangolare: "Rettangolare",
 };
 
 /**

@@ -1,10 +1,11 @@
 "use client";
 
+import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Forma, State } from "@/convex/schema";
-import { stateLabel } from "@/lib/ceste";
+import { formaLabel, stateClass, stateLabel } from "@/lib/ceste";
 import { cn } from "@/lib/utils";
 
 /** A Cesta as the fleet screen shows her. */
@@ -14,18 +15,6 @@ export type FleetCesta = {
   portata: number;
   forma: Forma;
   state: State;
-};
-
-const formaLabel: Record<Forma, string> = {
-  quadrata: "Quadrata",
-  rettangolare: "Rettangolare",
-};
-
-const stateClass: Record<State, string> = {
-  disponibile: "bg-secondary text-secondary-foreground",
-  fuori: "bg-primary text-primary-foreground",
-  attesa_molitura: "bg-muted text-muted-foreground",
-  dismessa: "bg-destructive/10 text-destructive",
 };
 
 /**
@@ -83,18 +72,30 @@ export function CesteList({
               </span>
             </>
           );
-          const className = cn(
-            "flex items-center gap-3 rounded-lg border bg-card px-4 py-3",
-            isTicked && "border-primary bg-secondary",
-          );
+          const inner = "flex flex-1 items-center gap-3";
 
           return (
-            <li key={cesta.numero}>
-              {canPrint ? (
-                <label className={className}>{row}</label>
-              ) : (
-                <div className={className}>{row}</div>
+            <li
+              key={cesta.numero}
+              className={cn(
+                "flex items-center gap-3 rounded-lg border bg-card px-4 py-3",
+                isTicked && "border-primary bg-secondary",
               )}
+            >
+              {canPrint ? (
+                <label className={inner}>{row}</label>
+              ) : (
+                <div className={inner}>{row}</div>
+              )}
+              {/* Her own page: where she has been, and where an Admin says
+                  she has got to (#20). */}
+              <Link
+                href={`/ceste/${cesta.numero}`}
+                aria-label={`Apri la Cesta ${cesta.codice}`}
+                className="text-muted-foreground"
+              >
+                <ChevronRightIcon className="size-5" />
+              </Link>
             </li>
           );
         })}
