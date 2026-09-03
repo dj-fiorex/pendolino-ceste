@@ -366,7 +366,12 @@ export default defineSchema({
     // The action this Movimento was part of, so that the Registro reads a
     // Ritiro of six Ceste as the one thing a person did (ADR-0006).
     registroId: v.id("registro"),
-  }).index("by_cliente", ["clienteId"]),
+  })
+    .index("by_cliente", ["clienteId"])
+    // One Cesta's own history, newest last: how the Ritiro that took her out is
+    // found, which is what "Fuori since" means on the Rientro and on the Lista
+    // di recupero (#22).
+    .index("by_cesta", ["cestaId"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   // Written inside the mutation making the change, never edited and never

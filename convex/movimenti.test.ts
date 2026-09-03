@@ -145,6 +145,9 @@ describe("a Ritiro at the counter", () => {
         codice: `400-R-00${numero}`,
         portata: 400,
         forma: "rettangolare",
+        // When the Ritiro that took her out happened: what the counter reads
+        // as "Fuori dal 25 ott · 11 giorni".
+        since: expect.any(Number),
       })),
     });
   });
@@ -479,6 +482,32 @@ describe("a Rientro at the counter", () => {
       [1, "Giuseppe Amato"],
       [2, "Salvatore Russo"],
       [4, "Giuseppe Amato"],
+    ]);
+  });
+
+  test("a Cesta Fuori says when the Ritiro that took her out happened", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    // Out, back, and out again: what the counter reads as "Fuori dal 25 ott"
+    // is the Ritiro that took her out this time, not the one before it.
+    const cesteIds = await takeAway(marco, clienteId, ["1"]);
+    await marco.mutation(api.movimenti.rientro, { clienteId, cesteIds });
+    await marco.mutation(api.movimenti.ritiro, { clienteId, cesteIds });
+
+    const ritiri = (await marco.query(api.movimenti.byCliente, { clienteId }))
+      .filter((movimento) => movimento.kind === "ritiro")
+      .map((movimento) => movimento.at)
+      .sort((one, other) => one - other);
+    expect(ritiri).toHaveLength(2);
+    const cliente = await marco.query(api.clienti.get, { clienteId });
+    expect(cliente?.cesteFuori).toEqual([
+      expect.objectContaining({ numero: 1, since: ritiri[1] }),
     ]);
   });
 

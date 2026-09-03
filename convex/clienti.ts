@@ -65,6 +65,25 @@ async function cesteFuoriOf(
 }
 
 /**
+ * When the Ritiro that took a Cesta out happened, which is what a Cesta being
+ * Fuori "since" means at the counter. A Cesta that reached Fuori some other
+ * way — a Rettifica of #20 — has no Ritiro to date, and says so rather than
+ * inventing one.
+ */
+async function fuoriSince(
+  ctx: QueryCtx,
+  cestaId: Id<"ceste">,
+): Promise<number | null> {
+  const ritiro = await ctx.db
+    .query("movimenti")
+    .withIndex("by_cesta", (q) => q.eq("cestaId", cestaId))
+    .order("desc")
+    .filter((q) => q.eq(q.field("kind"), "ritiro"))
+    .first();
+  return ritiro?._creationTime ?? null;
+}
+
+/**
  * Refuses a Cliente that nothing would tell apart from the namesakes already
  * in the registry.
  *
@@ -254,6 +273,9 @@ export const get = query({
           codice: v.string(),
           portata,
           forma,
+          // When the Ritiro that took her out happened, so that the counter can
+          // say how long she has been gone (#17, #22).
+          since: v.union(v.null(), v.number()),
         }),
       ),
     }),
@@ -267,13 +289,16 @@ export const get = query({
     return {
       ...asCliente(cliente),
       active: cliente.active,
-      cesteFuori: (await cesteFuoriOf(ctx, cliente._id)).map((cesta) => ({
-        _id: cesta._id,
-        numero: cesta.numero,
-        codice: cesta.codice,
-        portata: cesta.portata,
-        forma: cesta.forma,
-      })),
+      cesteFuori: await Promise.all(
+        (await cesteFuoriOf(ctx, cliente._id)).map(async (cesta) => ({
+          _id: cesta._id,
+          numero: cesta.numero,
+          codice: cesta.codice,
+          portata: cesta.portata,
+          forma: cesta.forma,
+          since: await fuoriSince(ctx, cesta._id),
+        })),
+      ),
     };
   },
 });
