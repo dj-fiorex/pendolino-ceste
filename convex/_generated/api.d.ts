@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as campagne from "../campagne.js";
 import type * as ceste from "../ceste.js";
 import type * as clienti from "../clienti.js";
 import type * as etichette from "../etichette.js";
@@ -26,6 +27,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  campagne: typeof campagne;
   ceste: typeof ceste;
   clienti: typeof clienti;
   etichette: typeof etichette;

@@ -6,6 +6,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { campagnaFor } from "./campagne";
 import { requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
@@ -56,10 +57,19 @@ const atTheCounter = {
 
 type CounterMovimento = keyof typeof atTheCounter;
 
+/**
+ * The Campagna the device recording a Movimento names: the choice the app
+ * asked its Operatore for once, because the mill has none open, and has shown
+ * in the header ever since (#19). The open Campagna wins over it, and a
+ * Movimento goes through with neither.
+ */
+const campagnaArg = { campagnaId: v.optional(v.id("campagne")) };
+
 /** What either movement at the counter is: a Cliente, and the Ceste added. */
 const counterArgs = {
   clienteId: v.id("clienti"),
   cesteIds: v.array(v.id("ceste")),
+  ...campagnaArg,
 };
 
 /**
@@ -82,10 +92,17 @@ const counterArgs = {
 async function recordAtTheCounter(
   ctx: MutationCtx,
   kind: CounterMovimento,
-  args: { clienteId: Id<"clienti">; cesteIds: Id<"ceste">[] },
+  args: {
+    clienteId: Id<"clienti">;
+    cesteIds: Id<"ceste">[];
+    campagnaId?: Id<"campagne">;
+  },
 ): Promise<null> {
   const { name, becomes } = atTheCounter[kind];
   const operatore = await requireOperatore(ctx);
+  // Settled once for the whole movement, so that the Registro row and every
+  // Movimento under it name the same season (ADR-0006).
+  const campagnaId = await campagnaFor(ctx, args.campagnaId);
   const cliente = await ctx.db.get(args.clienteId);
   if (cliente === null) {
     throw new Error("This Cliente is not in the registry.");
@@ -106,6 +123,7 @@ async function recordAtTheCounter(
   const registroId = await writeRegistroRow(ctx, {
     operatoreId: operatore._id,
     clienteId: cliente._id,
+    campagnaId,
     action: {
       kind,
       numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
@@ -119,6 +137,7 @@ async function recordAtTheCounter(
       cestaId: cesta._id,
       clienteId: cliente._id,
       operatoreId: operatore._id,
+      campagnaId,
       registroId,
     });
   }
@@ -168,10 +187,11 @@ export const rientro = mutation({
  * somebody with olives on their hands back to the counter (ADR-0005).
  */
 export const svuotamento = mutation({
-  args: { cesteIds: v.array(v.id("ceste")) },
+  args: { cesteIds: v.array(v.id("ceste")), ...campagnaArg },
   returns: v.null(),
   handler: async (ctx, args) => {
     const operatore = await requireOperatore(ctx);
+    const campagnaId = await campagnaFor(ctx, args.campagnaId);
 
     // The same Cesta twice — tapped on her tile and then typed on the keypad —
     // is one Cesta emptied once.
@@ -187,6 +207,7 @@ export const svuotamento = mutation({
 
     const registroId = await writeRegistroRow(ctx, {
       operatoreId: operatore._id,
+      campagnaId,
       action: {
         kind: "svuotamento",
         numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
@@ -203,6 +224,7 @@ export const svuotamento = mutation({
           cestaId: cesta._id,
           clienteId: cesta.clienteId,
           operatoreId: operatore._id,
+          campagnaId,
           registroId,
           rettifica: { cause: "discrepanza", believedState: cesta.state },
         });
@@ -220,6 +242,7 @@ export const svuotamento = mutation({
         kind: "svuotamento",
         cestaId: cesta._id,
         operatoreId: operatore._id,
+        campagnaId,
         registroId,
       });
     }
@@ -247,6 +270,9 @@ export const byCesta = query({
       ),
       operatore: v.string(),
       at: v.number(),
+      // The Campagna the Movimento belonged to, as she is named now, and
+      // nobody on the Movimenti recorded before the mill had one (#19).
+      campagna: v.union(v.null(), v.string()),
       registroId: v.id("registro"),
       // What a Rettifica corrected, and nothing on every other kind.
       rettifica: v.union(v.null(), v.object(rettificaFields)),
@@ -266,6 +292,10 @@ export const byCesta = query({
           movimento.clienteId === undefined
             ? null
             : await ctx.db.get(movimento.clienteId);
+        const campagna =
+          movimento.campagnaId === undefined
+            ? null
+            : await ctx.db.get(movimento.campagnaId);
         if (operatore === null) {
           // Neither an Operatore nor a Cliente is ever deleted (ADR-0004).
           throw new Error("A Movimento names an Operatore that is gone.");
@@ -278,6 +308,7 @@ export const byCesta = query({
               : { name: cliente.name, alias: cliente.alias },
           operatore: operatore.name,
           at: movimento._creationTime,
+          campagna: campagna?.name ?? null,
           registroId: movimento.registroId,
           rettifica: movimento.rettifica ?? null,
         };

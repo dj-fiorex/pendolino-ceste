@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CampagnaBar } from "@/components/campagna-bar";
-import { RientroFlow } from "@/components/rientro-flow";
+import { CampagneAdmin } from "@/components/campagne-admin";
 import { signedInOperatore } from "@/lib/auth-server";
 
 /**
- * The Rientro: the Cliente drives back in with a load of full Ceste, and one
- * numero off the trailer is enough to say whose they are.
+ * The Campagne: the mill's seasons, opened at the start and closed at the end.
+ * An Admin's, like everything that acts on the Campagne rather than on the
+ * day's movements (CONTEXT.md) — and refused to everybody else by the
+ * mutations themselves, not by this redirect.
  */
-export default async function Rientro() {
+export default async function Campagne() {
   const { signedIn, operatore } = await signedInOperatore();
   if (!signedIn) {
     redirect("/accedi");
   }
-  if (operatore === null) {
+  if (operatore === null || operatore.role !== "admin") {
     redirect("/");
   }
 
@@ -27,14 +28,14 @@ export default async function Rientro() {
           ← Indietro
         </Link>
         <h1 className="font-display text-3xl font-bold tracking-tight">
-          Rientro
+          Le Campagne
         </h1>
         <p className="text-muted-foreground">
-          Chi riporta le Ceste piene, e quali sono.
+          La stagione a cui appartiene quello che si registra al banco.
+          Chiuderla non sposta nessuna Cesta.
         </p>
       </div>
-      <CampagnaBar />
-      <RientroFlow />
+      <CampagneAdmin />
     </main>
   );
 }

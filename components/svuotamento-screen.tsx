@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { HashIcon } from "lucide-react";
 import { useState } from "react";
+import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaTile } from "@/components/cesta-tile";
 import { NumeroKeypad } from "@/components/numero-keypad";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ const FROM_THE_KEYPAD = "keypad";
  */
 export function SvuotamentoScreen() {
   const empty = useMutation(api.movimenti.svuotamento);
+  const { campagnaId, mustAsk } = useCampagnaChoice();
   const yard = useQuery(api.ceste.attesaMolituraByCliente);
   const [selected, setSelected] = useState<Id<"ceste">[]>([]);
   // Ceste typed on the keypad that the app does not have in Attesa molitura.
@@ -156,7 +158,7 @@ export function SvuotamentoScreen() {
     setPending(true);
     setFailed(false);
     try {
-      await empty({ cesteIds: chosen });
+      await empty({ cesteIds: chosen, campagnaId });
       playConfirmation();
       setSelected([]);
       // What was typed in and has now been emptied leaves with the tiles; what
@@ -278,10 +280,14 @@ export function SvuotamentoScreen() {
         </Dialog>
         <Button
           className="h-16 flex-1 text-xl"
-          disabled={pending || chosen.length === 0}
+          disabled={pending || chosen.length === 0 || mustAsk}
           onClick={confirm}
         >
-          {pending ? "Un attimo…" : `Svuota ${cesteCount(chosen.length)}`}
+          {pending
+            ? "Un attimo…"
+            : mustAsk
+              ? "Scegli prima la Campagna"
+              : `Svuota ${cesteCount(chosen.length)}`}
         </Button>
       </div>
     </>

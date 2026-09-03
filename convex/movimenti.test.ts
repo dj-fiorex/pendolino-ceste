@@ -131,6 +131,9 @@ describe("a Ritiro at the counter", () => {
       at: expect.any(Number),
       operatore: "Marco",
       cliente: { name: "Giuseppe Amato", alias: [] },
+      // The mill has no Campagna open here, and the Ritiro goes through all
+      // the same: the counter is not blocked by the calendar either (#19).
+      campagna: null,
       action: {
         kind: "ritiro",
         numeri: [1, 2, 3, 4, 5, 6],
@@ -347,6 +350,7 @@ describe("a Rientro at the counter", () => {
       at: expect.any(Number),
       operatore: "Marco",
       cliente: { name: "Giuseppe Amato", alias: [] },
+      campagna: null,
       action: { kind: "rientro", numeri: [1, 2, 3, 4] },
     });
     // Back at the mill, still full: not yet Disponibile, and no longer Fuori.
@@ -636,6 +640,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       at: expect.any(Number),
       operatore: "Marco",
       cliente: null,
+      campagna: null,
       action: { kind: "svuotamento", numeri: [1, 2, 3, 4, 5] },
     });
     expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
@@ -678,6 +683,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       operatore: "Marco",
       at: expect.any(Number),
+      campagna: null,
       registroId: expect.any(String),
     });
     // The Rettifica and the Svuotamento are one action (ADR-0006).
@@ -720,6 +726,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       cliente: null,
       operatore: "Marco",
       at: expect.any(Number),
+      campagna: null,
       registroId: expect.any(String),
     });
   });

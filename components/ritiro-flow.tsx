@@ -3,6 +3,7 @@
 import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
+import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
 import { NumeroField } from "@/components/numero-field";
@@ -29,6 +30,7 @@ import { clienteLabel, type Cliente } from "@/lib/cliente";
  */
 export function RitiroFlow() {
   const recordRitiro = useMutation(api.movimenti.ritiro);
+  const { campagnaId, mustAsk } = useCampagnaChoice();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [ceste, setCeste] = useState<FoundCesta[]>([]);
   const [failed, setFailed] = useState(false);
@@ -77,6 +79,7 @@ export function RitiroFlow() {
       await recordRitiro({
         clienteId: cliente._id,
         cesteIds: ceste.map((cesta) => cesta._id),
+        campagnaId,
       });
       setDone({ cliente, count: ceste.length });
     } catch {
@@ -157,12 +160,14 @@ export function RitiroFlow() {
         />
         <Button
           className="h-14 w-full text-lg"
-          disabled={pending || ceste.length === 0}
+          disabled={pending || ceste.length === 0 || mustAsk}
           onClick={confirm}
         >
           {pending
             ? "Un attimo…"
-            : `Conferma Ritiro · ${cesteCount(ceste.length)}`}
+            : mustAsk
+              ? "Scegli prima la Campagna"
+              : `Conferma Ritiro · ${cesteCount(ceste.length)}`}
         </Button>
       </div>
     </div>

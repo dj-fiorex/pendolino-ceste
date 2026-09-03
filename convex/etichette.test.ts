@@ -82,6 +82,7 @@ describe("the Etichetta settings", () => {
         at: expect.any(Number),
         operatore: "Gabriele",
         cliente: null,
+        campagna: null,
         action: {
           kind: "etichette_settings",
           changes: [

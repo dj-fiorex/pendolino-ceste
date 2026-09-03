@@ -198,6 +198,7 @@ describe("the Registro", () => {
         at: expect.any(Number),
         operatore: "Marco",
         cliente: { name: "Giuseppe Amato", alias: [] },
+        campagna: null,
         action: {
           kind: "cliente_creato",
           name: "Giuseppe Amato",
@@ -254,6 +255,7 @@ describe("correcting a Cliente", () => {
       at: expect.any(Number),
       operatore: "Marco",
       cliente: { name: "Giuseppe Amato", alias: [] },
+      campagna: null,
       action: {
         kind: "cliente_modificato",
         changes: [
@@ -378,6 +380,7 @@ describe("deactivating a Cliente", () => {
       at: expect.any(Number),
       operatore: "Gabriele",
       cliente: { name: "Giuseppe Amato", alias: [] },
+      campagna: null,
       action: {
         kind: "cliente_disattivato",
         name: "Giuseppe Amato",

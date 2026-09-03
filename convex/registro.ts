@@ -2,6 +2,7 @@ import type { IndexRange } from "convex/server";
 import { v, type Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { openCampagna } from "./campagne";
 import { requireAdmin } from "./operatori";
 import { action, type Action } from "./schema";
 
@@ -37,6 +38,9 @@ type Filters = Infer<ReturnType<typeof v.object<typeof filters>>>;
  * a mutation of its own, so that the change and the row it is recorded under
  * cannot exist without each other (ADR-0006). Hands back the row's id, which
  * every Movimento the same action produces carries (#16).
+ *
+ * The Campagna is settled here rather than by each caller, so that no mutation
+ * has to remember to say which season its row belongs to (#19).
  */
 export async function writeRegistroRow(
   ctx: MutationCtx,
@@ -44,10 +48,20 @@ export async function writeRegistroRow(
     operatoreId: Id<"operatori">;
     /** The Cliente the action concerns, where it concerns one. */
     clienteId?: Id<"clienti">;
+    /**
+     * The Campagna the action belongs to, where the mutation has already
+     * settled it: a Movimento at the counter, which stamps the same one on
+     * every Cesta it moves, and an action on a Campagna herself, which is
+     * about the one it names rather than the one that happens to be open.
+     * Every other action takes the Campagna the mill has open, and none where
+     * it has none.
+     */
+    campagnaId?: Id<"campagne">;
     action: Action;
   },
 ): Promise<Id<"registro">> {
-  return await ctx.db.insert("registro", row);
+  const campagnaId = row.campagnaId ?? (await openCampagna(ctx))?._id;
+  return await ctx.db.insert("registro", { ...row, campagnaId });
 }
 
 /**
@@ -127,6 +141,22 @@ async function operatoreOf(
   return operatore;
 }
 
+/**
+ * The Campagna a row belongs to, as she is named now: renaming a Campagna
+ * renames the season, and the rows recorded in it read under the new name.
+ * The rows written before the app knew about Campagne belong to none (#19).
+ */
+async function campagnaNameOf(
+  ctx: QueryCtx,
+  row: Doc<"registro">,
+): Promise<string | null> {
+  if (row.campagnaId === undefined) {
+    return null;
+  }
+  const campagna = await ctx.db.get(row.campagnaId);
+  return campagna?.name ?? null;
+}
+
 /** The Cliente a row concerns, where it concerns one. Never deleted either. */
 async function clienteOf(
   ctx: QueryCtx,
@@ -163,6 +193,9 @@ export const list = query({
         v.null(),
         v.object({ name: v.string(), alias: v.array(v.string()) }),
       ),
+      // The Campagna the action belonged to, and nobody on the rows that
+      // predate the mill's first one.
+      campagna: v.union(v.null(), v.string()),
       action,
     }),
   ),
@@ -181,6 +214,7 @@ export const list = query({
             cliente === null
               ? null
               : { name: cliente.name, alias: cliente.alias },
+          campagna: await campagnaNameOf(ctx, row),
           action: row.action,
         };
       }),

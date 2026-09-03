@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CampagnaBar } from "@/components/campagna-bar";
 import { RitiroFlow } from "@/components/ritiro-flow";
 import { signedInOperatore } from "@/lib/auth-server";
 
@@ -32,6 +33,7 @@ export default async function Ritiro() {
           Chi ritira, e quali Ceste si porta via.
         </p>
       </div>
+      <CampagnaBar />
       <RitiroFlow />
     </main>
   );

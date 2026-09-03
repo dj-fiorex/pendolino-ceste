@@ -177,6 +177,7 @@ describe("the Registro of a day", () => {
       at: expect.any(Number),
       operatore: "Marco",
       cliente: { name: "Giuseppe Amato", alias: [] },
+      campagna: null,
       action: {
         kind: "cliente_modificato",
         changes: [

@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
+import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
 import { NumeroField } from "@/components/numero-field";
@@ -34,6 +35,7 @@ type OnTheTrailer = { _id: Id<"ceste">; numero: number; codice: string };
  */
 export function RientroFlow() {
   const recordRientro = useMutation(api.movimenti.rientro);
+  const { campagnaId, mustAsk } = useCampagnaChoice();
   // The one Cesta the load was identified by: whose the app says it is before
   // the Cliente is settled, and the Cesta the tiles are opened with after.
   const [identifiedBy, setIdentifiedBy] = useState<FoundCesta | null>(null);
@@ -144,7 +146,11 @@ export function RientroFlow() {
       setPending(true);
       setFailed(false);
       try {
-        await recordRientro({ clienteId: cliente._id, cesteIds: ticked });
+        await recordRientro({
+          clienteId: cliente._id,
+          cesteIds: ticked,
+          campagnaId,
+        });
         setDone({ cliente, count: ticked.length });
       } catch {
         setFailed(true);
@@ -242,12 +248,14 @@ export function RientroFlow() {
           />
           <Button
             className="h-14 w-full text-lg"
-            disabled={pending || ticked.length === 0}
+            disabled={pending || ticked.length === 0 || mustAsk}
             onClick={confirm}
           >
             {pending
               ? "Un attimo…"
-              : `Registra Rientro · ${cesteCount(ticked.length)}`}
+              : mustAsk
+                ? "Scegli prima la Campagna"
+                : `Registra Rientro · ${cesteCount(ticked.length)}`}
           </Button>
         </div>
       </div>

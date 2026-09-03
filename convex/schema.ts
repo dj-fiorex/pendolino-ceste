@@ -246,11 +246,10 @@ export const dayBounds = (day: string) => {
 /**
  * What a Registro row says was done, one member per kind of action. Every
  * mutation that changes the domain writes its row in the same transaction, and
- * each ticket adds its member here as it adds its mutation (ADR-0006). #19 adds
- * the Campagna the action belongs to.
+ * each ticket adds its member here as it adds its mutation (ADR-0006).
  *
- * The Operatore and the Cliente are not here: they are fields of the row, so
- * that the Registro reads for one Cliente or one Operatore through an index.
+ * The Operatore, the Cliente and the Campagna are not here: they are fields of
+ * the row, so that the Registro reads for one of them through an index.
  * What is here is what the action alone knows.
  */
 export const action = v.union(
@@ -304,6 +303,28 @@ export const action = v.union(
     // The Ceste the Cliente was still holding when the Admin went ahead: the
     // row says the warning was seen, not merely that somebody was deactivated.
     numeriFuori: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal("campagna_aperta"),
+    // The name the season was opened under: a later rename changes the
+    // Campagna, never what this row says happened (ADR-0004).
+    name: v.string(),
+  }),
+  v.object({
+    kind: v.literal("campagna_rinominata"),
+    before: v.string(),
+    after: v.string(),
+  }),
+  v.object({
+    kind: v.literal("campagna_chiusa"),
+    name: v.string(),
+    // The Ceste still Fuori when the Admin went ahead: the row says the
+    // warning was seen, and that closing moved none of them (#19).
+    numeriFuori: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal("campagna_riaperta"),
+    name: v.string(),
   }),
   v.object({
     kind: v.literal("etichette_settings"),
@@ -387,9 +408,24 @@ export default defineSchema({
   // reads as the app's own.
   settings: defineTable(etichettaSettingsFields),
 
+  // The mill's seasons. At most one is open at any moment — enforced in the
+  // mutation that opens one and not only in the screen that offers it — and
+  // every Movimento belongs to one: the open Campagna, or the one the
+  // Operatore named when none was (CONTEXT.md).
+  campagne: defineTable({
+    name: v.string(),
+    // When the season was opened, and when it was closed, or nothing while it
+    // is still open. Reopening clears the close rather than moving the
+    // opening: the season started when it started, and the Registro is what
+    // says it was closed by mistake and put back (ADR-0004).
+    openedAt: v.number(),
+    closedAt: v.union(v.null(), v.number()),
+  })
+    // The open Campagna as a single row: the read every Movimento makes.
+    .index("by_closedAt", ["closedAt"]),
+
   // One row per Cesta per occasion: six Ceste leaving together are six
-  // Movimenti (CONTEXT.md). Never edited and never deleted (ADR-0004); the
-  // Campagna each one belongs to arrives with #19.
+  // Movimenti (CONTEXT.md). Never edited and never deleted (ADR-0004).
   movimenti: defineTable({
     kind: movimentoKind,
     cestaId: v.id("ceste"),
@@ -401,6 +437,13 @@ export default defineSchema({
     // mill would go looking for why a Cesta stopped being counted against them.
     clienteId: v.optional(v.id("clienti")),
     operatoreId: v.id("operatori"),
+    // The Campagna this Movimento belongs to: the one open when it happened,
+    // or, when none was, the one the Operatore named on this device (#19).
+    // Absent on the Movimenti recorded before the app knew about Campagne, and
+    // on any recorded while the mill has none at all — the counter is never
+    // blocked by the calendar (ADR-0005), and no row is rewritten afterwards
+    // to say otherwise (ADR-0004).
+    campagnaId: v.optional(v.id("campagne")),
     // The action this Movimento was part of, so that the Registro reads a
     // Ritiro of six Ceste as the one thing a person did (ADR-0006).
     registroId: v.id("registro"),
@@ -426,7 +469,10 @@ export default defineSchema({
     // Operatore, as ADR-0006 has it, so that the Registro of one Cliente is a
     // range read rather than a scan of every action ever taken.
     clienteId: v.optional(v.id("clienti")),
-    // The Campagna the action belongs to joins these with #19.
+    // The Campagna the action belongs to, beside them for the same reason
+    // (ADR-0006), and absent on the same terms as on a Movimento: the rows
+    // written before this table knew about Campagne carry none.
+    campagnaId: v.optional(v.id("campagne")),
     action,
   })
     // The two filters the Registro offers besides the day, which the built-in

@@ -16,8 +16,25 @@ export type RegistroRow = {
   at: number;
   operatore: string;
   cliente: ClienteName | null;
+  /** The Campagna it belongs to, and nobody on the rows that predate them. */
+  campagna: string | null;
   action: Action;
 };
+
+/**
+ * The actions that are about a Campagna herself, and so name her in their own
+ * sentence: saying the Campagna after them again would read as a stammer.
+ */
+const ABOUT_A_CAMPAGNA: Action["kind"][] = [
+  "campagna_aperta",
+  "campagna_rinominata",
+  "campagna_chiusa",
+  "campagna_riaperta",
+];
+
+/** Whether a row still has to say which Campagna it belongs to. */
+export const saysItsCampagna = (row: RegistroRow) =>
+  row.campagna !== null && !ABOUT_A_CAMPAGNA.includes(row.action.kind);
 
 /** The hour a row was written, as the mill reads a clock. */
 export const timeOf = (at: number) =>
@@ -138,6 +155,16 @@ export const registroSentence = ({
       return action.numeriFuori.length === 0
         ? `${operatore} ha disattivato il Cliente ${action.name}.`
         : `${operatore} ha disattivato il Cliente ${action.name}, che aveva ancora ${cesteCount(action.numeriFuori.length)} Fuori: ${numeriInSentence(action.numeriFuori)}.`;
+    case "campagna_aperta":
+      return `${operatore} ha aperto la Campagna ${action.name}.`;
+    case "campagna_rinominata":
+      return `${operatore} ha rinominato la Campagna da ${quoted(action.before)} a ${quoted(action.after)}.`;
+    case "campagna_chiusa":
+      return action.numeriFuori.length === 0
+        ? `${operatore} ha chiuso la Campagna ${action.name}.`
+        : `${operatore} ha chiuso la Campagna ${action.name}, con ancora ${cesteCount(action.numeriFuori.length)} Fuori: ${numeriInSentence(action.numeriFuori)}.`;
+    case "campagna_riaperta":
+      return `${operatore} ha riaperto la Campagna ${action.name}.`;
     case "etichette_settings":
       return `${operatore} ha cambiato le Etichette: ${changesInSentence(action.changes, etichettaFieldLabel, etichettaValue)}.`;
   }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CampagnaBar } from "@/components/campagna-bar";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +45,7 @@ export default async function Home() {
               {roleLabel[operatore.role]}
             </p>
           </div>
+          <CampagnaBar />
           <Card>
             <CardHeader>
               <CardTitle>Il banco</CardTitle>
@@ -72,18 +74,17 @@ export default async function Home() {
           {operatore.role === "admin" && (
             <Card>
               <CardHeader>
-                <CardTitle>Il Registro</CardTitle>
+                <CardTitle>Il Registro e le Campagne</CardTitle>
                 <CardDescription>
-                  Chi ha fatto cosa, e quando. Giorno per giorno.
+                  Chi ha fatto cosa, e quando. E la stagione a cui appartiene.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button
-                  variant="outline"
-                  asChild
-                  className="h-12 w-full text-base"
-                >
+              <CardContent className="grid gap-3">
+                <Button variant="outline" asChild className="h-12 text-base">
                   <Link href="/registro">Apri il Registro</Link>
+                </Button>
+                <Button variant="outline" asChild className="h-12 text-base">
+                  <Link href="/campagne">Le Campagne</Link>
                 </Button>
               </CardContent>
             </Card>

@@ -241,6 +241,21 @@ async function clientiHolding(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
   );
 }
 
+/**
+ * The Ceste of a set, one group per Cliente named on them, with the Ceste the
+ * app believes are nobody's — none, unless a Rettifica put one there — as one
+ * group of their own rather than as one group each. The order inside a group
+ * is the order they came in, which both readers set by numero.
+ */
+function byCliente(ceste: Doc<"ceste">[]): Doc<"ceste">[][] {
+  const groups = new Map<string, Doc<"ceste">[]>();
+  for (const cesta of ceste) {
+    const key = cesta.clienteId ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), cesta]);
+  }
+  return [...groups.values()];
+}
+
 /** A Cesta as a tile or a row of the yard shows her. */
 const waitingCesta = {
   _id: v.id("ceste"),
@@ -311,17 +326,9 @@ export const attesaMolituraByCliente = query({
     const ceste = await inAttesaMolitura(ctx);
     const clienti = await clientiHolding(ctx, ceste);
 
-    // Grouped on the Cliente the tape names, with the Ceste the app believes
-    // are nobody's — none, unless a Rettifica put one here — as one group of
-    // their own rather than as one group each.
-    const groups = new Map<string, Doc<"ceste">[]>();
-    for (const cesta of ceste) {
-      const key = cesta.clienteId ?? "";
-      groups.set(key, [...(groups.get(key) ?? []), cesta]);
-    }
-
+    // Grouped on the Cliente the tape names, which is whose the load is.
     const dated = await Promise.all(
-      [...groups.values()].map(async (group) => {
+      byCliente(ceste).map(async (group) => {
         const rientri = await Promise.all(
           group.map((cesta) => lastMovimentoAt(ctx, cesta._id, "rientro")),
         );
@@ -349,6 +356,60 @@ export const attesaMolituraByCliente = query({
         );
       }
       return one.ceste[0].numero - other.ceste[0].numero;
+    });
+  },
+});
+
+/**
+ * The Ceste out with somebody right now, one group per Cliente, by name: which
+ * Ceste are still Fuori and who holds them.
+ *
+ * What an Admin closing a Campagna is shown before they go ahead, since
+ * closing moves none of them (#19). The Lista di recupero reads the same fact
+ * with the dates and the telephone that chasing them needs (#22).
+ */
+export const fuoriByCliente = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      cliente: v.union(v.null(), v.object(clienteShape)),
+      ceste: v.array(v.object({ numero: v.number(), codice: v.string() })),
+    }),
+  ),
+  handler: async (ctx) => {
+    await requireOperatore(ctx);
+    const ceste = (
+      await ctx.db
+        .query("ceste")
+        .withIndex("by_state", (q) => q.eq("state", "fuori"))
+        .collect()
+    ).sort((one, other) => one.numero - other.numero);
+    const clienti = await clientiHolding(ctx, ceste);
+
+    // Grouped on the Cliente the Cesta went out to, which is who to call.
+    const groups = byCliente(ceste).map((group) => {
+      const [first] = group;
+      return {
+        cliente:
+          first.clienteId === undefined
+            ? null
+            : (clienti.get(first.clienteId) ?? null),
+        ceste: group.map((cesta) => ({
+          numero: cesta.numero,
+          codice: cesta.codice,
+        })),
+      };
+    });
+
+    // By name, as every list of Clienti is read, and the Ceste nobody is
+    // holding last, where a name would have been.
+    return groups.sort((one, other) => {
+      if (one.cliente === null || other.cliente === null) {
+        return (
+          (one.cliente === null ? 1 : 0) - (other.cliente === null ? 1 : 0)
+        );
+      }
+      return one.cliente.name.localeCompare(other.cliente.name, "it");
     });
   },
 });

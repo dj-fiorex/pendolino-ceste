@@ -1,6 +1,7 @@
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CampagnaBar } from "@/components/campagna-bar";
 import { SvuotamentoScreen } from "@/components/svuotamento-screen";
 import { Button } from "@/components/ui/button";
 import { signedInOperatore } from "@/lib/auth-server";
@@ -31,6 +32,7 @@ export default async function Svuotamento() {
           Svuotamento
         </h1>
       </div>
+      <CampagnaBar />
       <SvuotamentoScreen />
     </main>
   );

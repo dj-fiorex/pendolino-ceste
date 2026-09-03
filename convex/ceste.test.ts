@@ -158,6 +158,7 @@ describe("Censimento", () => {
         operatore: "Gabriele",
         // A Censimento concerns no Cliente.
         cliente: null,
+        campagna: null,
         action: {
           kind: "censimento",
           portata: 400,

@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { dayBounds } from "@/convex/schema";
 import { clienteLabel } from "@/lib/cliente";
-import { registroSentence, timeOf } from "@/lib/registro";
+import { registroSentence, saysItsCampagna, timeOf } from "@/lib/registro";
 
 /** The option that narrows nothing, and the value the DOM gives it. */
 const NARROWS_NOTHING = "";
@@ -162,7 +162,17 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
               <span className="font-display font-bold tabular-nums text-muted-foreground">
                 {timeOf(row.at)}
               </span>
-              <p className="flex-1">{registroSentence(row)}</p>
+              <p className="flex-1">
+                {registroSentence(row)}
+                {/* The Campagna the action belonged to, where the sentence
+                    has not already said it (#19). */}
+                {saysItsCampagna(row) && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · Campagna {row.campagna}
+                  </span>
+                )}
+              </p>
             </li>
           ))}
         </ol>
