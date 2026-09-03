@@ -26,6 +26,15 @@ export const state = v.union(
 );
 
 /**
+ * What a Movimento is: one Cesta changing state on one occasion. Each ticket
+ * adds its member here as it adds its mutation — Rientro (#17), Svuotamento
+ * (#18) and Rettifica (#20, #21) follow.
+ */
+export const movimentoKind = v.union(v.literal("ritiro"));
+
+export type MovimentoKind = Infer<typeof movimentoKind>;
+
+/**
  * The size of the printed Etichetta, out of the sizes a print shop cuts as a
  * matter of course. The Forma is not one of these: it belongs to the Cesta and
  * is chosen at Censimento (ADR-0007).
@@ -79,6 +88,73 @@ export const etichettaSettingField = v.union(
 
 export type EtichettaSettingField = Infer<typeof etichettaSettingField>;
 
+/** A value as it is stored: no leading, trailing or doubled spaces. */
+export const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
+
+/**
+ * A name as two Clienti are compared by it. "mario  rossi" and "Mario Rossi"
+ * are one person at the counter, so neither case nor spacing tells two Clienti
+ * apart.
+ */
+export const comparableName = (text: string) => tidy(text).toLowerCase();
+
+/** How many Clienti a search hands back, on screen as in the query. */
+export const MAX_SEARCH_RESULTS = 20;
+
+/**
+ * The Clienti already answering to a name. A deactivated one counts: they stay
+ * on the Lista di recupero holding Ceste (ADR-0004), and two rows there that
+ * nothing tells apart is the confusion this rule exists to prevent.
+ */
+export const namesakesOf = <T extends { name: string }>(
+  clienti: T[],
+  name: string,
+) =>
+  clienti.filter(
+    (other) => comparableName(other.name) === comparableName(name),
+  );
+
+/** Why an Alias fails to tell a Cliente apart from their namesakes. */
+export type NamesakeClash = "no_alias" | "shared_alias";
+
+/**
+ * Whether an Alias tells a Cliente apart from the namesakes they were entered
+ * against, and if not, why: two Clienti never share a name and an Alias, and a
+ * namesake with no Alias at all is the same person (CONTEXT.md).
+ *
+ * One rule in two voices: the mutation turns the answer into a refusal, the
+ * form into the sentence that says what to type instead.
+ */
+export const namesakeClash = (
+  alias: string[],
+  namesakes: { alias: string[] }[],
+): NamesakeClash | null => {
+  if (namesakes.length === 0) {
+    return null;
+  }
+  if (alias.length === 0) {
+    return "no_alias";
+  }
+  const taken = new Set(
+    namesakes.flatMap((namesake) => namesake.alias.map(comparableName)),
+  );
+  return alias.some((one) => taken.has(comparableName(one)))
+    ? "shared_alias"
+    : null;
+};
+
+/**
+ * What can be corrected on a Cliente, each one named so that a Registro row
+ * can say which of them an Operatore changed.
+ */
+export const clienteField = v.union(
+  v.literal("name"),
+  v.literal("alias"),
+  v.literal("phone"),
+);
+
+export type ClienteField = Infer<typeof clienteField>;
+
 /**
  * What a Registro row says was done, one member per kind of action. Every
  * mutation that changes the domain writes its row in the same transaction, and
@@ -94,6 +170,41 @@ export const action = v.union(
     count: v.number(),
     fromNumero: v.number(),
     toNumero: v.number(),
+  }),
+  v.object({
+    kind: v.literal("cliente_creato"),
+    clienteId: v.id("clienti"),
+    // The name as it was written that day: a later edit changes the Cliente,
+    // never what this row says happened (ADR-0004).
+    name: v.string(),
+  }),
+  v.object({
+    kind: v.literal("cliente_modificato"),
+    clienteId: v.id("clienti"),
+    // Only what actually changed, each with what it said before and what it
+    // says now (#27).
+    changes: v.array(
+      v.object({
+        field: clienteField,
+        before: v.union(v.null(), v.string(), v.array(v.string())),
+        after: v.union(v.null(), v.string(), v.array(v.string())),
+      }),
+    ),
+  }),
+  v.object({
+    kind: v.literal("ritiro"),
+    clienteId: v.id("clienti"),
+    // The Ceste that went out, by numero, so that the Registro reads as the
+    // Operatore would say it: "un Ritiro di 6 Ceste: 12, 45, 78…" (#27).
+    numeri: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal("cliente_disattivato"),
+    clienteId: v.id("clienti"),
+    name: v.string(),
+    // The Ceste the Cliente was still holding when the Admin went ahead: the
+    // row says the warning was seen, not merely that somebody was deactivated.
+    numeriFuori: v.array(v.number()),
   }),
   v.object({
     kind: v.literal("etichette_settings"),
@@ -133,18 +244,61 @@ export default defineSchema({
     forma,
     codice: v.string(),
     state,
+    // The Cliente the Cesta is out with, while she is Fuori. Held here beside
+    // the state rather than replayed from the Movimenti, for the same reason
+    // the state is (ADR-0005): "who has this Cesta" is where she is.
+    clienteId: v.optional(v.id("clienti")),
     active: v.boolean(),
   })
     // Also the sequence: the highest numero handed out so far is the first row
     // of this index read backwards.
     .index("by_numero", ["numero"])
-    .index("by_state", ["state"]),
+    .index("by_state", ["state"])
+    // Which Ceste a Cliente is holding: the Lista di recupero's own read (#22),
+    // and the warning before an Admin deactivates somebody.
+    .index("by_cliente_and_state", ["clienteId", "state"]),
+
+  // The mill's registry: whoever takes Ceste away and brings them back. Never
+  // deleted, only deactivated (ADR-0004), so that a Cliente still holding Ceste
+  // stays on the Lista di recupero after the mill has written them off.
+  clienti: defineTable({
+    name: v.string(),
+    // The further names the counter knows them by, Soprannomi on screen. Shown
+    // after the name wherever Clienti are listed, and matched by search, so
+    // that two Giuseppe Amato are told apart by the person typing.
+    alias: v.array(v.string()),
+    // Nullable rather than absent: the mill either knows a Cliente's telephone
+    // or it does not, and the Lista di recupero has to say which (#22).
+    phone: v.union(v.null(), v.string()),
+    // The Gestionale record this Cliente answers to, once the one-way mirror
+    // exists (ADR-0003). Nothing populates it yet, and nothing ever writes
+    // back to the Gestionale.
+    gestionaleId: v.union(v.null(), v.string()),
+    active: v.boolean(),
+  })
+    // The registry is read whole and sorted by name: this is that order.
+    .index("by_name", ["name"]),
 
   // What the whole mill has settled on, as one row and no more: the Etichetta
   // the print shop prints, and, when #22 arrives, the Soglia di ritardo beside
   // it. An empty table means nobody has changed anything yet, and every setting
   // reads as the app's own.
   settings: defineTable(etichettaSettingsFields),
+
+  // One row per Cesta per occasion: six Ceste leaving together are six
+  // Movimenti (CONTEXT.md). Never edited and never deleted (ADR-0004); the
+  // Campagna each one belongs to arrives with #19.
+  movimenti: defineTable({
+    kind: movimentoKind,
+    cestaId: v.id("ceste"),
+    // The Cliente the Cesta moved to or from. The Svuotamento of #18 has none
+    // and widens this field when it arrives.
+    clienteId: v.id("clienti"),
+    operatoreId: v.id("operatori"),
+    // The action this Movimento was part of, so that #27 can read a Ritiro of
+    // six Ceste as the one thing a person did (ADR-0006).
+    registroId: v.id("registro"),
+  }).index("by_cliente", ["clienteId"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   registro: defineTable({

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
+import { cesteCount } from "@/lib/ceste";
 
 /**
  * The fleet: what the mill owns, of which Portata and Forma, and where each
@@ -30,6 +31,9 @@ export default async function Ceste() {
     fetchAuthQuery(api.ceste.disponibiliByPortata, {}),
   ]);
 
+  // Every Cesta a Cliente is holding: what the Disponibili have fallen by.
+  const fuori = ceste.filter((cesta) => cesta.state === "fuori").length;
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
       <div className="space-y-2">
@@ -43,7 +47,7 @@ export default async function Ceste() {
           Le Ceste
         </h1>
         <p className="text-muted-foreground">
-          {ceste.length === 1 ? "1 Cesta" : `${ceste.length} Ceste`} in tutto.
+          {cesteCount(ceste.length)} in tutto.
         </p>
       </div>
 
@@ -52,18 +56,25 @@ export default async function Ceste() {
           <CardTitle>Disponibili adesso</CardTitle>
           <CardDescription>Al frantoio, vuote, pronte da dare.</CardDescription>
         </CardHeader>
-        <CardContent className="flex gap-3">
-          {disponibili.map(({ portata, count }) => (
-            <div
-              key={portata}
-              className="flex-1 rounded-lg bg-secondary px-4 py-3"
-            >
-              <p className="font-display text-3xl font-bold text-secondary-foreground tabular-nums">
-                {count}
-              </p>
-              <p className="text-sm text-muted-foreground">da {portata} kg</p>
-            </div>
-          ))}
+        <CardContent className="grid gap-3">
+          <div className="flex gap-3">
+            {disponibili.map(({ portata, count }) => (
+              <div
+                key={portata}
+                className="flex-1 rounded-lg bg-secondary px-4 py-3"
+              >
+                <p className="font-display text-3xl font-bold text-secondary-foreground tabular-nums">
+                  {count}
+                </p>
+                <p className="text-sm text-muted-foreground">da {portata} kg</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {fuori === 0
+              ? "Nessuna Cesta è Fuori."
+              : `${cesteCount(fuori)} ${fuori === 1 ? "è Fuori" : "sono Fuori"}, con i Clienti.`}
+          </p>
         </CardContent>
       </Card>
 

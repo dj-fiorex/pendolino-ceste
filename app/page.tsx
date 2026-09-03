@@ -46,14 +46,30 @@ export default async function Home() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Le Ceste</CardTitle>
+              <CardTitle>Il banco</CardTitle>
               <CardDescription>
-                Quante Ceste ci sono, di che Portata, e dove sono. Ritiri,
-                Rientri e Svuotamenti arrivano nelle prossime versioni.
+                Chi ritira, e quali Ceste si porta via. Rientri e Svuotamenti
+                arrivano nelle prossime versioni.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               <Button asChild className="h-12 text-base">
+                <Link href="/ritiro">Nuovo Ritiro</Link>
+              </Button>
+              <Button variant="outline" asChild className="h-12 text-base">
+                <Link href="/clienti">I Clienti</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Le Ceste</CardTitle>
+              <CardDescription>
+                Quante Ceste ci sono, di che Portata, e dove sono.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <Button variant="outline" asChild className="h-12 text-base">
                 <Link href="/ceste">Vedi le Ceste</Link>
               </Button>
               <SignOutButton />

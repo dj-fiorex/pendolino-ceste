@@ -10,8 +10,10 @@
 
 import type * as auth from "../auth.js";
 import type * as ceste from "../ceste.js";
+import type * as clienti from "../clienti.js";
 import type * as etichette from "../etichette.js";
 import type * as http from "../http.js";
+import type * as movimenti from "../movimenti.js";
 import type * as operatori from "../operatori.js";
 import type * as registro from "../registro.js";
 import type * as seed from "../seed.js";
@@ -25,8 +27,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   ceste: typeof ceste;
+  clienti: typeof clienti;
   etichette: typeof etichette;
   http: typeof http;
+  movimenti: typeof movimenti;
   operatori: typeof operatori;
   registro: typeof registro;
   seed: typeof seed;

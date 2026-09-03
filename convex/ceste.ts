@@ -116,6 +116,63 @@ export const list = query({
 });
 
 /**
+ * The numero as the Operatore types it: a Cesta wears her numero to three
+ * digits on her Etichetta, and at the counter one types 17 or 017 for the same
+ * Cesta. Anything that is not a numero at all is nobody's.
+ */
+const readNumero = (typed: string): number | null => {
+  const digits = typed.trim();
+  if (!/^\d+$/.test(digits)) {
+    return null;
+  }
+  const numero = Number(digits);
+  return Number.isSafeInteger(numero) && numero > 0 ? numero : null;
+};
+
+/**
+ * The Cesta answering to a typed numero, or null when none does, so that the
+ * screen can say so and add nothing (spec #1, story 57). The full Codice comes
+ * back with her: a glance at `400-R-017` confirms the right Cesta without
+ * anybody typing the prefix.
+ *
+ * Whatever state she is in, she comes back: the counter is never blocked
+ * (ADR-0005). Saying plainly that she was not where the app believed, and
+ * writing the Rettifica that records it, is #21's.
+ */
+export const byNumero = query({
+  args: { numero: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("ceste"),
+      numero: v.number(),
+      codice: v.string(),
+      portata,
+    }),
+  ),
+  handler: async (ctx, args) => {
+    await requireOperatore(ctx);
+    const numero = readNumero(args.numero);
+    if (numero === null) {
+      return null;
+    }
+    const cesta = await ctx.db
+      .query("ceste")
+      .withIndex("by_numero", (q) => q.eq("numero", numero))
+      .unique();
+    if (cesta === null) {
+      return null;
+    }
+    return {
+      _id: cesta._id,
+      numero: cesta.numero,
+      codice: cesta.codice,
+      portata: cesta.portata,
+    };
+  },
+});
+
+/**
  * How many Ceste are Disponibile right now, by Portata: the number an
  * Operatore needs before promising a Cliente containers. The Forma never
  * splits it (ADR-0007), and both Portate are always reported, so that none
