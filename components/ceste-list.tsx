@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Forma, State } from "@/convex/schema";
+import { stateLabel } from "@/lib/ceste";
 import { cn } from "@/lib/utils";
 
 /** A Cesta as the fleet screen shows her. */
@@ -18,13 +19,6 @@ export type FleetCesta = {
 const formaLabel: Record<Forma, string> = {
   quadrata: "Quadrata",
   rettangolare: "Rettangolare",
-};
-
-const stateLabel: Record<State, string> = {
-  disponibile: "Disponibile",
-  fuori: "Fuori",
-  attesa_molitura: "Attesa molitura",
-  dismessa: "Dismessa",
 };
 
 const stateClass: Record<State, string> = {

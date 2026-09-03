@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { asCliente, clienteShape } from "./clienti";
+import { lastMovimentoAt } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import { forma, portata, state, type Forma, type Portata } from "./schema";
@@ -159,8 +160,9 @@ const readNumero = (typed: string): number | null => {
  * (#17).
  *
  * Whatever state she is in, she comes back: the counter is never blocked
- * (ADR-0005). Saying plainly that she was not where the app believed, and
- * writing the Rettifica that records it, is #21's.
+ * (ADR-0005). Saying so plainly on the counter screens, and writing the
+ * Rettifica that records it there, is #21's — the Svuotamento already does
+ * both (#18).
  */
 export const byNumero = query({
   args: { numero: v.string() },
@@ -171,6 +173,10 @@ export const byNumero = query({
       numero: v.number(),
       codice: v.string(),
       portata,
+      // Where the app believes she is. Nothing refuses her for it (ADR-0005);
+      // it comes back so that a screen can say what it is about to correct —
+      // "400-R-005 risulta Fuori: verrà svuotata con una Rettifica" (#18).
+      state,
       // Whom the app believes is holding her, and nobody unless she is Fuori:
       // a Cesta at the mill is in nobody's hands, and one in Attesa molitura
       // wears a name on her tape rather than being held. Either way the
@@ -196,9 +202,58 @@ export const byNumero = query({
       numero: cesta.numero,
       codice: cesta.codice,
       portata: cesta.portata,
+      state: cesta.state,
       cliente: cesta.state === "fuori" ? await clienteWith(ctx, cesta) : null,
     };
   },
+});
+
+/** The Ceste back at the mill and still full, by numero. */
+async function inAttesaMolitura(ctx: QueryCtx): Promise<Doc<"ceste">[]> {
+  const waiting = await ctx.db
+    .query("ceste")
+    .withIndex("by_state", (q) => q.eq("state", "attesa_molitura"))
+    .collect();
+  // A Dismessa Cesta is not in Attesa molitura anyway, but every read that
+  // fills a list filters on the active flag regardless (ADR-0004).
+  return waiting
+    .filter((cesta) => cesta.active)
+    .sort((one, other) => one.numero - other.numero);
+}
+
+/**
+ * The Clienti a set of Ceste names, as every screen names them. A yard of
+ * forty Ceste is a handful of Clienti: each of them is read once, not once per
+ * Cesta bearing their name.
+ */
+async function clientiHolding(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
+  return new Map(
+    (
+      await Promise.all(
+        [...new Set(ceste.flatMap((cesta) => cesta.clienteId ?? []))].map(
+          (clienteId) => ctx.db.get(clienteId),
+        ),
+      )
+    ).flatMap((cliente) =>
+      // A Cliente is deactivated but never deleted (ADR-0004).
+      cliente === null ? [] : [[cliente._id, asCliente(cliente)] as const],
+    ),
+  );
+}
+
+/** A Cesta as a tile or a row of the yard shows her. */
+const waitingCesta = {
+  _id: v.id("ceste"),
+  numero: v.number(),
+  codice: v.string(),
+  portata,
+};
+
+const asWaitingCesta = (cesta: Doc<"ceste">) => ({
+  _id: cesta._id,
+  numero: cesta.numero,
+  codice: cesta.codice,
+  portata: cesta.portata,
 });
 
 /**
@@ -206,58 +261,95 @@ export const byNumero = query({
  * whose name the paper tape carries. This is the list the yard is walked with:
  * what the app believes is waiting to be milled, read against the tapes on the
  * Ceste themselves.
- *
- * The Svuotamento screen of #18 is this same read, grouped by Cliente and laid
- * out for hands that have been in the olives.
  */
 export const attesaMolitura = query({
   args: {},
   returns: v.array(
     v.object({
-      _id: v.id("ceste"),
-      numero: v.number(),
-      codice: v.string(),
-      portata,
+      ...waitingCesta,
       cliente: v.union(v.null(), v.object(clienteShape)),
     }),
   ),
   handler: async (ctx) => {
     await requireOperatore(ctx);
-    const waiting = await ctx.db
-      .query("ceste")
-      .withIndex("by_state", (q) => q.eq("state", "attesa_molitura"))
-      .collect();
-    // A Dismessa Cesta is not in Attesa molitura anyway, but every read that
-    // fills a list filters on the active flag regardless (ADR-0004).
-    const ceste = waiting.filter((cesta) => cesta.active);
+    const ceste = await inAttesaMolitura(ctx);
+    const clienti = await clientiHolding(ctx, ceste);
+    return ceste.map((cesta) => ({
+      ...asWaitingCesta(cesta),
+      cliente:
+        cesta.clienteId === undefined
+          ? null
+          : (clienti.get(cesta.clienteId) ?? null),
+    }));
+  },
+});
 
-    // A yard of forty Ceste is a handful of Clienti: each of them is read once,
-    // not once per Cesta bearing their name.
-    const clienti = new Map(
-      (
-        await Promise.all(
-          [...new Set(ceste.flatMap((cesta) => cesta.clienteId ?? []))].map(
-            (clienteId) => ctx.db.get(clienteId),
-          ),
-        )
-      ).flatMap((cliente) =>
-        // A Cliente is deactivated but never deleted (ADR-0004).
-        cliente === null ? [] : [[cliente._id, asCliente(cliente)] as const],
-      ),
+/**
+ * The same Ceste, grouped as the Svuotamento screen empties them: one group
+ * per Cliente, because the Cliente is what the paper tape says, and oldest
+ * Rientro first, because that is the load that has been waiting longest (#18).
+ *
+ * A Cliente whose Ceste came back over several days is one group all the same,
+ * dated by the oldest Rientro among them: whoever empties them works from the
+ * tapes, and the tapes say a name rather than a load. The Ceste inside a group
+ * come by numero, which is the order they are stacked and read in.
+ */
+export const attesaMolituraByCliente = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      cliente: v.union(v.null(), v.object(clienteShape)),
+      // The oldest Rientro in the group: the date on its header. A Cesta that
+      // reached Attesa molitura some other way has none, and a group of only
+      // such Ceste says so rather than inventing a date.
+      oldestRientro: v.union(v.null(), v.number()),
+      ceste: v.array(v.object(waitingCesta)),
+    }),
+  ),
+  handler: async (ctx) => {
+    await requireOperatore(ctx);
+    const ceste = await inAttesaMolitura(ctx);
+    const clienti = await clientiHolding(ctx, ceste);
+
+    // Grouped on the Cliente the tape names, with the Ceste the app believes
+    // are nobody's — none, unless a Rettifica put one here — as one group of
+    // their own rather than as one group each.
+    const groups = new Map<string, Doc<"ceste">[]>();
+    for (const cesta of ceste) {
+      const key = cesta.clienteId ?? "";
+      groups.set(key, [...(groups.get(key) ?? []), cesta]);
+    }
+
+    const dated = await Promise.all(
+      [...groups.values()].map(async (group) => {
+        const rientri = await Promise.all(
+          group.map((cesta) => lastMovimentoAt(ctx, cesta._id, "rientro")),
+        );
+        const known = rientri.filter((at) => at !== null);
+        const [first] = group;
+        return {
+          cliente:
+            first.clienteId === undefined
+              ? null
+              : (clienti.get(first.clienteId) ?? null),
+          oldestRientro: known.length === 0 ? null : Math.min(...known),
+          ceste: group.map(asWaitingCesta),
+        };
+      }),
     );
 
-    return ceste
-      .sort((one, other) => one.numero - other.numero)
-      .map((cesta) => ({
-        _id: cesta._id,
-        numero: cesta.numero,
-        codice: cesta.codice,
-        portata: cesta.portata,
-        cliente:
-          cesta.clienteId === undefined
-            ? null
-            : (clienti.get(cesta.clienteId) ?? null),
-      }));
+    // Longest wait first. A group with no Rientro to date goes last rather than
+    // first, and ties — two Clienti whose Ceste came in on the same Rientro,
+    // which one Movimento apart is all it takes — break on the numero the
+    // Ceste are read in, so that the screen never reshuffles between reads.
+    return dated.sort((one, other) => {
+      if (one.oldestRientro !== other.oldestRientro) {
+        return (
+          (one.oldestRientro ?? Infinity) - (other.oldestRientro ?? Infinity)
+        );
+      }
+      return one.ceste[0].numero - other.ceste[0].numero;
+    });
   },
 });
 

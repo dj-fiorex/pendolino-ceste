@@ -8,4 +8,6 @@ import type { MovimentoKind } from "@/convex/schema";
 export const movimentoLabel: Record<MovimentoKind, string> = {
   ritiro: "Ritiro",
   rientro: "Rientro",
+  svuotamento: "Svuotamento",
+  rettifica: "Rettifica",
 };

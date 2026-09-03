@@ -27,12 +27,40 @@ export const state = v.union(
 
 /**
  * What a Movimento is: one Cesta changing state on one occasion. Each ticket
- * adds its member here as it adds its mutation — Svuotamento (#18) and
- * Rettifica (#20, #21) follow.
+ * adds its member here as it adds its mutation — the Rettifiche an Admin
+ * records by hand follow with #20 and #28.
  */
-export const movimentoKind = v.union(v.literal("ritiro"), v.literal("rientro"));
+export const movimentoKind = v.union(
+  v.literal("ritiro"),
+  v.literal("rientro"),
+  v.literal("svuotamento"),
+  v.literal("rettifica"),
+);
 
 export type MovimentoKind = Infer<typeof movimentoKind>;
+
+/**
+ * Why a Rettifica was written. Only *discrepanza* is here, because it is the
+ * only one the app writes itself: a Movimento going through on a Cesta that
+ * was not where the app believed writes one as it goes (ADR-0005). The four an
+ * Admin chooses — persa, rotta, ritrovata, errore — arrive with #20 and #28,
+ * and no Admin can ever choose this one.
+ */
+export const rettificaCause = v.union(v.literal("discrepanza"));
+
+/**
+ * What a Rettifica records besides the Cesta it is written against: why, and
+ * where the app believed the Cesta was at the moment the Movimento beside it
+ * went through.
+ *
+ * That belief is the fact the mill has never been able to see (ADR-0005), and
+ * it is gone from the Cesta the instant she moves — so it is written down here
+ * rather than worked out afterwards from a history that no longer holds it.
+ */
+export const rettificaFields = {
+  cause: rettificaCause,
+  believedState: state,
+};
 
 /**
  * The size of the printed Etichetta, out of the sizes a print shop cuts as a
@@ -265,6 +293,12 @@ export const action = v.union(
     numeri: v.array(v.number()),
   }),
   v.object({
+    kind: v.literal("svuotamento"),
+    // The Ceste tipped out, by numero. No Cliente anywhere on the row: the
+    // tapes come off and the load is nobody's by the time it is milled (#18).
+    numeri: v.array(v.number()),
+  }),
+  v.object({
     kind: v.literal("cliente_disattivato"),
     name: v.string(),
     // The Ceste the Cliente was still holding when the Admin went ahead: the
@@ -359,19 +393,28 @@ export default defineSchema({
   movimenti: defineTable({
     kind: movimentoKind,
     cestaId: v.id("ceste"),
-    // The Cliente the Cesta moved to or from. The Svuotamento of #18 has none
-    // and widens this field when it arrives.
-    clienteId: v.id("clienti"),
+    // The Cliente the Cesta moved to or from, where there is one. A Ritiro and
+    // a Rientro always name the Cliente at the counter. A Svuotamento names
+    // nobody: the Cesta is tipped out at the mill and her tape comes off. A
+    // Rettifica names whoever the app believed was holding her, so that the
+    // correction turns up in that Cliente's own history, which is where the
+    // mill would go looking for why a Cesta stopped being counted against them.
+    clienteId: v.optional(v.id("clienti")),
     operatoreId: v.id("operatori"),
     // The action this Movimento was part of, so that the Registro reads a
     // Ritiro of six Ceste as the one thing a person did (ADR-0006).
     registroId: v.id("registro"),
+    // Only a Rettifica carries this, and every Rettifica does.
+    rettifica: v.optional(v.object(rettificaFields)),
   })
     .index("by_cliente", ["clienteId"])
-    // One Cesta's own history, newest last: how the Ritiro that took her out is
-    // found, which is what "Fuori since" means on the Rientro and on the Lista
-    // di recupero (#22).
-    .index("by_cesta", ["cestaId"]),
+    // One Cesta's own history, newest last.
+    .index("by_cesta", ["cestaId"])
+    // The newest Movimento of one kind against her, read as a single row: the
+    // Ritiro that took her out, which is what "Fuori since" means on the
+    // Rientro and on the Lista di recupero (#22), and the Rientro that brought
+    // her back, which dates a Cliente's stack on the Svuotamento screen (#18).
+    .index("by_cesta_and_kind", ["cestaId", "kind"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   // Written inside the mutation making the change, never edited and never

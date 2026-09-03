@@ -48,8 +48,7 @@ export default async function Home() {
             <CardHeader>
               <CardTitle>Il banco</CardTitle>
               <CardDescription>
-                Chi ritira, chi riporta, e quali Ceste. Lo Svuotamento arriva
-                nella prossima versione.
+                Chi ritira, chi riporta, e quali Ceste si svuotano.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
@@ -58,6 +57,9 @@ export default async function Home() {
               </Button>
               <Button asChild className="h-12 text-base">
                 <Link href="/rientro">Nuovo Rientro</Link>
+              </Button>
+              <Button asChild className="h-12 text-base">
+                <Link href="/svuotamento">Svuotamento</Link>
               </Button>
               <Button variant="outline" asChild className="h-12 text-base">
                 <Link href="/attesa-molitura">Attesa molitura</Link>

@@ -59,6 +59,34 @@ const typeNumero = async (device: Device, numero: string) => {
   return cesta._id;
 };
 
+/** A Ritiro of the numeri given, so that there is a load to bring back. */
+const takeAway = async (
+  device: Device,
+  clienteId: Id<"clienti">,
+  numeri: string[],
+) => {
+  const cesteIds = [];
+  for (const numero of numeri) {
+    cesteIds.push(await typeNumero(device, numero));
+  }
+  await device.mutation(api.movimenti.ritiro, { clienteId, cesteIds });
+  return cesteIds;
+};
+
+/**
+ * A Ritiro and then the Rientro that brings the load back: the Ceste are in
+ * the yard, full, with the Cliente's name on their tapes.
+ */
+const bringBack = async (
+  device: Device,
+  clienteId: Id<"clienti">,
+  numeri: string[],
+) => {
+  const cesteIds = await takeAway(device, clienteId, numeri);
+  await device.mutation(api.movimenti.rientro, { clienteId, cesteIds });
+  return cesteIds;
+};
+
 describe("a Ritiro at the counter", () => {
   test("six Ceste leave as six Movimenti under one Registro row", async () => {
     const t = startApp();
@@ -171,6 +199,7 @@ describe("a Ritiro at the counter", () => {
       numero: 7,
       codice: "400-R-007",
       portata: 400,
+      state: "disponibile",
       cliente: null,
     });
   });
@@ -255,20 +284,6 @@ describe("a Ritiro at the counter", () => {
 });
 
 describe("a Rientro at the counter", () => {
-  /** A Ritiro of the numeri given, so that there is a load to bring back. */
-  const takeAway = async (
-    device: Device,
-    clienteId: Id<"clienti">,
-    numeri: string[],
-  ) => {
-    const cesteIds = [];
-    for (const numero of numeri) {
-      cesteIds.push(await typeNumero(device, numero));
-    }
-    await device.mutation(api.movimenti.ritiro, { clienteId, cesteIds });
-    return cesteIds;
-  };
-
   test("the numero of one Cesta of the load says whose the load is", async () => {
     const t = startApp();
     const gabriele = await admin(t);
@@ -288,6 +303,7 @@ describe("a Rientro at the counter", () => {
       numero: 2,
       codice: "400-R-002",
       portata: 400,
+      state: "fuori",
       cliente: {
         _id: clienteId,
         name: "Giuseppe Amato",
@@ -524,5 +540,280 @@ describe("a Rientro at the counter", () => {
       t.mutation(api.movimenti.rientro, { clienteId, cesteIds: [cestaId] }),
     ).rejects.toThrow();
     await expect(t.query(api.ceste.attesaMolitura, {})).rejects.toThrow();
+  });
+});
+
+describe("a Svuotamento where the Ceste are tipped out", () => {
+  /** Where Cesta 1 is, and how many Ceste of 400 kg are Disponibile. */
+  const cestaOneAndTheCount = async (device: Device) => {
+    const ceste = await device.query(api.ceste.list, {});
+    const disponibili = await device.query(api.ceste.disponibiliByPortata, {});
+    return {
+      state: ceste.find((cesta) => cesta.numero === 1)?.state,
+      disponibili: disponibili.find((count) => count.portata === 400)?.count,
+    };
+  };
+
+  test("one Cesta goes all the way round: Disponibile, Fuori, Attesa molitura, Disponibile", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    expect(await cestaOneAndTheCount(marco)).toEqual({
+      state: "disponibile",
+      disponibili: 10,
+    });
+
+    const cesteIds = await takeAway(marco, clienteId, ["1"]);
+    expect(await cestaOneAndTheCount(marco)).toEqual({
+      state: "fuori",
+      disponibili: 9,
+    });
+
+    await marco.mutation(api.movimenti.rientro, { clienteId, cesteIds });
+    expect(await cestaOneAndTheCount(marco)).toEqual({
+      state: "attesa_molitura",
+      disponibili: 9,
+    });
+
+    await marco.mutation(api.movimenti.svuotamento, { cesteIds });
+    expect(await cestaOneAndTheCount(marco)).toEqual({
+      state: "disponibile",
+      disponibili: 10,
+    });
+    expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
+  });
+
+  test("a stack of five is emptied in one tap, under one Registro row and no Cliente", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const salvatore = await marco.mutation(api.clienti.create, {
+      name: "Salvatore Russo",
+    });
+    const his = await bringBack(marco, giuseppe, ["1", "2", "3"]);
+    const hers = await bringBack(marco, salvatore, ["4", "5"]);
+
+    // Whoever empties them selects both stacks and taps once.
+    await marco.mutation(api.movimenti.svuotamento, {
+      cesteIds: [...his, ...hers],
+    });
+
+    const histories = await Promise.all(
+      [...his, ...hers].map((cestaId) =>
+        marco.query(api.movimenti.byCesta, { cestaId }),
+      ),
+    );
+    const svuotamenti = histories.map((history) =>
+      history.filter((movimento) => movimento.kind === "svuotamento"),
+    );
+    // One Svuotamento Movimento per Cesta, all of them under the one Registro
+    // row that says what the Operatore did (ADR-0006).
+    expect(svuotamenti.map((one) => one.length)).toEqual([1, 1, 1, 1, 1]);
+    expect(
+      new Set(svuotamenti.flat().map((movimento) => movimento.registroId)).size,
+    ).toBe(1);
+    // A Svuotamento carries no Cliente: the tape comes off and the Cesta is
+    // nobody's again.
+    expect(
+      svuotamenti.flat().every((movimento) => movimento.cliente === null),
+    ).toBe(true);
+    // Every one of them was where the app believed, so nothing was corrected.
+    expect(
+      histories.flat().some((movimento) => movimento.kind === "rettifica"),
+    ).toBe(false);
+
+    expect(await gabriele.query(api.registro.list, {})).toContainEqual({
+      _id: expect.any(String),
+      at: expect.any(Number),
+      operatore: "Marco",
+      cliente: null,
+      action: { kind: "svuotamento", numeri: [1, 2, 3, 4, 5] },
+    });
+    expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
+    expect(await marco.query(api.ceste.disponibiliByPortata, {})).toEqual([
+      { portata: 400, count: 10 },
+      { portata: 250, count: 0 },
+    ]);
+  });
+
+  test("a Cesta the app believed Fuori is emptied anyway, with a Rettifica beside her", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [cestaId] = await takeAway(marco, clienteId, ["3"]);
+
+    // Nobody registered her Rientro, and she is standing full in the mill
+    // regardless: no mutation refuses a Cesta for the state she is in
+    // (ADR-0005).
+    await marco.mutation(api.movimenti.svuotamento, { cesteIds: [cestaId] });
+
+    const ceste = await marco.query(api.ceste.list, {});
+    expect(ceste.find((cesta) => cesta.numero === 3)?.state).toBe(
+      "disponibile",
+    );
+    expect(await marco.query(api.ceste.disponibiliByPortata, {})).toEqual([
+      { portata: 400, count: 10 },
+      { portata: 250, count: 0 },
+    ]);
+
+    const history = await marco.query(api.movimenti.byCesta, { cestaId });
+    expect(history).toContainEqual({
+      kind: "rettifica",
+      // Where the app had her, and with whom: the belief the Svuotamento
+      // corrected, written down beside what actually happened.
+      rettifica: { cause: "discrepanza", believedState: "fuori" },
+      cliente: { name: "Giuseppe Amato", alias: [] },
+      operatore: "Marco",
+      at: expect.any(Number),
+      registroId: expect.any(String),
+    });
+    // The Rettifica and the Svuotamento are one action (ADR-0006).
+    const moved = history.filter(
+      (movimento) =>
+        movimento.kind !== "ritiro" && movimento.kind !== "rientro",
+    );
+    expect(moved.map((movimento) => movimento.kind).sort()).toEqual([
+      "rettifica",
+      "svuotamento",
+    ]);
+    expect(new Set(moved.map((movimento) => movimento.registroId)).size).toBe(
+      1,
+    );
+    // And she stops being counted against him.
+    expect(await marco.query(api.clienti.get, { clienteId })).toMatchObject({
+      cesteFuori: [],
+    });
+  });
+
+  test("a Cesta the app believed Disponibile is emptied too, and is counted once", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const cestaId = await typeNumero(marco, "7");
+
+    await marco.mutation(api.movimenti.svuotamento, { cesteIds: [cestaId] });
+
+    expect(await marco.query(api.ceste.disponibiliByPortata, {})).toEqual([
+      { portata: 400, count: 10 },
+      { portata: 250, count: 0 },
+    ]);
+    expect(
+      await marco.query(api.movimenti.byCesta, { cestaId }),
+    ).toContainEqual({
+      kind: "rettifica",
+      rettifica: { cause: "discrepanza", believedState: "disponibile" },
+      // Nobody was holding her, so the Rettifica names nobody either.
+      cliente: null,
+      operatore: "Marco",
+      at: expect.any(Number),
+      registroId: expect.any(String),
+    });
+  });
+
+  test("the yard reads as one group per Cliente, oldest Rientro first", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      alias: ["Turi"],
+    });
+    const salvatore = await marco.mutation(api.clienti.create, {
+      name: "Salvatore Russo",
+    });
+
+    expect(await marco.query(api.ceste.attesaMolituraByCliente, {})).toEqual(
+      [],
+    );
+    const his = await bringBack(marco, giuseppe, ["4", "1"]);
+    await bringBack(marco, salvatore, ["2"]);
+    // A second load of his, a day later: one Cliente with Ceste from several
+    // Rientri is still one group.
+    const alsoHis = await bringBack(marco, giuseppe, ["7"]);
+
+    const groups = await marco.query(api.ceste.attesaMolituraByCliente, {});
+    expect(
+      groups.map((group) => [
+        group.cliente?.name,
+        group.ceste.map((cesta) => cesta.numero),
+      ]),
+    ).toEqual([
+      ["Giuseppe Amato", [1, 4, 7]],
+      ["Salvatore Russo", [2]],
+    ]);
+    expect(groups[0].cliente).toMatchObject({ alias: ["Turi"] });
+    expect(groups[0].ceste[0]).toEqual({
+      _id: his[1],
+      numero: 1,
+      codice: "400-R-001",
+      portata: 400,
+    });
+
+    // The date on a group's header is the oldest Rientro in it, not the newest.
+    const rientroAt = async (cestaId: Id<"ceste">) =>
+      (await marco.query(api.movimenti.byCesta, { cestaId })).find(
+        (movimento) => movimento.kind === "rientro",
+      )!.at;
+    expect(groups[0].oldestRientro).toBe(await rientroAt(his[0]));
+    expect(groups[0].oldestRientro).toBeLessThan(await rientroAt(alsoHis[0]));
+    expect(groups[0].oldestRientro!).toBeLessThan(groups[1].oldestRientro!);
+  });
+
+  test("a Svuotamento of none is refused, and the same Cesta twice is emptied once", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [cestaId] = await bringBack(marco, clienteId, ["3"]);
+
+    await expect(
+      marco.mutation(api.movimenti.svuotamento, { cesteIds: [] }),
+    ).rejects.toThrow();
+    // Tapped on a tile and then typed on the keypad is one Cesta emptied once.
+    await marco.mutation(api.movimenti.svuotamento, {
+      cesteIds: [cestaId, cestaId],
+    });
+
+    expect(
+      (await marco.query(api.movimenti.byCesta, { cestaId })).filter(
+        (movimento) => movimento.kind === "svuotamento",
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("nobody signed in empties a Cesta, or reads the yard by Cliente", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const clienteId = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [cestaId] = await bringBack(gabriele, clienteId, ["1"]);
+
+    await expect(
+      t.mutation(api.movimenti.svuotamento, { cesteIds: [cestaId] }),
+    ).rejects.toThrow();
+    await expect(
+      t.query(api.ceste.attesaMolituraByCliente, {}),
+    ).rejects.toThrow();
+    await expect(t.query(api.movimenti.byCesta, { cestaId })).rejects.toThrow();
   });
 });

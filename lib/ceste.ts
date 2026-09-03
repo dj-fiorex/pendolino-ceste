@@ -1,9 +1,22 @@
 import type { Id } from "@/convex/_generated/dataModel";
+import type { State } from "@/convex/schema";
 import type { Cliente } from "@/lib/cliente";
 
 /** How many Ceste, as the counter says it. */
 export const cesteCount = (count: number) =>
   count === 1 ? "1 Cesta" : `${count} Ceste`;
+
+/**
+ * Where a Cesta is, in the mill's own words: on the fleet screen, and in the
+ * sentence that says a Cesta about to be emptied was not where the app had her
+ * (#18).
+ */
+export const stateLabel: Record<State, string> = {
+  disponibile: "Disponibile",
+  fuori: "Fuori",
+  attesa_molitura: "Attesa molitura",
+  dismessa: "Dismessa",
+};
 
 /**
  * A Cesta as a typed numero finds her: what is printed on her Etichetta, and
@@ -15,6 +28,7 @@ export type FoundCesta = {
   numero: number;
   codice: string;
   portata: number;
+  state: State;
   cliente: Cliente | null;
 };
 

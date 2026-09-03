@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
+import { lastMovimentoAt } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
@@ -62,25 +63,6 @@ async function cesteFuoriOf(
     )
     .collect();
   return ceste.sort((one, other) => one.numero - other.numero);
-}
-
-/**
- * When the Ritiro that took a Cesta out happened, which is what a Cesta being
- * Fuori "since" means at the counter. A Cesta that reached Fuori some other
- * way — a Rettifica of #20 — has no Ritiro to date, and says so rather than
- * inventing one.
- */
-async function fuoriSince(
-  ctx: QueryCtx,
-  cestaId: Id<"ceste">,
-): Promise<number | null> {
-  const ritiro = await ctx.db
-    .query("movimenti")
-    .withIndex("by_cesta", (q) => q.eq("cestaId", cestaId))
-    .order("desc")
-    .filter((q) => q.eq(q.field("kind"), "ritiro"))
-    .first();
-  return ritiro?._creationTime ?? null;
 }
 
 /**
@@ -296,7 +278,9 @@ export const get = query({
           codice: cesta.codice,
           portata: cesta.portata,
           forma: cesta.forma,
-          since: await fuoriSince(ctx, cesta._id),
+          // When the Ritiro that took her out happened, which is what a Cesta
+          // being Fuori "since" means at the counter.
+          since: await lastMovimentoAt(ctx, cesta._id, "ritiro"),
         })),
       ),
     };
