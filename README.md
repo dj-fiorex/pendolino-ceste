@@ -42,6 +42,11 @@ npx convex run seed:createFirstAdmin \
 
 It refuses to run a second time.
 
+The dev deployment named in `.env.local` already has its Admin:
+`gabriele@frantoio.example`, password `olio-di-ottobre`. It is written down
+because it opens nothing but a dev deployment full of test data, and a screen
+nobody can sign in to is a screen nobody can check.
+
 ## Tests
 
 ```bash
