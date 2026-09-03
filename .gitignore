@@ -6,3 +6,5 @@ node_modules/
 
 # Client-supplied data: never commit (third-party customer registry)
 client_files/
+.vercel
+.env*
