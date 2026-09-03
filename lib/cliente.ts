@@ -1,10 +1,15 @@
 import type { Id } from "@/convex/_generated/dataModel";
 
+/**
+ * As much of a Cliente as it takes to name them: the name, and the Soprannomi
+ * that tell two Giuseppe Amato apart. Everything that writes a Cliente's name
+ * out asks for this and no more.
+ */
+export type ClienteName = { name: string; alias: string[] };
+
 /** A Cliente as the screens carry them around. */
-export type Cliente = {
+export type Cliente = ClienteName & {
   _id: Id<"clienti">;
-  name: string;
-  alias: string[];
   phone: string | null;
 };
 
@@ -13,7 +18,7 @@ export type Cliente = {
  * screen that lists Clienti reads them this way, because the Soprannome is
  * what tells two Giuseppe Amato apart (CONTEXT.md).
  */
-export const clienteLabel = (cliente: { name: string; alias: string[] }) =>
+export const clienteLabel = (cliente: ClienteName) =>
   [cliente.name, ...cliente.alias].join(" · ");
 
 /** The Soprannomi as they are typed: one line, separated by commas. */
@@ -22,3 +27,13 @@ export const readAlias = (typed: string) =>
     .split(",")
     .map((one) => one.trim())
     .filter((one) => one !== "");
+
+/**
+ * A Cliente as a sentence names them: the name, then the Soprannomi in
+ * brackets. The Registro reads as prose rather than as a list, and "Giuseppe
+ * Amato (Turi)" is how the counter would say it out loud.
+ */
+export const clienteInSentence = (cliente: ClienteName) =>
+  cliente.alias.length === 0
+    ? cliente.name
+    : `${cliente.name} (${cliente.alias.join(", ")})`;

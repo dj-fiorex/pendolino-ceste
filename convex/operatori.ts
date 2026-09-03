@@ -91,10 +91,9 @@ export const exists = internalQuery({
  * Operatore arrives by seed script or by an Admin's invitation (#26), never by
  * signing themselves up.
  *
- * Writes no Registro row, against ADR-0006. The Registro arrives with #27, and
- * the only caller today is the seed script, whose first Admin has no signed-in
- * account to attribute a row to. #26 adds the row when it adds the Admin who
- * does the inviting.
+ * Writes no Registro row, against ADR-0006: the only caller today is the seed
+ * script, whose first Admin has no signed-in account to attribute a row to.
+ * #26 adds the row when it adds the Admin who does the inviting.
  */
 export const create = internalMutation({
   args: {

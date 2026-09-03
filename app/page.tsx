@@ -61,6 +61,25 @@ export default async function Home() {
               </Button>
             </CardContent>
           </Card>
+          {operatore.role === "admin" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Il Registro</CardTitle>
+                <CardDescription>
+                  Chi ha fatto cosa, e quando. Giorno per giorno.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  asChild
+                  className="h-12 w-full text-base"
+                >
+                  <Link href="/registro">Apri il Registro</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Le Ceste</CardTitle>

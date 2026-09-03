@@ -40,10 +40,13 @@ export const ritiro = mutation({
     }
     const inFleet = ceste.flatMap((cesta) => (cesta === null ? [] : [cesta]));
 
-    const registroId = await writeRegistroRow(ctx, operatore._id, {
-      kind: "ritiro",
+    const registroId = await writeRegistroRow(ctx, {
+      operatoreId: operatore._id,
       clienteId: cliente._id,
-      numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
+      action: {
+        kind: "ritiro",
+        numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
+      },
     });
 
     for (const cesta of inFleet) {
@@ -77,7 +80,7 @@ export const byCliente = query({
       codice: v.string(),
       operatore: v.string(),
       at: v.number(),
-      // The action this Movimento was part of, which #27 groups by.
+      // The action this Movimento was part of, which the Registro groups by.
       registroId: v.id("registro"),
     }),
   ),

@@ -78,7 +78,10 @@ describe("the Etichetta settings", () => {
     });
     expect(await gabriele.query(api.registro.list, {})).toEqual([
       {
+        _id: expect.any(String),
+        at: expect.any(Number),
         operatore: "Gabriele",
+        cliente: null,
         action: {
           kind: "etichette_settings",
           changes: [

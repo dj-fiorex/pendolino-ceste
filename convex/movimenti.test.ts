@@ -98,10 +98,12 @@ describe("a Ritiro at the counter", () => {
       new Set(movimenti.map((movimento) => movimento.registroId)).size,
     ).toBe(1);
     expect(await gabriele.query(api.registro.list, {})).toContainEqual({
+      _id: expect.any(String),
+      at: expect.any(Number),
       operatore: "Marco",
+      cliente: { name: "Giuseppe Amato", alias: [] },
       action: {
         kind: "ritiro",
-        clienteId,
         numeri: [1, 2, 3, 4, 5, 6],
       },
     });

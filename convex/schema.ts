@@ -156,11 +156,74 @@ export const clienteField = v.union(
 export type ClienteField = Infer<typeof clienteField>;
 
 /**
+ * The mill's timezone. A day at the counter starts at midnight here, wherever
+ * the device reading the Registro happens to be: the mill's Tuesday has to be
+ * the same stretch of time for the Admin at the counter and for one looking at
+ * the day from somewhere else.
+ */
+export const MILL_TIME_ZONE = "Europe/Rome";
+
+/**
+ * What the mill's clock reads at an instant, as the instant that reading would
+ * be were the mill on UTC. The difference between the two is the mill's offset,
+ * which is how the offset is read off the timezone rather than assumed.
+ */
+const millClockAt = (instant: number) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MILL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const read = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return Date.UTC(
+    read("year"),
+    read("month") - 1,
+    read("day"),
+    read("hour"),
+    read("minute"),
+    read("second"),
+  );
+};
+
+/** Today at the mill, as `<input type="date">` writes a date. */
+export const todayAtTheMill = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: MILL_TIME_ZONE });
+
+/**
+ * The two instants a day at the mill runs between: `from` included, `to` not.
+ * The Registro is read a day at a time, and this is what a day is.
+ *
+ * Each end is found by asking what the mill's clock read at that date's
+ * midnight UTC and moving by the difference, so the two nights a year the
+ * clocks change come out 23 and 25 hours long rather than 24.
+ */
+export const dayBounds = (day: string) => {
+  const [year, month, date] = day.split("-").map(Number);
+  const startOf = (offsetInDays: number) => {
+    const asIfTheMillWereOnUtc = Date.UTC(year, month - 1, date + offsetInDays);
+    return (
+      asIfTheMillWereOnUtc +
+      (asIfTheMillWereOnUtc - millClockAt(asIfTheMillWereOnUtc))
+    );
+  };
+  return { from: startOf(0), to: startOf(1) };
+};
+
+/**
  * What a Registro row says was done, one member per kind of action. Every
  * mutation that changes the domain writes its row in the same transaction, and
- * each ticket adds its member here as it adds its mutation (ADR-0006). #27
- * builds the screen that reads them, and #19 adds the Campagna the action
- * belongs to.
+ * each ticket adds its member here as it adds its mutation (ADR-0006). #19 adds
+ * the Campagna the action belongs to.
+ *
+ * The Operatore and the Cliente are not here: they are fields of the row, so
+ * that the Registro reads for one Cliente or one Operatore through an index.
+ * What is here is what the action alone knows.
  */
 export const action = v.union(
   v.object({
@@ -173,16 +236,14 @@ export const action = v.union(
   }),
   v.object({
     kind: v.literal("cliente_creato"),
-    clienteId: v.id("clienti"),
     // The name as it was written that day: a later edit changes the Cliente,
     // never what this row says happened (ADR-0004).
     name: v.string(),
   }),
   v.object({
     kind: v.literal("cliente_modificato"),
-    clienteId: v.id("clienti"),
     // Only what actually changed, each with what it said before and what it
-    // says now (#27).
+    // says now.
     changes: v.array(
       v.object({
         field: clienteField,
@@ -193,14 +254,12 @@ export const action = v.union(
   }),
   v.object({
     kind: v.literal("ritiro"),
-    clienteId: v.id("clienti"),
     // The Ceste that went out, by numero, so that the Registro reads as the
-    // Operatore would say it: "un Ritiro di 6 Ceste: 12, 45, 78…" (#27).
+    // Operatore would say it: "un Ritiro di 6 Ceste: 12, 45, 78…".
     numeri: v.array(v.number()),
   }),
   v.object({
     kind: v.literal("cliente_disattivato"),
-    clienteId: v.id("clienti"),
     name: v.string(),
     // The Ceste the Cliente was still holding when the Admin went ahead: the
     // row says the warning was seen, not merely that somebody was deactivated.
@@ -209,7 +268,7 @@ export const action = v.union(
   v.object({
     kind: v.literal("etichette_settings"),
     // Only the settings that actually changed, each with what it said before
-    // and what it says now (#27).
+    // and what it says now.
     changes: v.array(
       v.object({
         field: etichettaSettingField,
@@ -295,14 +354,28 @@ export default defineSchema({
     // and widens this field when it arrives.
     clienteId: v.id("clienti"),
     operatoreId: v.id("operatori"),
-    // The action this Movimento was part of, so that #27 can read a Ritiro of
-    // six Ceste as the one thing a person did (ADR-0006).
+    // The action this Movimento was part of, so that the Registro reads a
+    // Ritiro of six Ceste as the one thing a person did (ADR-0006).
     registroId: v.id("registro"),
   }).index("by_cliente", ["clienteId"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
+  // Written inside the mutation making the change, never edited and never
+  // deleted (ADR-0004): no mutation to do either exists, here or anywhere.
   registro: defineTable({
     operatoreId: v.id("operatori"),
+    // The Cliente the action concerns, where it concerns one — a Censimento
+    // and an Etichetta setting concern nobody. Held on the row beside the
+    // Operatore, as ADR-0006 has it, so that the Registro of one Cliente is a
+    // range read rather than a scan of every action ever taken.
+    clienteId: v.optional(v.id("clienti")),
+    // The Campagna the action belongs to joins these with #19.
     action,
-  }),
+  })
+    // The two filters the Registro offers besides the day, which the built-in
+    // by_creation_time index answers. Every index carries _creationTime as its
+    // last field, so a Cliente's day and an Operatore's day are range reads
+    // too.
+    .index("by_cliente", ["clienteId"])
+    .index("by_operatore", ["operatoreId"]),
 });

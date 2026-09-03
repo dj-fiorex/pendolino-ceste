@@ -72,13 +72,16 @@ export const censimento = mutation({
 
     // One row for the whole Censimento, however many Ceste it covers
     // (ADR-0006).
-    await writeRegistroRow(ctx, admin._id, {
-      kind: "censimento",
-      portata: args.portata,
-      forma: args.forma,
-      count: args.count,
-      fromNumero,
-      toNumero,
+    await writeRegistroRow(ctx, {
+      operatoreId: admin._id,
+      action: {
+        kind: "censimento",
+        portata: args.portata,
+        forma: args.forma,
+        count: args.count,
+        fromNumero,
+        toNumero,
+      },
     });
 
     return { fromNumero, toNumero };

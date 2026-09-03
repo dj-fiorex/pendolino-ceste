@@ -166,10 +166,10 @@ export const create = mutation({
       active: true,
     });
 
-    await writeRegistroRow(ctx, operatore._id, {
-      kind: "cliente_creato",
+    await writeRegistroRow(ctx, {
+      operatoreId: operatore._id,
       clienteId,
-      name,
+      action: { kind: "cliente_creato", name },
     });
 
     return clienteId;
@@ -183,7 +183,7 @@ export const create = mutation({
  * stale (spec #1, story 53).
  *
  * The Cliente is given whole, as the form holds them, and the Registro row
- * names only what actually changed, with before and after (ADR-0006, #27).
+ * names only what actually changed, with before and after (ADR-0006).
  */
 export const update = mutation({
   args: {
@@ -224,10 +224,10 @@ export const update = mutation({
     }
 
     await ctx.db.patch(cliente._id, wanted);
-    await writeRegistroRow(ctx, operatore._id, {
-      kind: "cliente_modificato",
+    await writeRegistroRow(ctx, {
+      operatoreId: operatore._id,
       clienteId: cliente._id,
-      changes,
+      action: { kind: "cliente_modificato", changes },
     });
     return null;
   },
@@ -310,11 +310,14 @@ export const deactivate = mutation({
     }
 
     await ctx.db.patch(cliente._id, { active: false });
-    await writeRegistroRow(ctx, admin._id, {
-      kind: "cliente_disattivato",
+    await writeRegistroRow(ctx, {
+      operatoreId: admin._id,
       clienteId: cliente._id,
-      name: cliente.name,
-      numeriFuori: cesteFuori.map((cesta) => cesta.numero),
+      action: {
+        kind: "cliente_disattivato",
+        name: cliente.name,
+        numeriFuori: cesteFuori.map((cesta) => cesta.numero),
+      },
     });
     return null;
   },

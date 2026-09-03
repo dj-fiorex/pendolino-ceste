@@ -153,7 +153,11 @@ describe("Censimento", () => {
 
     expect(await gabriele.query(api.registro.list, {})).toEqual([
       {
+        _id: expect.any(String),
+        at: expect.any(Number),
         operatore: "Gabriele",
+        // A Censimento concerns no Cliente.
+        cliente: null,
         action: {
           kind: "censimento",
           portata: 400,

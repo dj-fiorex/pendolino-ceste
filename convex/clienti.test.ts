@@ -190,16 +190,16 @@ describe("the Registro", () => {
     const gabriele = await admin(t);
     const marco = await operatore(t);
 
-    const clienteId = await marco.mutation(api.clienti.create, {
-      name: "Giuseppe Amato",
-    });
+    await marco.mutation(api.clienti.create, { name: "Giuseppe Amato" });
 
     expect(await gabriele.query(api.registro.list, {})).toEqual([
       {
+        _id: expect.any(String),
+        at: expect.any(Number),
         operatore: "Marco",
+        cliente: { name: "Giuseppe Amato", alias: [] },
         action: {
           kind: "cliente_creato",
-          clienteId,
           name: "Giuseppe Amato",
         },
       },
@@ -250,10 +250,12 @@ describe("correcting a Cliente", () => {
 
     const registro = await gabriele.query(api.registro.list, {});
     expect(registro[0]).toEqual({
+      _id: expect.any(String),
+      at: expect.any(Number),
       operatore: "Marco",
+      cliente: { name: "Giuseppe Amato", alias: [] },
       action: {
         kind: "cliente_modificato",
-        clienteId,
         changes: [
           { field: "phone", before: "333 111 2222", after: "333 999 8888" },
         ],
@@ -372,10 +374,12 @@ describe("deactivating a Cliente", () => {
       cesteFuori: [expect.objectContaining({ codice: "400-R-002" })],
     });
     expect(await gabriele.query(api.registro.list, {})).toContainEqual({
+      _id: expect.any(String),
+      at: expect.any(Number),
       operatore: "Gabriele",
+      cliente: { name: "Giuseppe Amato", alias: [] },
       action: {
         kind: "cliente_disattivato",
-        clienteId,
         name: "Giuseppe Amato",
         numeriFuori: [2],
       },

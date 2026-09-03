@@ -58,7 +58,7 @@ export const settings = query({
  * is ever printed from settings the Registro has not seen.
  *
  * The Registro row names only what actually changed, with before and after
- * (ADR-0006, #27); saving the same settings again changes nothing, and nothing
+ * (ADR-0006); saving the same settings again changes nothing, and nothing
  * changed is nothing to record.
  */
 export const setSettings = mutation({
@@ -98,9 +98,9 @@ export const setSettings = mutation({
     } else {
       await ctx.db.patch(stored._id, wanted);
     }
-    await writeRegistroRow(ctx, admin._id, {
-      kind: "etichette_settings",
-      changes,
+    await writeRegistroRow(ctx, {
+      operatoreId: admin._id,
+      action: { kind: "etichette_settings", changes },
     });
     return null;
   },
