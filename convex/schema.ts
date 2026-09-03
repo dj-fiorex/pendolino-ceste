@@ -27,10 +27,10 @@ export const state = v.union(
 
 /**
  * What a Movimento is: one Cesta changing state on one occasion. Each ticket
- * adds its member here as it adds its mutation — Rientro (#17), Svuotamento
- * (#18) and Rettifica (#20, #21) follow.
+ * adds its member here as it adds its mutation — Svuotamento (#18) and
+ * Rettifica (#20, #21) follow.
  */
-export const movimentoKind = v.union(v.literal("ritiro"));
+export const movimentoKind = v.union(v.literal("ritiro"), v.literal("rientro"));
 
 export type MovimentoKind = Infer<typeof movimentoKind>;
 
@@ -259,6 +259,12 @@ export const action = v.union(
     numeri: v.array(v.number()),
   }),
   v.object({
+    kind: v.literal("rientro"),
+    // The Ceste that came back full, by numero. Four of the six that went out
+    // is a Rientro of four, and the row says which four.
+    numeri: v.array(v.number()),
+  }),
+  v.object({
     kind: v.literal("cliente_disattivato"),
     name: v.string(),
     // The Ceste the Cliente was still holding when the Admin went ahead: the
@@ -303,9 +309,12 @@ export default defineSchema({
     forma,
     codice: v.string(),
     state,
-    // The Cliente the Cesta is out with, while she is Fuori. Held here beside
-    // the state rather than replayed from the Movimenti, for the same reason
-    // the state is (ADR-0005): "who has this Cesta" is where she is.
+    // The Cliente the Cesta is with: the one she went out to while she is
+    // Fuori, and, once she is back in Attesa molitura, the one whose name the
+    // paper tape in the yard carries — which is the Cliente who actually
+    // brought her in, whatever the app believed beforehand (#17). Held here
+    // beside the state rather than replayed from the Movimenti, for the same
+    // reason the state is (ADR-0005): "who has this Cesta" is where she is.
     clienteId: v.optional(v.id("clienti")),
     active: v.boolean(),
   })

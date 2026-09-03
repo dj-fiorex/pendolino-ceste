@@ -130,6 +130,8 @@ export const registroSentence = ({
       return `${operatore} ha corretto ${whom(cliente)}: ${changesInSentence(action.changes, clienteFieldLabel, quoted)}.`;
     case "ritiro":
       return `${operatore} ha registrato un Ritiro di ${cesteCount(action.numeri.length)} a ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
+    case "rientro":
+      return `${operatore} ha registrato un Rientro di ${cesteCount(action.numeri.length)} da ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
     case "cliente_disattivato":
       return action.numeriFuori.length === 0
         ? `${operatore} ha disattivato il Cliente ${action.name}.`

@@ -48,13 +48,19 @@ export default async function Home() {
             <CardHeader>
               <CardTitle>Il banco</CardTitle>
               <CardDescription>
-                Chi ritira, e quali Ceste si porta via. Rientri e Svuotamenti
-                arrivano nelle prossime versioni.
+                Chi ritira, chi riporta, e quali Ceste. Lo Svuotamento arriva
+                nella prossima versione.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               <Button asChild className="h-12 text-base">
                 <Link href="/ritiro">Nuovo Ritiro</Link>
+              </Button>
+              <Button asChild className="h-12 text-base">
+                <Link href="/rientro">Nuovo Rientro</Link>
+              </Button>
+              <Button variant="outline" asChild className="h-12 text-base">
+                <Link href="/attesa-molitura">Attesa molitura</Link>
               </Button>
               <Button variant="outline" asChild className="h-12 text-base">
                 <Link href="/clienti">I Clienti</Link>

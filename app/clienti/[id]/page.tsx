@@ -10,12 +10,10 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { MovimentoKind } from "@/convex/schema";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
 import { cesteCount } from "@/lib/ceste";
 import { clienteLabel } from "@/lib/cliente";
-
-const movimentoLabel: Record<MovimentoKind, string> = { ritiro: "Ritiro" };
+import { movimentoLabel } from "@/lib/movimento";
 
 /** The mill is in Italy, and so is every hour it writes down. */
 const whenLabel = new Intl.DateTimeFormat("it-IT", {

@@ -14,14 +14,14 @@ import {
 } from "./schema";
 
 /** A Cliente as every screen shows them: the name, the Alias, the telephone. */
-const clienteShape = {
+export const clienteShape = {
   _id: v.id("clienti"),
   name: v.string(),
   alias: v.array(v.string()),
   phone: v.union(v.null(), v.string()),
 };
 
-const asCliente = (cliente: Doc<"clienti">) => ({
+export const asCliente = (cliente: Doc<"clienti">) => ({
   _id: cliente._id,
   name: cliente.name,
   alias: cliente.alias,
