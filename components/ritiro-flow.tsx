@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
@@ -32,8 +32,14 @@ import {
   whereTheAppHasHer,
   type FoundCesta,
 } from "@/lib/ceste";
-import { clienteLabel, type Cliente } from "@/lib/cliente";
-import { mediaInSentence, upload } from "@/lib/media";
+import { clienteInSentence, clienteLabel, type Cliente } from "@/lib/cliente";
+import { mediaKinds, mediaListed, toRetakeLine, upload } from "@/lib/media";
+import {
+  forgetDraft,
+  readDraft,
+  writeDraft,
+  type RitiroDraft,
+} from "@/lib/ritiro-draft";
 
 /**
  * Whether the app had a Cesta where a Ritiro expects to find her: at the mill,
@@ -42,6 +48,72 @@ import { mediaInSentence, upload } from "@/lib/media";
  * warning by it (ADR-0005, #21).
  */
 const asExpected = (cesta: FoundCesta) => cesta.state === expectedBefore.ritiro;
+
+/**
+ * The Ritiro this device was left in the middle of, held out to whoever has
+ * the phone now (#24).
+ *
+ * Held out and never put back by itself. The Ceste of a Ritiro are scans with
+ * nothing on them saying who scanned them, and a phone goes round a counter
+ * where five Operatori work a hundred and fifty people: an app that quietly
+ * reopened Giuseppe's four Ceste while Antonio was standing there would attach
+ * one man's load to another man's name, and nobody would see it happen. So the
+ * draft is named — whose Ritiro, how many Ceste — and answered before anything
+ * of it is on screen.
+ *
+ * Both answers are one tap, and refusing is as plain as taking it: nothing
+ * here has gone wrong, and no Cesta has left the yard on this Ritiro yet.
+ */
+function ResumeOffer({
+  draft,
+  onResume,
+  onAbandon,
+}: {
+  draft: RitiroDraft;
+  onResume: () => void;
+  onAbandon: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Un Ritiro lasciato a metà</CardTitle>
+        <CardDescription>
+          Nessuna Cesta è ancora uscita: riprendilo, oppure ricomincia da capo.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {/* Said before the Operatore decides, because it is part of what
+            resuming gets them: what they took is not in there, and somebody
+            who had the Cliente sign must not confirm believing it is (#25). */}
+        {draft.notKept.length > 0 && (
+          <Warning>{toRetakeLine(draft.notKept)}</Warning>
+        )}
+        {/* Wrapping rather than nowrap, alone among the buttons at the
+            counter: this one carries a Cliente's name and his Soprannomi, and
+            the one thing it must never do is run "Giuseppe Amato (Turi)" off
+            the side of a phone held in one hand. */}
+        <Button
+          className="h-auto min-h-14 w-full px-4 py-3 text-base whitespace-normal"
+          onClick={onResume}
+        >
+          Riprendi il Ritiro di {clienteInSentence(draft.cliente)} ·{" "}
+          {cesteCount(draft.ceste.length)}
+        </Button>
+        {/* Not "annulla": nothing here is annulled, because nothing here has
+            been recorded yet, and *annullamento* is a word the mill does not
+            use of a Ritiro (CONTEXT.md). Starting again is what this does and
+            what it says. */}
+        <Button
+          variant="outline"
+          className="h-12 w-full text-base"
+          onClick={onAbandon}
+        >
+          Ricomincia da capo
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 /**
  * The counter: the Cliente in front of the Operatore, then their Ceste one at
@@ -72,12 +144,90 @@ export function RitiroFlow() {
      */
     notUploaded: MediaKind[];
   } | null>(null);
+  /**
+   * The Ritiro this device was holding when this screen opened, and what has
+   * become of the question it asks. Three answers, and the flow below is only
+   * itself on the last of them: `undefined` while the device is still being
+   * read, the draft itself while the Operatore has it in front of them and has
+   * not said, and `null` once they have — or once it turned out there was
+   * nothing to ask about (#24).
+   */
+  const [offer, setOffer] = useState<RitiroDraft | null | undefined>(undefined);
+  /**
+   * What was taken on this Ritiro and is not on this device any more: the
+   * signature or the photograph of a Ritiro that has been resumed, which the
+   * draft names and deliberately does not carry (#24, #25).
+   *
+   * Carried in its own right rather than read off what is captured, because it
+   * is a fact about the Ritiro and not about the run of the screen: an
+   * Operatore who resumes, is told the signature is gone, and then locks the
+   * phone again must be told the same thing the second time.
+   */
+  const [toRetake, setToRetake] = useState<MediaKind[]>([]);
+
+  // Read once, when this screen opens, and never again: what the device is
+  // holding is a question asked at the start of a Ritiro, not a thing this
+  // screen goes on watching. Read here rather than at the first render because
+  // a server has no device to read, and a screen that said one thing on the
+  // server and another on the phone would be a screen React refuses to keep.
+  useEffect(() => {
+    setOffer(readDraft());
+  }, []);
+
   // What this Cliente is already holding, before a single Cesta of this Ritiro
   // is added: the Cliente's own read, the one the Rientro and his page make.
   const held = useQuery(
     api.clienti.get,
     cliente === null ? "skip" : { clienteId: cliente._id },
   );
+
+  /**
+   * The Ritiro as it stands, written down on the device after every change to
+   * it: one more Cesta scanned, one taken back off, the signature taken (#24).
+   *
+   * Written from here rather than at each of the four places that change it,
+   * so that a Ritiro can never be a Cesta ahead of what the device is holding:
+   * whatever is on screen is what a reload gets back.
+   *
+   * Three moments write nothing at all. While the device is still being read,
+   * because an empty screen would wipe the very draft about to be offered.
+   * While the offer is up and unanswered, because the flow beneath it is empty
+   * and that emptiness is not a Ritiro anybody built. And once the Ritiro is
+   * registered, because it is the mill's record from then on and the draft has
+   * been deliberately forgotten.
+   */
+  useEffect(() => {
+    if (offer !== null || done !== null) {
+      return;
+    }
+    // A Ritiro is the Ceste on it, so a Ritiro with none is nothing to offer
+    // back: a prompt with nothing behind it, in the way of every Ritiro after
+    // it.
+    if (ceste.length === 0) {
+      forgetDraft();
+      return;
+    }
+    // Changing Cliente leaves the Ceste where they are, because they are in the
+    // yard whoever is taking them (#25). What is written down is left exactly
+    // as it was until a Cliente is picked again — it is the Ritiro as it stood
+    // a moment ago, offered back under the name it had, which the Operatore
+    // reads and can change with the tap they were already making. Forgetting
+    // it here instead would throw six scans away for a phone that locked
+    // during a search.
+    if (cliente === null) {
+      return;
+    }
+    writeDraft({
+      cliente,
+      ceste,
+      // Everything taken on this Ritiro, whether it is still on the device or
+      // was already lost to an earlier reload: none of it is written down, so
+      // all of it has to be taken again.
+      notKept: mediaKinds.filter(
+        (kind) => captured[kind] !== null || toRetake.includes(kind),
+      ),
+    });
+  }, [offer, done, cliente, ceste, captured, toRetake]);
 
   if (done !== null) {
     return (
@@ -94,9 +244,7 @@ export function RitiroFlow() {
               rather than finding out in November (ADR-0005, #25). */}
           {done.notUploaded.length > 0 && (
             <Warning>
-              {`Il Ritiro è registrato, ma ${done.notUploaded
-                .map((kind) => mediaInSentence[kind])
-                .join(" e ")} ${
+              {`Il Ritiro è registrato, ma ${mediaListed(done.notUploaded)} ${
                 done.notUploaded.length === 1
                   ? "non è stata caricata"
                   : "non sono state caricate"
@@ -110,6 +258,7 @@ export function RitiroFlow() {
               setCliente(null);
               setCeste([]);
               setCaptured(NOTHING_CAPTURED);
+              setToRetake([]);
               setFailed(false);
             }}
           >
@@ -120,6 +269,38 @@ export function RitiroFlow() {
           </Button>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Nothing at all for the one frame the device takes to answer. Showing the
+  // Cliente search and then pulling it away to ask about a draft would put the
+  // Operatore a tap into the wrong Ritiro.
+  if (offer === undefined) {
+    return null;
+  }
+
+  if (offer !== null) {
+    return (
+      <ResumeOffer
+        draft={offer}
+        onResume={() => {
+          // Back exactly as it was left, and no further: where the app had
+          // each Cesta is what it had when she was scanned, and the mutation
+          // settles that again on the server and writes the Rettifica by what
+          // it finds there (ADR-0005). The signature and the photograph do not
+          // come back, and the offer has already said so.
+          setCliente(offer.cliente);
+          setCeste(offer.ceste);
+          setToRetake(offer.notKept);
+          setOffer(null);
+        }}
+        onAbandon={() => {
+          // Said no, so it is gone: the next Operatore at this counter is
+          // asked nothing and starts on the Cliente in front of them.
+          forgetDraft();
+          setOffer(null);
+        }}
+      />
     );
   }
 
@@ -162,6 +343,11 @@ export function RitiroFlow() {
         signatureId,
         photoId,
       });
+      // Registered, so the mill holds it and the device has no business
+      // holding it too: a draft left behind here would be offered back as a
+      // Ritiro to build, and building it again would send the same Ceste out
+      // twice (#24).
+      forgetDraft();
       setDone({ cliente, count: ceste.length, notUploaded });
     } catch {
       setFailed(true);
@@ -169,6 +355,11 @@ export function RitiroFlow() {
       setPending(false);
     }
   };
+
+  // What was taken on this Ritiro before it was resumed and has still not been
+  // taken again. One that has been says nothing: it is on the device now, and
+  // the Ritiro will carry it.
+  const stillToRetake = toRetake.filter((kind) => captured[kind] === null);
 
   // The Ceste of this Ritiro the app did not have Disponibile, in the order
   // they were added: each of them goes out with a Rettifica beside her.
@@ -324,6 +515,15 @@ export function RitiroFlow() {
           Non è stato possibile registrare il Ritiro. Controlla la connessione e
           riprova.
         </p>
+      )}
+
+      {/* Said on the offer that brought this Ritiro back, and then again here
+          for as long as it stands, beside the buttons that would take it
+          again: the offer has scrolled away by the time anybody confirms, and
+          a Ritiro confirmed in the belief that the Cliente's signature is on
+          it is the one thing worse than a Ritiro with no signature (#24). */}
+      {stillToRetake.length > 0 && (
+        <Warning>{toRetakeLine(stillToRetake)}</Warning>
       )}
 
       {/* Offered here, the last thing before the bar that confirms, and asked
