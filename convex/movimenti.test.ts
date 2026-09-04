@@ -1690,6 +1690,12 @@ describe("a Rettifica for an Errore di registrazione", () => {
       operatore: "Marco",
       at: ritiro.at,
     });
+    // And it reads in Giuseppe's own history too, under his name: "why did
+    // Cesta 6 stop being counted against me" is asked of the Cliente she was
+    // taken off, and the answer has to be where he is looked up.
+    expect(
+      await gabriele.query(api.movimenti.byCliente, { clienteId: giuseppe }),
+    ).toContainEqual(expect.objectContaining({ kind: "rettifica", numero: 6 }));
     expect(history[0].rettifica).toEqual({
       cause: "errore",
       believedState: "fuori",

@@ -7,7 +7,7 @@ import type {
   Forma,
   PlainMovimentoKind,
 } from "@/convex/schema";
-import { cesteCount, dayOf, stateLabel } from "@/lib/ceste";
+import { cesteCount, dayOf, stateInSentence } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
 import { ETICHETTA_SIZE_LABELS } from "@/lib/etichetta";
 import { movimentoInSentence, rettificaCauseLabel } from "@/lib/movimento";
@@ -190,14 +190,8 @@ const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
     case "rettifica": {
       // Where the Rettifica left her, and, where that is a Cliente's hands,
       // whose: the row already names him, and the sentence says why he is on
-      // it. A Cesta *is* Fuori, Disponibile or Dismessa, and she is *in*
-      // Attesa molitura, so that the line reads like Italian.
-      const becomes =
-        action.becomes === "fuori"
-          ? `Fuori con ${whom(cliente)}`
-          : action.becomes === "attesa_molitura"
-            ? "in Attesa molitura"
-            : stateLabel[action.becomes];
+      // it.
+      const becomes = stateInSentence(action.becomes, whom(cliente));
       const note = action.note === undefined ? "" : ` Nota: «${action.note}»`;
       return `${operatore} ha registrato una Rettifica sulla Cesta ${action.numero}: ${rettificaCauseLabel[action.cause].toLowerCase()}. Adesso è ${becomes}.${note}`;
     }

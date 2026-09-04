@@ -33,6 +33,25 @@ export const formaLabel: Record<Forma, string> = {
 };
 
 /**
+ * Where a Cesta is, as a sentence puts it: "Disponibile", "in Attesa
+ * molitura", "Fuori con Giuseppe Amato (Turi)". What the Registro reads and
+ * what the Rettifica form says confirming will do (#28).
+ *
+ * A Cesta *is* Fuori, Disponibile or Dismessa, and she is *in* Attesa
+ * molitura: a line read at a glance has to read like Italian. The Cliente is
+ * handed in already named, because a sentence names them one way and a list
+ * another, and only Fuori is somebody's hands.
+ */
+export const stateInSentence = (state: State, cliente: string | null) => {
+  if (state === "attesa_molitura") {
+    return "in Attesa molitura";
+  }
+  return state === "fuori" && cliente !== null
+    ? `Fuori con ${cliente}`
+    : stateLabel[state];
+};
+
+/**
  * A Cesta as a typed numero finds her: what is printed on her Etichetta, and
  * whom the app believes she is with. Everything at the counter works from this
  * — the running list of a Ritiro or of a Rientro is a list of these.

@@ -214,11 +214,18 @@ async function campagnaNameOf(
 
 /**
  * The kinds of row a Rettifica of *errore* is ever written against: the three
- * movements somebody registers at the counter or in the yard. A Censimento or
- * a Campagna opened is not put right by a Rettifica, and no read looks for one
+ * movements somebody registers at the counter or in the yard, read off the
+ * Movimento's own union rather than listed again here. A Censimento or a
+ * Campagna opened is not put right by a Rettifica, and no read looks for one
  * against them.
  */
-const CORRECTABLE: Action["kind"][] = ["ritiro", "rientro", "svuotamento"];
+const CORRECTABLE: PlainMovimentoKind[] = plainMovimentoKind.members.map(
+  (member) => member.value,
+);
+
+/** Whether a row names one of them, and so has a correction to be read for. */
+const isCorrectable = (kind: Action["kind"]): kind is PlainMovimentoKind =>
+  CORRECTABLE.some((correctable) => correctable === kind);
 
 /**
  * The action a row corrects, where it is the Rettifica of an *errore*: which
@@ -234,16 +241,12 @@ async function correctsOf(ctx: QueryCtx, row: Doc<"registro">) {
     throw new Error("A Rettifica names a Registro row that is gone.");
   }
   const kind = corrected.action.kind;
-  if (!CORRECTABLE.includes(kind)) {
+  if (!isCorrectable(kind)) {
     throw new Error(
       "A Rettifica corrects a Ritiro, a Rientro or a Svuotamento.",
     );
   }
-  return {
-    _id: corrected._id,
-    at: corrected._creationTime,
-    kind: kind as PlainMovimentoKind,
-  };
+  return { _id: corrected._id, at: corrected._creationTime, kind };
 }
 
 /**
@@ -256,7 +259,7 @@ async function correctsOf(ctx: QueryCtx, row: Doc<"registro">) {
  * corrections as the action moved Ceste, and a Ritiro moves six.
  */
 async function correctedByOf(ctx: QueryCtx, row: Doc<"registro">) {
-  if (!CORRECTABLE.includes(row.action.kind)) {
+  if (!isCorrectable(row.action.kind)) {
     return [];
   }
   const corrections = await ctx.db

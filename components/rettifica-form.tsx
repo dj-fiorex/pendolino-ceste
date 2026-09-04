@@ -23,7 +23,7 @@ import {
   type MovimentoKind,
   type State,
 } from "@/convex/schema";
-import { dayOf, stateLabel } from "@/lib/ceste";
+import { dayOf, stateInSentence, stateLabel } from "@/lib/ceste";
 import { clienteLabel, type Cliente, type ClienteName } from "@/lib/cliente";
 import { movimentoLabel } from "@/lib/movimento";
 import { timeOf } from "@/lib/registro";
@@ -62,13 +62,17 @@ const CAUSES: {
 
 /**
  * Where an Admin can say a Cesta really is. Dismessa is not among them: a Cesta
- * leaves the fleet because è persa or è rotta, and a Movimento registered
- * wrongly is neither (ADR-0004).
+ * leaves the fleet because she is *persa* or *rotta*, and a Movimento
+ * registered wrongly is neither (ADR-0004).
  */
-const REALLY_AT: State[] = ["disponibile", "attesa_molitura", "fuori"];
+const WHERE_SHE_REALLY_IS: State[] = [
+  "disponibile",
+  "attesa_molitura",
+  "fuori",
+];
 
 /** A Movimento of this Cesta as the correction picker lists it. */
-export type CestaMovimento = {
+type CestaMovimento = {
   _id: Id<"movimenti">;
   kind: MovimentoKind;
   at: number;
@@ -208,25 +212,25 @@ export function RettificaForm({
             ? "Scegli il Cliente"
             : null;
 
+  // What confirming will do, once there is enough to say — and what is still
+  // missing until there is. A Cesta handed to the wrong Cliente has been Fuori
+  // since she left rather than since today, and the wrong Movimento stays
+  // exactly as it was written (ADR-0004, #28).
   const where =
     becomes === null
       ? ""
-      : becomes === "fuori" && cliente !== null
-        ? `Fuori con ${clienteLabel(cliente)}`
-        : becomes === "attesa_molitura"
-          ? "in Attesa molitura"
-          : stateLabel[becomes];
+      : stateInSentence(
+          becomes,
+          cliente === null ? null : clienteLabel(cliente),
+        );
   const outcome =
-    settled === null
-      ? // The wrong Movimento stays exactly as it was written, and a Cesta
-        // handed to the wrong Cliente has been Fuori since she left, not since
-        // today (ADR-0004, #28).
-        missing !== null
-        ? `${missing}.`
-        : `Il Movimento sbagliato resta scritto com'è. ${cesta.codice} risulta ${where}${becomes === "fuori" ? ", dal giorno in cui è uscita" : ""}.`
-      : becomes === "fuori" && cliente !== null
-        ? `${cesta.codice} risulta ${where}, da oggi.`
-        : `${cesta.codice} ${becomes === "dismessa" ? "diventa" : "torna"} ${stateLabel[becomes!]}.`;
+    becomes === null || missing !== null
+      ? `${missing ?? "Scegli dov'è davvero"}.`
+      : settled === null
+        ? `Il Movimento sbagliato resta scritto com'è. ${cesta.codice} risulta ${where}${becomes === "fuori" ? ", dal giorno in cui è uscita" : ""}.`
+        : becomes === "fuori" && cliente !== null
+          ? `${cesta.codice} risulta ${where}, da oggi.`
+          : `${cesta.codice} ${becomes === "dismessa" ? "diventa" : "torna"} ${stateLabel[becomes]}.`;
 
   const confirm = async () => {
     setPending(true);
@@ -318,7 +322,7 @@ export function RettificaForm({
                 Dov&apos;è davvero?
               </p>
               <div className="flex gap-3">
-                {REALLY_AT.map((state) => (
+                {WHERE_SHE_REALLY_IS.map((state) => (
                   <Button
                     key={state}
                     variant={reallyAt === state ? "default" : "outline"}

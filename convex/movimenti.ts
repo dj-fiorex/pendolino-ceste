@@ -439,7 +439,7 @@ export const svuotamento = mutation({
  */
 async function correctedMovimento(
   ctx: MutationCtx,
-  cesta: Doc<"ceste">,
+  cestaId: Id<"ceste">,
   args: { cause: AdminRettificaCause; corrects?: Id<"movimenti"> },
 ): Promise<Doc<"movimenti"> | null> {
   if (args.cause !== "errore") {
@@ -452,7 +452,7 @@ async function correctedMovimento(
     throw new Error("A correction names the Movimento registered wrongly.");
   }
   const movimento = await ctx.db.get(args.corrects);
-  if (movimento === null || movimento.cestaId !== cesta._id) {
+  if (movimento === null || movimento.cestaId !== cestaId) {
     throw new Error("That Movimento was not registered against this Cesta.");
   }
   if (movimento.kind === "rettifica") {
@@ -502,7 +502,7 @@ export const rettifica = mutation({
     if (cesta === null) {
       throw new Error("This Cesta is not in the fleet.");
     }
-    const corrected = await correctedMovimento(ctx, cesta, args);
+    const corrected = await correctedMovimento(ctx, cesta._id, args);
 
     // Where the Rettifica leaves her: what the cause says by itself, or, on an
     // *errore*, the state the Admin says she is really in — which is the one
