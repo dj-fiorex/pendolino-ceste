@@ -4,6 +4,29 @@ import { v, type Infer } from "convex/values";
 /** An Operatore is either plain counter staff or an Admin. */
 export const role = v.union(v.literal("operatore"), v.literal("admin"));
 
+export type Role = Infer<typeof role>;
+
+/**
+ * What Resend made of an email the app asked it to send: the moment it went
+ * out, or the reason it did not.
+ */
+export const emailDelivered = v.union(
+  v.object({ kind: v.literal("sent"), at: v.number() }),
+  v.object({ kind: v.literal("failed"), at: v.number(), reason: v.string() }),
+);
+
+/** The same, and nothing at all while the send is still to be tried. */
+export const emailDelivery = v.union(v.null(), ...emailDelivered.members);
+
+export type EmailDelivery = Infer<typeof emailDelivery>;
+
+/**
+ * The shortest password the mill will take. Refused by the action that sets
+ * one and said on the screen that asks for it, which is one rule in two voices
+ * — the form tells you before you press, and the app refuses regardless.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
 /** The weight of olives a Cesta carries. The unit the counter counts in. */
 export const portata = v.union(v.literal(400), v.literal(250));
 
@@ -429,6 +452,42 @@ export const action = v.union(
       }),
     ),
   }),
+  v.object({
+    kind: v.literal("operatore_invitato"),
+    // The person as the Admin wrote them down. An invitation is all there is
+    // of them until they accept, so the row says who was asked and at which
+    // address, rather than pointing at a staff record that does not exist yet.
+    name: v.string(),
+    email: v.string(),
+    role,
+  }),
+  v.object({
+    kind: v.literal("invito_accettato"),
+    // Written under the person who accepted, who is an Operatore by the time
+    // the row is written: this is the moment they joined the mill.
+    name: v.string(),
+    email: v.string(),
+    role,
+  }),
+  v.object({
+    kind: v.literal("operatore_reset_inviato"),
+    name: v.string(),
+    email: v.string(),
+  }),
+  v.object({
+    kind: v.literal("operatore_promosso"),
+    name: v.string(),
+    // The role before and after, because a promotion is a change and the
+    // Registro says what changed (#26, ADR-0006).
+    before: role,
+    after: role,
+  }),
+  v.object({
+    kind: v.literal("operatore_disattivato"),
+    // The name they were deactivated under: their Movimenti stay attributed to
+    // them, and this row says when they stopped registering any (ADR-0004).
+    name: v.string(),
+  }),
 );
 
 export type Action = Infer<typeof action>;
@@ -471,6 +530,58 @@ export default defineSchema({
     role,
     active: v.boolean(),
   }).index("by_authUserId", ["authUserId"]),
+
+  // The two links an Admin emails: the invitation that opens an account, and
+  // the reset that puts a new password on one (ADR-0008). Both are one act in
+  // two costumes — somebody chooses a password from a link they were sent —
+  // so both are one table, and the rule that a link is good once and not for
+  // long is written once.
+  //
+  // Nobody at this mill ever types a password somebody else chose: the sign-up
+  // route is off, there is no self-service reset, and this is the only way an
+  // account is opened or its password changed (#26).
+  //
+  // The links are the app's own rather than Better Auth's, because Better
+  // Auth's reset arrives with the endpoint that lets anybody ask for one, and
+  // the mill decided against that endpoint before it decided anything else
+  // about resets (ADR-0008). Leaving it unconfigured is what closes it.
+  accessLinks: defineTable({
+    // The secret the emailed URL carries, and the whole of what stands between
+    // that URL and the account it opens.
+    token: v.string(),
+    // Where the link was sent. On an invitation this is the address the
+    // account will answer to; on a reset, the one it already answers to.
+    email: v.string(),
+    expiresAt: v.number(),
+    // When the link was used, and nothing while it still can be: an invitation
+    // already accepted opens nothing, and neither does a reset already spent.
+    usedAt: v.union(v.null(), v.number()),
+    // What the link is for, which is also what using it does: an invitation
+    // makes an Operatore out of somebody the mill has none of yet, and a reset
+    // puts a new password on the one named here.
+    purpose: v.union(
+      v.object({
+        kind: v.literal("invitation"),
+        name: v.string(),
+        role,
+      }),
+      v.object({
+        kind: v.literal("reset"),
+        operatoreId: v.id("operatori"),
+      }),
+    ),
+    // The Admin who sent it. Only an Admin ever does (CONTEXT.md).
+    sentBy: v.id("operatori"),
+    // What became of the email carrying it. A Resend failure is meant to reach
+    // the Admin as an unsent invitation and never the counter (ADR-0008), and
+    // this is what it reaches them as.
+    delivery: emailDelivery,
+  })
+    // The link somebody has just followed, found from the token in the URL.
+    .index("by_token", ["token"])
+    // The invitations still outstanding, which the staff screen lists under
+    // the Operatori who have already accepted theirs.
+    .index("by_usedAt", ["usedAt"]),
 
   // The fleet. A Cesta's numero, portata, forma and codice are settled at
   // Censimento and never change afterwards, because the Etichetta is printed
