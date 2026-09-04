@@ -1,4 +1,4 @@
-# Prototype: the app shell (branch `prototype/app-shell`)
+# Prototype: the app shell (#32, branch `prototype/app-shell`)
 
 Throwaway. Nothing on this branch is meant to be merged: the winning variant
 gets rewritten properly on `main`, and this branch stays as the primary source.
@@ -67,4 +67,4 @@ Everything prototype is marked `PROTOTYPE (#shell)` in its header comment:
 
 ## Verdict
 
-_To be recorded here once the owner has flipped through._
+_To be recorded here and on #32 once the owner has flipped through._
