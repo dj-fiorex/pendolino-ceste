@@ -2,7 +2,7 @@
 
 import betterAuthTest from "@convex-dev/better-auth/test";
 import { convexTest, type TestConvex } from "convex-test";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -352,6 +352,67 @@ describe("an invitation", () => {
       name: "Nadia Greco",
       email: "nadia@frantoio.example",
       role: "operatore",
+    });
+  });
+});
+
+/**
+ * The one part of the mail path a test may run. Everywhere else in this suite
+ * the scheduled action is left unrun, because running it would post a real
+ * message to Resend; a deployment in prova posts nothing at all, so here the
+ * send can be driven to the end and the Admin's screen read afterwards.
+ */
+describe("a deployment in prova", () => {
+  /** An Admin invites somebody, and the mail path runs to its end. */
+  const invitedWith = async (testMode: string | undefined) => {
+    // Whatever the machine running the suite happens to have exported: no
+    // test posts to Resend, and none can be made to by an environment.
+    vi.stubEnv("RESEND_API_KEY", undefined);
+    vi.stubEnv("RESEND_TEST_MODE", testMode);
+    const t = startApp();
+    const gabriele = await admin(t);
+    await gabriele.mutation(api.operatori.invite, {
+      name: "Nadia Greco",
+      email: "nadia@frantoio.example",
+      role: "operatore",
+    });
+    vi.useFakeTimers();
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    vi.useRealTimers();
+    const [waiting] = await gabriele.query(api.accessLinks.pending, {});
+    return waiting.delivery;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  test("keeps the invitation and says nothing was sent", async () => {
+    expect(await invitedWith("true")).toEqual({
+      kind: "withheld",
+      at: expect.any(Number),
+    });
+  });
+
+  test("sends for real when it is told to, even in lowercase", async () => {
+    // No RESEND_API_KEY is set where the tests run, so a deployment that is
+    // not in prova gets as far as needing one and no further: the message
+    // never reaches Resend, and the Admin is told why.
+    expect(await invitedWith("False")).toEqual({
+      kind: "failed",
+      at: expect.any(Number),
+      reason: expect.stringContaining("RESEND_API_KEY"),
+    });
+  });
+
+  test("refuses a value that is neither true nor false", async () => {
+    // Guessing either way is worse than saying so: one posts real mail on a
+    // deployment that asked not to, the other swallows an invitation.
+    expect(await invitedWith("si")).toEqual({
+      kind: "failed",
+      at: expect.any(Number),
+      reason: expect.stringContaining("RESEND_TEST_MODE"),
     });
   });
 });

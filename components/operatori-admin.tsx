@@ -137,6 +137,15 @@ function Delivery({ delivery }: { delivery: EmailDelivery }) {
   if (delivery.kind === "sent") {
     return <span className="text-muted-foreground">Mandato per email.</span>;
   }
+  // Not a failure and not a send: the app was told to pretend, and says so
+  // rather than letting an Admin wait on a message nobody will ever get.
+  if (delivery.kind === "withheld") {
+    return (
+      <span className="text-muted-foreground">
+        Non mandato: l&rsquo;app è in prova. Il link è nei log.
+      </span>
+    );
+  }
   return (
     <span className="text-destructive">
       L&rsquo;email non è partita: {delivery.reason}

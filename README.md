@@ -27,14 +27,25 @@ npx convex env set SITE_URL http://localhost:3000
 npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
 npx convex env set RESEND_API_KEY re_...
 npx convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
+npx convex env set RESEND_TEST_MODE false
 ```
 
-The two Resend ones carry the mill's email: the invitation an Admin sends to a
-new Operatore, and the link that replaces a forgotten password (ADR-0008).
+The Resend ones carry the mill's email: the invitation an Admin sends to a new
+Operatore, and the link that replaces a forgotten password (ADR-0008).
 `RESEND_FROM` has to be an address on a domain the Resend account has verified,
 and defaults to Resend's own test sender. A deployment with no `RESEND_API_KEY`
 runs and counts Ceste exactly as one with it — nothing sends, and an invitation
 shows on the Operatori screen as one that never went out.
+
+`RESEND_TEST_MODE=true` says the deployment is only pretending. The invitation
+is written and its message built exactly as it would be, but nothing is handed
+to Resend: the link goes to the Convex logs, where whoever is trying the flow
+reads it, and the Operatori screen says the email was not sent rather than
+leaving an Admin waiting on one nobody will get. It needs no `RESEND_API_KEY`,
+which makes it what a development deployment wants. Anything other than `true`
+or `false` is refused, and the refusal reaches the Admin on the same screen: a
+typo that quietly posted real mail, or quietly swallowed an invitation, is
+worse than one that says so.
 
 `.env.example` lists what belongs in `.env.local`.
 

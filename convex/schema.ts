@@ -9,10 +9,12 @@ export type Role = Infer<typeof role>;
 
 /**
  * What Resend made of an email the app asked it to send: the moment it went
- * out, or the reason it did not.
+ * out, or the reason it did not — and, on a deployment in prova, the moment
+ * the app decided not to hand it over at all (RESEND_TEST_MODE).
  */
 export const emailDelivered = v.union(
   v.object({ kind: v.literal("sent"), at: v.number() }),
+  v.object({ kind: v.literal("withheld"), at: v.number() }),
   v.object({ kind: v.literal("failed"), at: v.number(), reason: v.string() }),
 );
 

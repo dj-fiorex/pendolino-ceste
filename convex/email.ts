@@ -10,8 +10,9 @@ import { MILL_TIME_ZONE } from "./schema";
  * Everything else about an invitation or a reset — who it is for, how long it
  * is good for, what it opens — is the app's own and is decided elsewhere. This
  * is a transport and knows none of it, which is what keeps the mill's tests
- * from ever posting anything to anybody: nothing sends without a key, and no
- * key is set where the tests run.
+ * from ever posting anything to anybody: nothing sends without a key, no key
+ * is set where the tests run, and a deployment can say outright that it is
+ * only pretending (RESEND_TEST_MODE).
  */
 type Message = { to: string; subject: string; text: string };
 
@@ -22,6 +23,31 @@ type Message = { to: string; subject: string; text: string };
  */
 function from(): string {
   return process.env.RESEND_FROM ?? "Pendolino Ceste <onboarding@resend.dev>";
+}
+
+/**
+ * Whether this deployment only pretends to send. Set on a deployment somebody
+ * is working against, so that inviting yourself to try the flow does not put a
+ * real message in a real inbox — and so that a mill's own address is never
+ * written to twice over by a developer.
+ *
+ * A value that is neither true nor false is refused rather than guessed at:
+ * guessing false posts real mail on a deployment that asked not to, and
+ * guessing true swallows the invitation an Admin is waiting on. The refusal
+ * lands on the link, and so on the Operatori screen, like any other reason an
+ * email did not go out.
+ */
+function testMode(): boolean {
+  const set = process.env.RESEND_TEST_MODE?.trim().toLowerCase();
+  if (set === undefined || set === "" || set === "false") {
+    return false;
+  }
+  if (set === "true") {
+    return true;
+  }
+  throw new Error(
+    `RESEND_TEST_MODE is "${process.env.RESEND_TEST_MODE}" on this deployment, which is neither true nor false.`,
+  );
 }
 
 /** Where the links point: this app, as the mill reaches it. */
@@ -35,7 +61,20 @@ function siteUrl(): string {
   return url;
 }
 
-async function deliver(message: Message): Promise<void> {
+/**
+ * Hands one message to Resend, and says what became of it. On a deployment in
+ * prova nothing is handed over: the message is built exactly as it would have
+ * been, so that a missing SITE_URL still fails here rather than in October,
+ * and it goes to the logs instead — where whoever is trying the flow reads the
+ * link straight out of the Convex dashboard. No key is needed to do that.
+ */
+async function deliver(message: Message): Promise<"sent" | "withheld"> {
+  if (testMode()) {
+    console.log(
+      `RESEND_TEST_MODE: nothing was sent to ${message.to}.\n${message.subject}\n\n${message.text}`,
+    );
+    return "withheld";
+  }
   const key = process.env.RESEND_API_KEY;
   if (key === undefined || key === "") {
     throw new Error(
@@ -60,6 +99,7 @@ async function deliver(message: Message): Promise<void> {
       `Resend refused the message: ${response.status} ${await response.text()}`,
     );
   }
+  return "sent";
 }
 
 /** The day a link stops working, as the mill reads a date. */
@@ -138,10 +178,10 @@ export const send = internalAction({
       return null;
     }
     try {
-      await deliver(messageFor(link));
+      const kind = await deliver(messageFor(link));
       await ctx.runMutation(internal.accessLinks.delivered, {
         accessLinkId: args.accessLinkId,
-        delivery: { kind: "sent", at: Date.now() },
+        delivery: { kind, at: Date.now() },
       });
     } catch (error) {
       await ctx.runMutation(internal.accessLinks.delivered, {
