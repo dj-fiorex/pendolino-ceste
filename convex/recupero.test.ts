@@ -146,6 +146,25 @@ describe("the Soglia di ritardo", () => {
     );
   });
 
+  test("is settled first without deciding anything about the Etichetta", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+
+    // The two share the one row the whole mill's settings live in. Writing
+    // that row for the Soglia must not settle the Etichetta by the way: it
+    // still says what the app says until an Admin says otherwise.
+    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 21 });
+
+    expect(await gabriele.query(api.etichette.settings, {})).toEqual({
+      etichettaSize: "100x150",
+      millName: "",
+      millNameOnEtichetta: true,
+      millPhone: "",
+      millPhoneOnEtichetta: true,
+    });
+    expect(await gabriele.query(api.registro.list, {})).toHaveLength(1);
+  });
+
   test("is a number of whole days, and at least one", async () => {
     const t = startApp();
     const gabriele = await admin(t);
@@ -207,24 +226,9 @@ describe("the Lista di recupero", () => {
         active: true,
         since: expect.any(Number),
         ceste: [
-          {
-            _id: expect.any(String),
-            numero: 1,
-            codice: "400-R-001",
-            since: expect.any(Number),
-          },
-          {
-            _id: expect.any(String),
-            numero: 2,
-            codice: "400-R-002",
-            since: expect.any(Number),
-          },
-          {
-            _id: expect.any(String),
-            numero: 3,
-            codice: "400-R-003",
-            since: expect.any(Number),
-          },
+          { _id: expect.any(String), numero: 1, since: expect.any(Number) },
+          { _id: expect.any(String), numero: 2, since: expect.any(Number) },
+          { _id: expect.any(String), numero: 3, since: expect.any(Number) },
         ],
       },
     ]);

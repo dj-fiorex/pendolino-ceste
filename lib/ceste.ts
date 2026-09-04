@@ -129,8 +129,16 @@ export const daysLabel = (days: number) =>
 export const daysAgo = (at: number) =>
   Math.floor((Date.now() - at) / 86_400_000);
 
-/** How many days ago something happened, as the counter says it. */
-export const daysSince = (at: number) => daysLabel(daysAgo(at));
+/**
+ * How many days ago something happened, as the counter says it. A Cesta that
+ * went out this morning has been out "oggi" and not "0 giorni": on a peak day
+ * of the Campagna most of what the screens date is same-day, and nobody at the
+ * counter counts a day that has not finished.
+ */
+export const daysSince = (at: number) => {
+  const days = daysAgo(at);
+  return days === 0 ? "oggi" : daysLabel(days);
+};
 
 /**
  * Whether a Cesta Fuori since a moment counts In ritardo: Fuori for more days
@@ -146,3 +154,13 @@ export const daysSince = (at: number) => daysLabel(daysAgo(at));
  */
 export const inRitardo = (since: number | null, sogliaRitardo: number) =>
   since !== null && daysAgo(since) > sogliaRitardo;
+
+/**
+ * The oldest date among a set of Ceste, and nothing where none of them carries
+ * one: how long a Cliente has been holding something of the mill's, which is
+ * the figure the counter is told and the Lista di recupero is ordered by (#22).
+ */
+export const oldestSince = (ceste: { since: number | null }[]) => {
+  const dates = ceste.flatMap((cesta) => cesta.since ?? []);
+  return dates.length === 0 ? null : Math.min(...dates);
+};

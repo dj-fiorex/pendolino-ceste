@@ -1,18 +1,23 @@
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
-import { cesteFuori } from "./ceste";
+import { byCliente, cesteFuori } from "./ceste";
 import { asCliente, clienteShape } from "./clienti";
 import { fuoriSince } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import { millSettings, saveMillSettings } from "./settings";
 
-/** One Cesta on the list: which she is, and since when she has been Fuori. */
-const cestaFuori = v.object({
+/**
+ * One Cesta on the list: which she is, and since when she has been Fuori.
+ *
+ * Her numero and no Codice, because this is a list read out over a telephone
+ * — "hai ancora la 17 e la 22" — and at the counter one says the numero
+ * (ADR-0007).
+ */
+const cestaOnTheList = v.object({
   _id: v.id("ceste"),
   numero: v.number(),
-  codice: v.string(),
   // The Ritiro that took her out, or the Rettifica that says she turned up in
   // somebody's yard — and nothing where she reached his hands some other way,
   // rather than a date the app would be inventing (ADR-0005).
@@ -24,12 +29,11 @@ const cestaFuori = v.object({
  * them: how long the mill has been waiting on this person, which is what the
  * list is sorted by and what a row is highlighted by.
  */
-async function heldBy(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
+async function whatHeHolds(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
   const dated = await Promise.all(
     ceste.map(async (cesta) => ({
       _id: cesta._id,
       numero: cesta.numero,
-      codice: cesta.codice,
       since: await fuoriSince(ctx, cesta._id),
     })),
   );
@@ -38,29 +42,6 @@ async function heldBy(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
     since: dates.length === 0 ? null : Math.min(...dates),
     ceste: dated,
   };
-}
-
-/**
- * The Ceste Fuori, one group per Cliente holding them, in the order the Ceste
- * are read: by numero, inside a group as between them.
- *
- * A Cesta the app has as nobody's is left out, because a row of this list is
- * somebody to telephone and that one names nobody to call. No mutation can
- * leave a Cesta there — Fuori with nobody is not a place a Cesta can be — and
- * `ceste.fuoriByCliente` is the fleet-wide read where one would show if a
- * deployment ever held one.
- */
-function byCliente(ceste: Doc<"ceste">[]): Map<Id<"clienti">, Doc<"ceste">[]> {
-  const groups = new Map<Id<"clienti">, Doc<"ceste">[]>();
-  for (const cesta of ceste) {
-    if (cesta.clienteId !== undefined) {
-      groups.set(cesta.clienteId, [
-        ...(groups.get(cesta.clienteId) ?? []),
-        cesta,
-      ]);
-    }
-  }
-  return groups;
 }
 
 /**
@@ -91,26 +72,37 @@ export const list = query({
         // how long the mill has been waiting on him, and what the list is
         // ordered by.
         since: v.union(v.null(), v.number()),
-        ceste: v.array(cestaFuori),
+        ceste: v.array(cestaOnTheList),
       }),
     ),
   }),
   handler: async (ctx) => {
     await requireOperatore(ctx);
     const { sogliaRitardo } = await millSettings(ctx);
-    const groups = byCliente(await cesteFuori(ctx));
+    // A group the app has as nobody's is left out: a row of this list is
+    // somebody to telephone, and that one names nobody to call. No mutation
+    // can make one — Fuori with nobody is not a place a Cesta can be — and
+    // `ceste.fuoriByCliente` is the fleet-wide read where one would show.
+    const groups = byCliente(await cesteFuori(ctx)).flatMap((group) =>
+      group.clienteId === undefined
+        ? []
+        : [{ clienteId: group.clienteId, ceste: group.ceste }],
+    );
 
     const clienti = await Promise.all(
-      [...groups].map(async ([clienteId, ceste]) => {
+      groups.map(async ({ clienteId, ceste }) => {
         const cliente = await ctx.db.get(clienteId);
         if (cliente === null) {
-          // A Cliente is deactivated but never deleted (ADR-0004).
+          // A Cliente is deactivated but never deleted (ADR-0004), so this is
+          // a broken invariant rather than a Cliente who left. It is raised
+          // rather than quietly dropped: the one screen that exists to find
+          // Ceste must not be the one that loses them.
           throw new Error("A Cesta Fuori names a Cliente that is gone.");
         }
         return {
           cliente: asCliente(cliente),
           active: cliente.active,
-          ...(await heldBy(ctx, ceste)),
+          ...(await whatHeHolds(ctx, ceste)),
         };
       }),
     );

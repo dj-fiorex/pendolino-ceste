@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { asCliente, clienteShape } from "./clienti";
 import { lastMovimentoAt } from "./movimenti";
@@ -338,17 +338,28 @@ async function clientiHolding(ctx: QueryCtx, ceste: Doc<"ceste">[]) {
   );
 }
 
+/** A Cliente's share of a set of Ceste, and nobody's where none is named. */
+export type CesteOfCliente = {
+  clienteId: Id<"clienti"> | undefined;
+  ceste: Doc<"ceste">[];
+};
+
 /**
  * The Ceste of a set, one group per Cliente named on them, with the Ceste the
  * app believes are nobody's — none, unless a Rettifica put one there — as one
  * group of their own rather than as one group each. The order inside a group
- * is the order they came in, which both readers set by numero.
+ * is the order they came in, which every reader sets by numero.
+ *
+ * The Cliente is handed back beside his Ceste rather than read off the first
+ * of them, so that a caller who has to tell the nobody group apart can do it
+ * without reaching into the group to find out (#22).
  */
-function byCliente(ceste: Doc<"ceste">[]): Doc<"ceste">[][] {
-  const groups = new Map<string, Doc<"ceste">[]>();
+export function byCliente(ceste: Doc<"ceste">[]): CesteOfCliente[] {
+  const groups = new Map<string, CesteOfCliente>();
   for (const cesta of ceste) {
     const key = cesta.clienteId ?? "";
-    groups.set(key, [...(groups.get(key) ?? []), cesta]);
+    const group = groups.get(key) ?? { clienteId: cesta.clienteId, ceste: [] };
+    groups.set(key, { ...group, ceste: [...group.ceste, cesta] });
   }
   return [...groups.values()];
 }
@@ -427,17 +438,18 @@ export const attesaMolituraByCliente = query({
     const dated = await Promise.all(
       byCliente(ceste).map(async (group) => {
         const rientri = await Promise.all(
-          group.map((cesta) => lastMovimentoAt(ctx, cesta._id, "rientro")),
+          group.ceste.map((cesta) =>
+            lastMovimentoAt(ctx, cesta._id, "rientro"),
+          ),
         );
         const known = rientri.filter((at) => at !== null);
-        const [first] = group;
         return {
           cliente:
-            first.clienteId === undefined
+            group.clienteId === undefined
               ? null
-              : (clienti.get(first.clienteId) ?? null),
+              : (clienti.get(group.clienteId) ?? null),
           oldestRientro: known.length === 0 ? null : Math.min(...known),
-          ceste: group.map(asWaitingCesta),
+          ceste: group.ceste.map(asWaitingCesta),
         };
       }),
     );
@@ -495,19 +507,16 @@ export const fuoriByCliente = query({
     const clienti = await clientiHolding(ctx, ceste);
 
     // Grouped on the Cliente the Cesta went out to, which is who to call.
-    const groups = byCliente(ceste).map((group) => {
-      const [first] = group;
-      return {
-        cliente:
-          first.clienteId === undefined
-            ? null
-            : (clienti.get(first.clienteId) ?? null),
-        ceste: group.map((cesta) => ({
-          numero: cesta.numero,
-          codice: cesta.codice,
-        })),
-      };
-    });
+    const groups = byCliente(ceste).map((group) => ({
+      cliente:
+        group.clienteId === undefined
+          ? null
+          : (clienti.get(group.clienteId) ?? null),
+      ceste: group.ceste.map((cesta) => ({
+        numero: cesta.numero,
+        codice: cesta.codice,
+      })),
+    }));
 
     // By name, as every list of Clienti is read, and the Ceste nobody is
     // holding last, where a name would have been.

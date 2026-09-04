@@ -17,6 +17,7 @@ import { api } from "@/convex/_generated/api";
 import {
   cesteCount,
   dayOf,
+  daysAgo,
   daysLabel,
   daysSince,
   inRitardo,
@@ -32,10 +33,12 @@ import { cn } from "@/lib/utils";
  */
 function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
   const setSogliaRitardo = useMutation(api.recupero.setSogliaRitardo);
+  // The box is the Admin's own edit, kept as they typed it; what the mill is
+  // actually running on is read live beside it, so that a Soglia changed on
+  // another device never hides behind a half-typed number here.
   const [typed, setTyped] = useState(String(sogliaRitardo));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   const days = Number(typed);
   const isDays = Number.isInteger(days) && days >= 1;
@@ -45,8 +48,9 @@ function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
       <CardHeader>
         <CardTitle>Soglia di ritardo</CardTitle>
         <CardDescription>
-          Dopo quanti giorni Fuori una Cesta è In ritardo. Colora le righe qui
-          sopra e basta: non toglie nessuno dall&rsquo;elenco.
+          Adesso è {daysLabel(sogliaRitardo)}. Dopo quanti giorni Fuori una
+          Cesta è In ritardo: colora le righe qui sopra e basta, non toglie
+          nessuno dall&rsquo;elenco.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -55,11 +59,9 @@ function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
           onSubmit={async (event) => {
             event.preventDefault();
             setError(null);
-            setSaved(false);
             setPending(true);
             try {
               await setSogliaRitardo({ days });
-              setSaved(true);
             } catch {
               setError("Non è stato possibile salvare. Riprova.");
             } finally {
@@ -77,10 +79,7 @@ function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
               min={1}
               step={1}
               value={typed}
-              onChange={(event) => {
-                setTyped(event.target.value);
-                setSaved(false);
-              }}
+              onChange={(event) => setTyped(event.target.value)}
               className="h-11"
             />
           </div>
@@ -92,11 +91,6 @@ function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
           {error !== null && (
             <p role="alert" className="text-sm text-destructive">
               {error}
-            </p>
-          )}
-          {saved && (
-            <p className="text-sm text-muted-foreground">
-              Adesso è {daysLabel(sogliaRitardo)}.
             </p>
           )}
           <Button
@@ -191,7 +185,9 @@ export function RecuperoList({ canSetSoglia }: { canSetSoglia: boolean }) {
                 <p className="text-sm text-muted-foreground">
                   {row.since === null
                     ? "Da quando, non lo sappiamo."
-                    : `Da ${daysSince(row.since)}, dal ${dayOf(row.since)}.`}
+                    : daysAgo(row.since) === 0
+                      ? "Da oggi."
+                      : `Da ${daysSince(row.since)}, dal ${dayOf(row.since)}.`}
                   {late && (
                     <span className="font-semibold text-amber-900 dark:text-amber-100">
                       {" "}

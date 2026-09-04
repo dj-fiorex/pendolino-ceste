@@ -30,11 +30,13 @@ export default async function Recupero() {
         >
           ← Indietro
         </Link>
+        {/* The mill's own name for this list (CONTEXT.md), with what it is
+            said underneath for whoever has not heard it called that yet. */}
         <h1 className="font-display text-3xl font-bold tracking-tight">
-          Chi ha le Ceste
+          Lista di recupero
         </h1>
         <p className="text-muted-foreground">
-          Chi ne ha Fuori, da quanto, e il numero da chiamare. Chi aspetta da
+          Chi ha Ceste Fuori, da quanto, e il numero da chiamare. Chi aspetta da
           più tempo sta in cima. Non manca nessuno: si esce da qui solo con un
           Rientro o una Rettifica.
         </p>

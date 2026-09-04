@@ -259,16 +259,18 @@ export const DEFAULT_SOGLIA_RITARDO = 10;
  * the table, the mutations that write it and the screens that read it take
  * their shape from here.
  */
-export const millSettingsFields = {
+export const settingsFields = {
   ...etichettaSettingsFields,
-  // Absent on a row written before the mill had a Soglia to set, which reads
-  // as the app's own ten: no row is ever rewritten to say otherwise
-  // (ADR-0004).
+  // Optional because a row can predate the setting: one written when the mill
+  // had only Etichette to settle carries no Soglia, and reads as the app's own
+  // ten rather than being rewritten to say so (ADR-0004). An Admin who sets
+  // the Soglia writes it; nothing else does.
   sogliaRitardo: v.optional(v.number()),
 };
 
-export type MillSettings = Infer<
-  ReturnType<typeof v.object<typeof millSettingsFields>>
+/** The settings row as it is stored — the Soglia only where one was set. */
+export type StoredSettings = Infer<
+  ReturnType<typeof v.object<typeof settingsFields>>
 >;
 
 /** A value as it is stored: no leading, trailing or doubled spaces. */
@@ -701,7 +703,7 @@ export default defineSchema({
   // the print shop prints, and the Soglia di ritardo beside it. An empty table
   // means nobody has changed anything yet, and every setting reads as the
   // app's own.
-  settings: defineTable(millSettingsFields),
+  settings: defineTable(settingsFields),
 
   // The mill's seasons. At most one is open at any moment — enforced in the
   // mutation that opens one and not only in the screen that offers it — and

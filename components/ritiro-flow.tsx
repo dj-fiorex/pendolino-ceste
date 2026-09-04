@@ -22,6 +22,7 @@ import {
   cesteCount,
   dayOf,
   daysSince,
+  oldestSince,
   warningLine,
   whereTheAppHasHer,
   type FoundCesta,
@@ -118,10 +119,10 @@ export function RitiroFlow() {
   const notWhereTheAppHadThem = ceste.filter((cesta) => !asExpected(cesta));
 
   // What this Cliente is holding already, by numero, and since when the oldest
-  // of them has been his.
-  const alreadyOut = held?.cesteFuori ?? [];
-  const outSince = alreadyOut.flatMap((cesta) => cesta.since ?? []);
-  const oldestOut = outSince.length === 0 ? null : Math.min(...outSince);
+  // of them has been his. Undefined while the read is still in flight, which
+  // is not the same as his holding nothing: the screen says which it is.
+  const alreadyOut = held?.cesteFuori;
+  const oldestOut = oldestSince(alreadyOut ?? []);
 
   /**
    * One more Cesta on this Ritiro, however she was read. The camera and the
@@ -185,21 +186,30 @@ export function RitiroFlow() {
 
           It never gates the button: the Ceste are on the trailer either way
           and the counter is never blocked (ADR-0005). */}
-      {alreadyOut.length > 0 && (
-        <Warning>
-          <span className="font-semibold">
-            Ha già {cesteCount(alreadyOut.length)} Fuori
-            {oldestOut === null ? "" : `, da ${daysSince(oldestOut)}`}:
-          </span>{" "}
-          {alreadyOut
-            .map((cesta) =>
-              cesta.since === null
-                ? `${cesta.numero}`
-                : `${cesta.numero} dal ${dayOf(cesta.since)}`,
-            )
-            .join(" · ")}
-          . Il Ritiro va avanti lo stesso.
-        </Warning>
+      {alreadyOut === undefined ? (
+        // Not "he has none": the app has not finished asking. Said out loud,
+        // because an Operatore who saw nothing would take that for an answer
+        // and confirm a Ritiro the warning never got to appear on.
+        <p className="text-sm text-muted-foreground">
+          Guardo se ha già Ceste Fuori…
+        </p>
+      ) : (
+        alreadyOut.length > 0 && (
+          <Warning>
+            <span className="font-semibold">
+              Ha già {cesteCount(alreadyOut.length)} Fuori
+              {oldestOut === null ? "" : `, da ${daysSince(oldestOut)}`}:
+            </span>{" "}
+            {alreadyOut
+              .map((cesta) =>
+                cesta.since === null
+                  ? `${cesta.numero}`
+                  : `${cesta.numero} dal ${dayOf(cesta.since)}`,
+              )
+              .join(" · ")}
+            . Il Ritiro va avanti lo stesso.
+          </Warning>
+        )
       )}
 
       <div className="flex items-baseline justify-between text-sm text-muted-foreground">
