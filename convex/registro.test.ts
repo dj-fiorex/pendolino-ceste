@@ -179,6 +179,8 @@ describe("the Registro of a day", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: {
         kind: "cliente_modificato",
         changes: [
@@ -202,6 +204,72 @@ describe("the Registro of a day", () => {
     expect(
       await gabriele.query(api.registro.filterOptions, { day: yesterday() }),
     ).toEqual({ clienti: [], operatori: [] });
+  });
+});
+
+/**
+ * A Rettifica of *errore* and the action it puts right are two rows, and the
+ * Registro is read for either of them: what was registered wrongly, and what
+ * says so. Neither row is ever rewritten to name the other (ADR-0004, #28).
+ */
+describe("a correction and the action it corrects", () => {
+  test("each of the two rows names the other", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t, "Marco", "auth|marco");
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const cesteIds = [
+      await typeNumero(marco, "4"),
+      await typeNumero(marco, "5"),
+    ];
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: giuseppe,
+      cesteIds,
+    });
+    // The second was scanned off the stack and never went on the trailer.
+    const [, scannedByMistake] = cesteIds;
+    const ritiro = (
+      await gabriele.query(api.movimenti.byCesta, {
+        cestaId: scannedByMistake,
+      })
+    ).find((movimento) => movimento.kind === "ritiro");
+
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId: scannedByMistake,
+      cause: "errore",
+      corrects: ritiro!._id,
+      becomes: "disponibile",
+    });
+
+    const rows = await gabriele.query(api.registro.list, { day: today() });
+    const correction = rows.find((row) => row.action.kind === "rettifica")!;
+    const corrected = rows.find((row) => row.action.kind === "ritiro")!;
+
+    // The Rettifica's row names the action it corrects…
+    expect(correction.corrects).toEqual({
+      _id: corrected._id,
+      at: corrected.at,
+      kind: "ritiro",
+    });
+    // …and the Ritiro's row reads as corrected by it, while still saying
+    // exactly what Marco did that morning, to both Ceste (ADR-0004).
+    expect(corrected.correctedBy).toEqual([
+      { _id: correction._id, at: correction.at, numero: 5 },
+    ]);
+    expect(corrected.action).toEqual({ kind: "ritiro", numeri: [4, 5] });
+    expect(corrected.operatore).toBe("Marco");
+    // The Rettifica is an action that produced a Rettifica; the Ritiro is not.
+    // That flag says what an action left behind it as it went through, not
+    // what somebody did about it days later (#21).
+    expect(correction.producedRettifica).toBe(true);
+    expect(corrected.producedRettifica).toBe(false);
+
+    // And nothing else of the day is either half of a pair.
+    expect(rows.filter((row) => row.corrects !== null)).toHaveLength(1);
+    expect(rows.filter((row) => row.correctedBy.length > 0)).toHaveLength(1);
   });
 });
 

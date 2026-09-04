@@ -4,7 +4,12 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { openCampagna } from "./campagne";
 import { requireAdmin } from "./operatori";
-import { action, type Action } from "./schema";
+import {
+  action,
+  plainMovimentoKind,
+  type Action,
+  type PlainMovimentoKind,
+} from "./schema";
 
 /**
  * The stretch of time a read of the Registro covers: `from` included, `to` not.
@@ -74,6 +79,11 @@ export async function writeRegistroRow(
      * Every other action leaves none, and says so by saying nothing.
      */
     producedRettifica?: boolean;
+    /**
+     * The row this one corrects: the action a Rettifica of *errore* says was
+     * registered wrongly (#28). Every other action corrects none.
+     */
+    corrects?: Id<"registro">;
     action: Action;
   },
 ): Promise<Id<"registro">> {
@@ -202,6 +212,73 @@ async function campagnaNameOf(
   return campagna?.name ?? null;
 }
 
+/**
+ * The kinds of row a Rettifica of *errore* is ever written against: the three
+ * movements somebody registers at the counter or in the yard, read off the
+ * Movimento's own union rather than listed again here. A Censimento or a
+ * Campagna opened is not put right by a Rettifica, and no read looks for one
+ * against them.
+ */
+const CORRECTABLE: PlainMovimentoKind[] = plainMovimentoKind.members.map(
+  (member) => member.value,
+);
+
+/** Whether a row names one of them, and so has a correction to be read for. */
+const isCorrectable = (kind: Action["kind"]): kind is PlainMovimentoKind =>
+  CORRECTABLE.some((correctable) => correctable === kind);
+
+/**
+ * The action a row corrects, where it is the Rettifica of an *errore*: which
+ * of the three movements was registered wrongly, and when it was written down.
+ */
+async function correctsOf(ctx: QueryCtx, row: Doc<"registro">) {
+  if (row.corrects === undefined) {
+    return null;
+  }
+  const corrected = await ctx.db.get(row.corrects);
+  if (corrected === null) {
+    // A Registro row is never deleted (ADR-0004).
+    throw new Error("A Rettifica names a Registro row that is gone.");
+  }
+  const kind = corrected.action.kind;
+  if (!isCorrectable(kind)) {
+    throw new Error(
+      "A Rettifica corrects a Ritiro, a Rientro or a Svuotamento.",
+    );
+  }
+  return { _id: corrected._id, at: corrected._creationTime, kind };
+}
+
+/**
+ * The Rettifiche that correct a row, and which Cesta each of them was about.
+ *
+ * Read from their end rather than the row's, because a correction is written
+ * days after the action it corrects and the corrected row is never rewritten
+ * to point back at it (ADR-0004). One indexed read per row that could be
+ * corrected, over a day the screen already holds; there are at most as many
+ * corrections as the action moved Ceste, and a Ritiro moves six.
+ */
+async function correctedByOf(ctx: QueryCtx, row: Doc<"registro">) {
+  if (!isCorrectable(row.action.kind)) {
+    return [];
+  }
+  const corrections = await ctx.db
+    .query("registro")
+    .withIndex("by_corrects", (q) => q.eq("corrects", row._id))
+    .collect();
+  return corrections.flatMap((correction) =>
+    correction.action.kind === "rettifica"
+      ? [
+          {
+            _id: correction._id,
+            at: correction._creationTime,
+            numero: correction.action.numero,
+          },
+        ]
+      : [],
+  );
+}
+
 /** The Cliente a row concerns, where it concerns one. Never deleted either. */
 async function clienteOf(
   ctx: QueryCtx,
@@ -244,6 +321,28 @@ export const list = query({
       // Whether the action left a Rettifica behind it, so that the screen can
       // mark the row and offer the day's discrepanze on their own (#21, #27).
       producedRettifica: v.boolean(),
+      // The action this row corrects, and the Rettifiche that correct it: the
+      // two ends of a misregistration put right, so that the Registro reads
+      // the pair from whichever of them the Admin happens to be looking at
+      // (#28). Every row that is neither says so with a null and an empty
+      // list.
+      corrects: v.union(
+        v.null(),
+        v.object({
+          _id: v.id("registro"),
+          at: v.number(),
+          kind: plainMovimentoKind,
+        }),
+      ),
+      correctedBy: v.array(
+        v.object({
+          _id: v.id("registro"),
+          at: v.number(),
+          // The Cesta the correction was about, because an action moves several
+          // and only one of them was the mistake.
+          numero: v.number(),
+        }),
+      ),
       action,
     }),
   ),
@@ -264,6 +363,8 @@ export const list = query({
               : { name: cliente.name, alias: cliente.alias },
           campagna: await campagnaNameOf(ctx, row),
           producedRettifica: leftARettifica(row),
+          corrects: await correctsOf(ctx, row),
+          correctedBy: await correctedByOf(ctx, row),
           action: row.action,
         };
       }),

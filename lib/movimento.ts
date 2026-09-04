@@ -14,7 +14,7 @@ export const movimentoLabel: Record<MovimentoKind, string> = {
 };
 
 /**
- * What each cause of a Rettifica is called on screen: the three an Admin
+ * What each cause of a Rettifica is called on screen: the four an Admin
  * chooses between, and the one the app writes itself as a Movimento goes
  * through on a Cesta that was not where it believed (ADR-0005).
  */
@@ -22,7 +22,20 @@ export const rettificaCauseLabel: Record<RettificaCause, string> = {
   persa: "Persa",
   rotta: "Rotta",
   ritrovata: "Ritrovata",
+  errore: "Errore di registrazione",
   discrepanza: "Discrepanza",
+};
+
+/**
+ * Each Movimento with the article a sentence names it by, because "lo
+ * Svuotamento" is Italian and "il Svuotamento" is not. What the Registro reads
+ * when one row names another: "corregge lo Svuotamento del 25 ott" (#28).
+ */
+export const movimentoInSentence: Record<MovimentoKind, string> = {
+  ritiro: "il Ritiro",
+  rientro: "il Rientro",
+  svuotamento: "lo Svuotamento",
+  rettifica: "la Rettifica",
 };
 
 /**

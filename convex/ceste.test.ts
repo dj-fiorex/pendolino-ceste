@@ -160,6 +160,8 @@ describe("Censimento", () => {
         cliente: null,
         campagna: null,
         producedRettifica: false,
+        corrects: null,
+        correctedBy: [],
         action: {
           kind: "censimento",
           portata: 400,

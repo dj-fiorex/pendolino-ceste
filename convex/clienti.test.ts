@@ -200,6 +200,8 @@ describe("the Registro", () => {
         cliente: { name: "Giuseppe Amato", alias: [] },
         campagna: null,
         producedRettifica: false,
+        corrects: null,
+        correctedBy: [],
         action: {
           kind: "cliente_creato",
           name: "Giuseppe Amato",
@@ -258,6 +260,8 @@ describe("correcting a Cliente", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: {
         kind: "cliente_modificato",
         changes: [
@@ -384,6 +388,8 @@ describe("deactivating a Cliente", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: {
         kind: "cliente_disattivato",
         name: "Giuseppe Amato",
