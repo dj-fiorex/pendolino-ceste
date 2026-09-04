@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CampagnaBar } from "@/components/campagna-bar";
+import { MediaKept } from "@/components/media-kept";
 import { RettificaForm } from "@/components/rettifica-form";
 import {
   Card,
@@ -169,6 +170,11 @@ export default async function CestaPage({
                         ? movimento.operatore
                         : `${clienteLabel(movimento.cliente)} · ${movimento.operatore}`}
                     </p>
+                    {/* What the Cliente left at the counter that morning, on
+                        the Ritiro that took her out and kept for good (#25).
+                        A tap opens it full size, which is the size a dispute
+                        wants to look at it at. */}
+                    <MediaKept media={movimento.media} />
                   </div>
                   <p className="text-sm text-muted-foreground tabular-nums">
                     {whenLabel.format(movimento.at)}

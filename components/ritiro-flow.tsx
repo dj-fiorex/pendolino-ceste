@@ -7,6 +7,11 @@ import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
+import {
+  NOTHING_CAPTURED,
+  RitiroMedia,
+  type CapturedMedia,
+} from "@/components/ritiro-media";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
-import { expectedBefore } from "@/convex/schema";
+import { expectedBefore, type MediaKind } from "@/convex/schema";
 import {
   cesteCount,
   warningLine,
@@ -25,6 +30,7 @@ import {
   type FoundCesta,
 } from "@/lib/ceste";
 import { clienteLabel, type Cliente } from "@/lib/cliente";
+import { mediaInSentence, upload } from "@/lib/media";
 
 /**
  * Whether the app had a Cesta where a Ritiro expects to find her: at the mill,
@@ -46,14 +52,23 @@ const asExpected = (cesta: FoundCesta) => cesta.state === expectedBefore.ritiro;
  */
 export function RitiroFlow() {
   const recordRitiro = useMutation(api.movimenti.ritiro);
+  const askWhereToPutIt = useMutation(api.media.uploadUrl);
   const { campagnaId, mustAsk } = useCampagnaChoice();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [ceste, setCeste] = useState<FoundCesta[]>([]);
+  const [captured, setCaptured] = useState<CapturedMedia>(NOTHING_CAPTURED);
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
-  const [done, setDone] = useState<{ cliente: Cliente; count: number } | null>(
-    null,
-  );
+  const [done, setDone] = useState<{
+    cliente: Cliente;
+    count: number;
+    /**
+     * What was taken and did not go up. The Ritiro is registered regardless:
+     * the Ceste are on the trailer, and an upload that failed is not a reason
+     * to hold the counter (ADR-0005).
+     */
+    notUploaded: MediaKind[];
+  } | null>(null);
 
   if (done !== null) {
     return (
@@ -65,12 +80,27 @@ export function RitiroFlow() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
+          {/* Said after the fact and never before it: what the Operatore took
+              did not go up, the Ritiro went through anyway, and they hear it
+              rather than finding out in November (ADR-0005, #25). */}
+          {done.notUploaded.length > 0 && (
+            <Warning>
+              {`Il Ritiro è registrato, ma ${done.notUploaded
+                .map((kind) => mediaInSentence[kind])
+                .join(" e ")} ${
+                done.notUploaded.length === 1
+                  ? "non è stata caricata"
+                  : "non sono state caricate"
+              }.`}
+            </Warning>
+          )}
           <Button
             className="h-12 text-base"
             onClick={() => {
               setDone(null);
               setCliente(null);
               setCeste([]);
+              setCaptured(NOTHING_CAPTURED);
               setFailed(false);
             }}
           >
@@ -88,16 +118,42 @@ export function RitiroFlow() {
     return <ClientePicker onPick={setCliente} pickLabel="Ritiro" />;
   }
 
+  /**
+   * What was taken goes up before the Ritiro does, because the Ritiro carries
+   * where each of them landed and not the file itself.
+   *
+   * An upload that fails costs the mill a signature, not a Ritiro. The Ceste
+   * are already on the trailer, so the movement is registered without it and
+   * the screen says which one is missing: the counter is never blocked, least
+   * of all by the optional half of it (ADR-0005, #25).
+   */
   const confirm = async () => {
     setPending(true);
     setFailed(false);
+    const notUploaded: MediaKind[] = [];
+    const put = async (kind: MediaKind) => {
+      const file = captured[kind];
+      if (file === null) {
+        return undefined;
+      }
+      try {
+        return await upload(await askWhereToPutIt({}), file);
+      } catch {
+        notUploaded.push(kind);
+        return undefined;
+      }
+    };
     try {
+      const signatureId = await put("signature");
+      const photoId = await put("photo");
       await recordRitiro({
         clienteId: cliente._id,
         cesteIds: ceste.map((cesta) => cesta._id),
         campagnaId,
+        signatureId,
+        photoId,
       });
-      setDone({ cliente, count: ceste.length });
+      setDone({ cliente, count: ceste.length, notUploaded });
     } catch {
       setFailed(true);
     } finally {
@@ -156,7 +212,16 @@ export function RitiroFlow() {
           <Button
             variant="outline"
             className="h-11 w-full text-base"
-            onClick={() => setCliente(null)}
+            onClick={() => {
+              // The Ceste stay: they are in the yard whoever is taking them,
+              // and the wrong name was the thing being corrected. The
+              // signature does not, because it is one man's hand and no
+              // other's — a phone shared across a shift must never confirm
+              // one Cliente's signature under the next Cliente's name (#25,
+              // and the reason a draft is never restored silently, spec #1).
+              setCaptured(NOTHING_CAPTURED);
+              setCliente(null);
+            }}
           >
             Cambia Cliente
           </Button>
@@ -211,6 +276,11 @@ export function RitiroFlow() {
           riprova.
         </p>
       )}
+
+      {/* Offered here, the last thing before the bar that confirms, and asked
+          for nowhere: a Ritiro is confirmed on the same one tap whether or not
+          either of them was taken (#25). */}
+      <RitiroMedia captured={captured} onCapture={setCaptured} />
 
       <div className="sticky bottom-4 grid gap-3 rounded-xl border bg-card p-3 shadow-lg">
         <CestaReader

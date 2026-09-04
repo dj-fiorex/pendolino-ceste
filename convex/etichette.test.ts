@@ -86,6 +86,7 @@ describe("the Etichetta settings", () => {
         producedRettifica: false,
         corrects: null,
         correctedBy: [],
+        media: { signature: null, photo: null },
         action: {
           kind: "etichette_settings",
           changes: [

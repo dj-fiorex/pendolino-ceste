@@ -202,6 +202,7 @@ describe("the Registro", () => {
         producedRettifica: false,
         corrects: null,
         correctedBy: [],
+        media: { signature: null, photo: null },
         action: {
           kind: "cliente_creato",
           name: "Giuseppe Amato",
@@ -262,6 +263,7 @@ describe("correcting a Cliente", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: {
         kind: "cliente_modificato",
         changes: [
@@ -390,6 +392,7 @@ describe("deactivating a Cliente", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: {
         kind: "cliente_disattivato",
         name: "Giuseppe Amato",

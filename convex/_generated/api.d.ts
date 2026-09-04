@@ -17,6 +17,7 @@ import type * as clienti from "../clienti.js";
 import type * as email from "../email.js";
 import type * as etichette from "../etichette.js";
 import type * as http from "../http.js";
+import type * as media from "../media.js";
 import type * as movimenti from "../movimenti.js";
 import type * as operatori from "../operatori.js";
 import type * as registro from "../registro.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   email: typeof email;
   etichette: typeof etichette;
   http: typeof http;
+  media: typeof media;
   movimenti: typeof movimenti;
   operatori: typeof operatori;
   registro: typeof registro;

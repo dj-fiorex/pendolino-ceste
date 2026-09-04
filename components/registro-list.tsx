@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { useState } from "react";
+import { MediaKept } from "@/components/media-kept";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
@@ -162,17 +163,23 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
               <span className="font-display font-bold tabular-nums text-muted-foreground">
                 {timeOf(row.at)}
               </span>
-              <p className="flex-1">
-                {registroSentence(row)}
-                {/* The Campagna the action belonged to, where the sentence
-                    has not already said it (#19). */}
-                {saysItsCampagna(row) && (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · Campagna {row.campagna}
-                  </span>
-                )}
-              </p>
+              <div className="flex-1">
+                <p>
+                  {registroSentence(row)}
+                  {/* The Campagna the action belonged to, where the sentence
+                      has not already said it (#19). */}
+                  {saysItsCampagna(row) && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · Campagna {row.campagna}
+                    </span>
+                  )}
+                </p>
+                {/* What the Cliente left at the counter, on the one line that
+                    is the whole Ritiro rather than one of its six Ceste
+                    (ADR-0006, #25). */}
+                <MediaKept media={row.media} />
+              </div>
             </li>
           ))}
         </ol>

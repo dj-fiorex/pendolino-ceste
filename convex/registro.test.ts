@@ -181,6 +181,7 @@ describe("the Registro of a day", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: {
         kind: "cliente_modificato",
         changes: [
