@@ -136,6 +136,9 @@ export function Scanner({
     // One frame is read at a time: the reader is slower than the interval on a
     // tired phone, and a queue of frames would only make it slower.
     let reading = false;
+    // One opening at a time, for the same reason: coming back to the screen
+    // twice in a moment must not ask for two cameras.
+    let opening = false;
 
     /**
      * Whether the camera has anything to say about this Codice. A Cesta already
@@ -218,39 +221,85 @@ export function Scanner({
     };
 
     const open = async () => {
+      opening = true;
       try {
-        // The camera on the back of the phone: the one pointed at the trailer.
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
-      } catch {
-        noCamera();
-        return;
-      }
-      if (stopped) {
-        // The screen was left while the camera was being asked for, so the
-        // clean-up below had nothing to turn off yet. This is where it goes
-        // out: a light left on in somebody's pocket is a camera left running.
-        closeCamera();
-        return;
-      }
-      frame.srcObject = stream;
-      try {
-        await frame.play();
-        const reader = await qrReader();
-        if (stopped) {
+        try {
+          // The camera on the back of the phone: the one pointed at the
+          // trailer.
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+          });
+        } catch {
+          noCamera();
           return;
         }
-        looking = setInterval(() => void look(reader), LOOK_EVERY);
-      } catch {
-        noCamera();
+        if (stopped) {
+          // The screen was left while the camera was being asked for, so the
+          // clean-up below had nothing to turn off yet. This is where it goes
+          // out: a light left on in somebody's pocket is a camera left running.
+          closeCamera();
+          return;
+        }
+        frame.srcObject = stream;
+        try {
+          await frame.play();
+          const reader = await qrReader();
+          if (stopped) {
+            return;
+          }
+          // A camera asked for again after the phone's own took it away is a
+          // camera that works: whatever the screen said about it is no longer
+          // true.
+          setTrouble(null);
+          looking = setInterval(() => void look(reader), LOOK_EVERY);
+        } catch {
+          noCamera();
+        }
+      } finally {
+        opening = false;
       }
     };
 
+    /** Whether the camera we were given is still a camera we can read. */
+    const stillOurs = () =>
+      stream !== null &&
+      stream.getVideoTracks().some((track) => track.readyState === "live");
+
+    /**
+     * The screen came back to the front. The phone's own camera app was over
+     * it — the Operatore was photographing the load (#25) — or a call was, and
+     * either can have taken the camera away from the page while it was behind
+     * them.
+     *
+     * A camera still ours only needs the picture started again; one that was
+     * taken away is asked for afresh. Without this the scanner would come back
+     * from a photograph as a frozen frame, and an Operatore would go on aiming
+     * the phone at Ceste that nothing was reading.
+     */
+    const cameBack = () => {
+      if (stopped || opening || document.visibilityState !== "visible") {
+        return;
+      }
+      if (stillOurs()) {
+        void frame.play().catch(() => {
+          // A picture that will not restart is a camera to ask for again.
+          clearInterval(looking);
+          closeCamera();
+          void open();
+        });
+        return;
+      }
+      clearInterval(looking);
+      closeCamera();
+      void open();
+    };
+
+    document.addEventListener("visibilitychange", cameBack);
     void open();
 
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", cameBack);
       clearInterval(looking);
       // The camera light goes out when the Ritiro is confirmed, not when the
       // phone is put away.

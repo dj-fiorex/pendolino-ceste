@@ -146,6 +146,7 @@ describe("a Ritiro at the counter", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: {
         kind: "ritiro",
         numeri: [1, 2, 3, 4, 5, 6],
@@ -259,6 +260,202 @@ describe("a Ritiro at the counter", () => {
     await expect(
       t.query(api.movimenti.byCliente, { clienteId }),
     ).rejects.toThrow();
+  });
+});
+
+describe("the signature and the photo of a Ritiro", () => {
+  /**
+   * A signature or a photograph already in the mill's file storage, and the id
+   * the Ritiro then carries.
+   *
+   * The device gets there in two steps: `media.uploadUrl` says where to put
+   * the file — which is its own test below — and the browser POSTs it to
+   * Convex's own storage endpoint. That POST reaches no function of this app,
+   * so there is nothing of ours for a test to drive it through; this stands in
+   * for the browser on that one step, and everything on either side of it goes
+   * through the seam.
+   */
+  const alreadyInStorage = (t: TestConvex<typeof schema>, file: Blob) =>
+    t.run((ctx) => ctx.storage.store(file));
+
+  /** The Cliente's finger on the phone, as the small PNG it is drawn into. */
+  const aSignature = () =>
+    new Blob(["the Cliente's finger"], { type: "image/png" });
+
+  /** The loaded trailer, as the JPEG the device downscaled it to. */
+  const aPhotoOfTheLoad = () =>
+    new Blob(["the loaded trailer"], { type: "image/jpeg" });
+
+  test("a Ritiro goes through with neither, and nothing hangs off it", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [first] = await takeAway(marco, clienteId, ["1", "2"]);
+
+    const history = await marco.query(api.movimenti.byCesta, {
+      cestaId: first,
+    });
+    expect(history).toMatchObject([
+      { kind: "ritiro", media: { signature: null, photo: null } },
+    ]);
+  });
+
+  test("the Cliente signs, and his signature is still there to look at", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const cestaId = await typeNumero(marco, "1");
+
+    const signatureId = await alreadyInStorage(t, aSignature());
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId,
+      cesteIds: [cestaId],
+      signatureId,
+    });
+
+    const [ritiro] = await marco.query(api.movimenti.byCesta, { cestaId });
+    expect(ritiro.kind).toBe("ritiro");
+    expect(ritiro.media.signature).toEqual(expect.any(String));
+    expect(ritiro.media.photo).toBeNull();
+  });
+
+  test("six Ceste are one signature and one photograph, and each of the six shows that pair", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    const signatureId = await alreadyInStorage(t, aSignature());
+    const photoId = await alreadyInStorage(t, aPhotoOfTheLoad());
+    const cesteIds = [];
+    for (const numero of ["1", "2", "3", "4", "5", "6"]) {
+      cesteIds.push(await typeNumero(marco, numero));
+    }
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId,
+      cesteIds,
+      signatureId,
+      photoId,
+    });
+
+    const eachCesta = [];
+    for (const cestaId of cesteIds) {
+      const history = await marco.query(api.movimenti.byCesta, { cestaId });
+      expect(history).toHaveLength(1);
+      eachCesta.push(history[0].media);
+    }
+    const [onTheFirst] = eachCesta;
+    expect(onTheFirst.signature).toEqual(expect.any(String));
+    expect(onTheFirst.photo).toEqual(expect.any(String));
+    expect(onTheFirst.signature).not.toEqual(onTheFirst.photo);
+    // The one pair the Cliente left, wherever the mill goes looking for it.
+    expect(eachCesta).toEqual(cesteIds.map(() => onTheFirst));
+  });
+
+  test("the pair hangs on the Ritiro, and not on the Rettifica beside it or on a Rientro", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const turiddu = await marco.mutation(api.clienti.create, {
+      name: "Salvatore Turiddu",
+    });
+    // The app has her Fuori with Giuseppe, and Turiddu is loading her: she
+    // goes out all the same, with a Rettifica beside her (ADR-0005).
+    const cestaId = (await takeAway(marco, giuseppe, ["1"]))[0];
+
+    const signatureId = await alreadyInStorage(t, aSignature());
+    const photoId = await alreadyInStorage(t, aPhotoOfTheLoad());
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: turiddu,
+      cesteIds: [cestaId],
+      signatureId,
+      photoId,
+    });
+    await marco.mutation(api.movimenti.rientro, {
+      clienteId: turiddu,
+      cesteIds: [cestaId],
+    });
+
+    const history = await marco.query(api.movimenti.byCesta, { cestaId });
+    // Newest first: the Rientro, then Turiddu's Ritiro and the Rettifica that
+    // shares its Registro row, then Giuseppe's Ritiro.
+    expect(
+      history.map((movimento) => [
+        movimento.kind,
+        movimento.media.signature !== null,
+      ]),
+    ).toEqual([
+      ["rientro", false],
+      ["ritiro", true],
+      ["rettifica", false],
+      ["ritiro", false],
+    ]);
+  });
+
+  test("the Registro shows the pair on the one row that is the whole Ritiro", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const clienteId = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    const signatureId = await alreadyInStorage(t, aSignature());
+    const photoId = await alreadyInStorage(t, aPhotoOfTheLoad());
+    const cesteIds = [];
+    for (const numero of ["1", "2", "3", "4", "5", "6"]) {
+      cesteIds.push(await typeNumero(gabriele, numero));
+    }
+    await gabriele.mutation(api.movimenti.ritiro, {
+      clienteId,
+      cesteIds,
+      signatureId,
+      photoId,
+    });
+    // And a Rientro of the same load, which nobody signs for.
+    await gabriele.mutation(api.movimenti.rientro, { clienteId, cesteIds });
+
+    const rows = await gabriele.query(api.registro.list, {});
+    // Six Ceste out and six back are two rows, not twelve (ADR-0006), and the
+    // signature is on the one of them that was signed for.
+    expect(
+      rows.map((row) => [
+        row.action.kind,
+        row.media.signature !== null,
+        row.media.photo !== null,
+      ]),
+    ).toEqual([
+      ["rientro", false, false],
+      ["ritiro", true, true],
+      ["cliente_creato", false, false],
+      ["censimento", false, false],
+    ]);
+  });
+
+  test("nobody signed in is given anywhere to put a signature or a photograph", async () => {
+    const t = startApp();
+    await admin(t);
+    const marco = await operatore(t);
+
+    await expect(t.mutation(api.media.uploadUrl, {})).rejects.toThrow();
+    expect(await marco.mutation(api.media.uploadUrl, {})).toEqual(
+      expect.any(String),
+    );
   });
 });
 
@@ -477,6 +674,7 @@ describe("a Rientro at the counter", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: { kind: "rientro", numeri: [1, 2, 3, 4] },
     });
     // Back at the mill, still full: not yet Disponibile, and no longer Fuori.
@@ -770,6 +968,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       producedRettifica: false,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: { kind: "svuotamento", numeri: [1, 2, 3, 4, 5] },
     });
     expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
@@ -819,6 +1018,8 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       at: expect.any(Number),
       campagna: null,
       registroId: expect.any(String),
+      // A Rettifica carries neither: only a Ritiro is ever signed for (#25).
+      media: { signature: null, photo: null },
     });
     // The Rettifica and the Svuotamento are one action (ADR-0006).
     const moved = history.filter(
@@ -867,6 +1068,8 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       at: expect.any(Number),
       campagna: null,
       registroId: expect.any(String),
+      // A Rettifica carries neither: only a Ritiro is ever signed for (#25).
+      media: { signature: null, photo: null },
     });
   });
 
@@ -1007,6 +1210,8 @@ describe("a Rettifica", () => {
       at: expect.any(Number),
       campagna: null,
       registroId: expect.any(String),
+      // A Rettifica carries neither: only a Ritiro is ever signed for (#25).
+      media: { signature: null, photo: null },
     });
     // The Rettifica is an action a person took, and says so in the Registro
     // under the same row the Movimento carries (ADR-0006, #27).
@@ -1021,6 +1226,7 @@ describe("a Rettifica", () => {
       producedRettifica: true,
       corrects: null,
       correctedBy: [],
+      media: { signature: null, photo: null },
       action: {
         kind: "rettifica",
         numero: 3,
@@ -1432,6 +1638,8 @@ describe("the counter is never blocked", () => {
       at: expect.any(Number),
       campagna: null,
       registroId: expect.any(String),
+      // A Rettifica carries neither: only a Ritiro is ever signed for (#25).
+      media: { signature: null, photo: null },
     });
     // The correction and the Ritiro are one action a person took (ADR-0006).
     const history = await marco.query(api.movimenti.byCesta, { cestaId });

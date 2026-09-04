@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v, type Infer } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 /** An Operatore is either plain counter staff or an Admin. */
 export const role = v.union(v.literal("operatore"), v.literal("admin"));
@@ -401,6 +402,48 @@ export const dayBounds = (day: string) => {
 };
 
 /**
+ * What a Ritiro carries besides its Ceste: the Cliente's signature, drawn on
+ * the phone with a finger, and a photograph of the loaded trailer. Both are
+ * optional by the mill's own decision — on a morning of a hundred and fifty
+ * people they are usually skipped, and that is what they are for (spec #1,
+ * stories 17 to 19).
+ *
+ * They hang on the Registro row rather than on the Movimenti, because one
+ * Cliente signed once: a Ritiro of six Ceste is six Movimenti and one action,
+ * and one signature and one photograph belong to the action (ADR-0006). Hung
+ * on the Movimenti they would be the same file said six times, and the
+ * question "which of the six is the real one" would have no answer.
+ *
+ * The device downscales the photograph to a JPEG of 1600 px on its longest
+ * side before it is uploaded, and draws the signature as a small PNG; what is
+ * kept here is where each of them landed in file storage. Neither is ever
+ * expired and neither is ever deleted, by the owner's explicit decision (spec
+ * #1, and ADR-0004 besides).
+ */
+export const mediaFields = {
+  signatureId: v.optional(v.id("_storage")),
+  photoId: v.optional(v.id("_storage")),
+};
+
+/**
+ * The same two as a screen can show them: a link to each, and nothing where
+ * the Operatore took nothing — which is most Ritiri.
+ *
+ * The shape the history reads, beside the shape the Registro row holds, for
+ * the reason `rettificaFields` is here: one file says what a thing is, and the
+ * table, the query and the screen all take their shape from it.
+ */
+export const mediaLinks = v.object({
+  signature: v.union(v.null(), v.string()),
+  photo: v.union(v.null(), v.string()),
+});
+
+export type MediaLinks = Infer<typeof mediaLinks>;
+
+/** Which of the two a screen is naming: the only two there are. */
+export type MediaKind = keyof MediaLinks;
+
+/**
  * What a Registro row says was done, one member per kind of action. Every
  * mutation that changes the domain writes its row in the same transaction, and
  * each ticket adds its member here as it adds its mutation (ADR-0006).
@@ -441,6 +484,9 @@ export const action = v.union(
     // The Ceste that went out, by numero, so that the Registro reads as the
     // Operatore would say it: "un Ritiro di 6 Ceste: 12, 45, 78…".
     numeri: v.array(v.number()),
+    // What the Operatore took beside them, where they took anything: the one
+    // signature and the one photograph of this Ritiro (#25).
+    ...mediaFields,
   }),
   v.object({
     kind: v.literal("rientro"),
@@ -555,6 +601,21 @@ export const action = v.union(
 );
 
 export type Action = Infer<typeof action>;
+
+/**
+ * What a Ritiro carried besides its Ceste, read off the action that says so,
+ * and nothing at all on every other kind of action.
+ *
+ * Here rather than at the reader's end because the shape of an action is this
+ * file's to know: a Rientro carries no signature, and asking whether it does
+ * is a question about what an action is.
+ */
+export const mediaOn = (
+  action: Action,
+): { signatureId?: Id<"_storage">; photoId?: Id<"_storage"> } =>
+  action.kind === "ritiro"
+    ? { signatureId: action.signatureId, photoId: action.photoId }
+    : {};
 
 /**
  * What every Movimento carries, whatever kind it is: the Cesta that moved, who

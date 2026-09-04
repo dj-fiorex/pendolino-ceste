@@ -162,6 +162,7 @@ describe("Censimento", () => {
         producedRettifica: false,
         corrects: null,
         correctedBy: [],
+        media: { signature: null, photo: null },
         action: {
           kind: "censimento",
           portata: 400,

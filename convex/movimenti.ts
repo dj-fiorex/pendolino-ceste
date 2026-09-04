@@ -7,16 +7,20 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { campagnaFor } from "./campagne";
+import { linksToMedia, NO_MEDIA } from "./media";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
   adminRettificaCause,
   expectedBefore,
+  mediaFields,
+  mediaLinks,
   movimentoKind,
   rettificaFields,
   rettificaLeaves,
   state,
   type AdminRettificaCause,
+  type MediaLinks,
   type MovimentoKind,
   type PlainMovimentoKind,
   type State,
@@ -38,6 +42,29 @@ export async function lastMovimentoAt(
   kind: MovimentoKind,
 ): Promise<number | null> {
   return (await lastMovimento(ctx, cestaId, kind))?._creationTime ?? null;
+}
+
+/**
+ * The signature and the photograph of the Ritiro a Movimento was part of, as
+ * links to look at.
+ *
+ * Read from that Ritiro's Registro row, which is where one signature and one
+ * photograph hang, because one Cliente signed once however many Ceste he
+ * loaded (ADR-0006, #25). So one Cesta's page shows them beside her own
+ * Ritiro, and the other five Ceste show the same pair beside theirs — never
+ * six copies of either, and never twice on one page: the Rettifica of
+ * *discrepanza* that shares the row is not the Ritiro and carries none.
+ */
+async function mediaLinksOf(
+  ctx: QueryCtx,
+  movimento: Doc<"movimenti">,
+): Promise<MediaLinks> {
+  if (movimento.kind !== "ritiro") {
+    return NO_MEDIA;
+  }
+  const row = await ctx.db.get(movimento.registroId);
+  // A Registro row is never deleted (ADR-0004), so this is belt and braces.
+  return row === null ? NO_MEDIA : await linksToMedia(ctx, row.action);
 }
 
 /** What a Rettifica corrected, and nothing on every other kind of Movimento. */
@@ -215,6 +242,14 @@ async function recordAtTheCounter(
     clienteId: Id<"clienti">;
     cesteIds: Id<"ceste">[];
     campagnaId?: Id<"campagne">;
+    /**
+     * What a Ritiro carries beside its Ceste, where the Operatore took
+     * anything: the Cliente's signature and the photograph of his load, both
+     * already in file storage (#25). A Rientro takes neither — nobody signs
+     * for bringing Ceste back.
+     */
+    signatureId?: Id<"_storage">;
+    photoId?: Id<"_storage">;
   },
 ): Promise<null> {
   const { name, becomes } = atTheCounter[kind];
@@ -248,15 +283,23 @@ async function recordAtTheCounter(
       .map((cesta) => cesta._id),
   );
 
+  const numeri = inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b);
   const registroId = await writeRegistroRow(ctx, {
     operatoreId: operatore._id,
     clienteId: cliente._id,
     campagnaId,
     producedRettifica: surprises.size > 0,
-    action: {
-      kind,
-      numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
-    },
+    // The signature and the photograph go on the row and nowhere else: one
+    // Cliente signed once, whether he loaded one Cesta or six (ADR-0006, #25).
+    action:
+      kind === "ritiro"
+        ? {
+            kind,
+            numeri,
+            signatureId: args.signatureId,
+            photoId: args.photoId,
+          }
+        : { kind, numeri },
   });
 
   for (const cesta of inFleet) {
@@ -309,7 +352,10 @@ async function recordAtTheCounter(
  * counter, and the mill can answer who is holding what.
  */
 export const ritiro = mutation({
-  args: counterArgs,
+  // The two the Ritiro alone takes: whatever the Operatore captured before
+  // confirming, already uploaded, and neither of them where they captured
+  // nothing — which is most mornings, and is what optional means here (#25).
+  args: { ...counterArgs, ...mediaFields },
   returns: v.null(),
   handler: (ctx, args) => recordAtTheCounter(ctx, "ritiro", args),
 });
@@ -647,6 +693,10 @@ export const byCesta = query({
       registroId: v.id("registro"),
       // What a Rettifica corrected, and nothing on every other kind.
       rettifica: v.union(v.null(), v.object(rettificaFields)),
+      // What the Operatore took beside the Ceste of a Ritiro, where they took
+      // anything: the signature and the photograph, to be looked at from here
+      // for as long as the mill keeps them, which is for good (#25).
+      media: mediaLinks,
     }),
   ),
   handler: async (ctx, args) => {
@@ -683,6 +733,7 @@ export const byCesta = query({
           campagna: campagna?.name ?? null,
           registroId: movimento.registroId,
           rettifica: rettificaOf(movimento),
+          media: await mediaLinksOf(ctx, movimento),
         };
       }),
     );

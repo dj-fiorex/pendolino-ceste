@@ -3,9 +3,11 @@ import { v, type Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { openCampagna } from "./campagne";
+import { linksToMedia } from "./media";
 import { requireAdmin } from "./operatori";
 import {
   action,
+  mediaLinks,
   plainMovimentoKind,
   type Action,
   type PlainMovimentoKind,
@@ -343,6 +345,12 @@ export const list = query({
           numero: v.number(),
         }),
       ),
+      // What a Ritiro carried besides its Ceste, to be looked at from here as
+      // well as from each Cesta's own page — this is the screen on which a
+      // Ritiro of six is the one line a person did, so it is where one
+      // signature and one photograph most obviously belong (ADR-0006, #25).
+      // Every other kind of action carried neither.
+      media: mediaLinks,
       action,
     }),
   ),
@@ -365,6 +373,7 @@ export const list = query({
           producedRettifica: leftARettifica(row),
           corrects: await correctsOf(ctx, row),
           correctedBy: await correctedByOf(ctx, row),
+          media: await linksToMedia(ctx, row.action),
           action: row.action,
         };
       }),
