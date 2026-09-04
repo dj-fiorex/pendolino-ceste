@@ -5,11 +5,12 @@ import type {
   EtichettaSettingField,
   EtichettaSize,
   Forma,
+  PlainMovimentoKind,
 } from "@/convex/schema";
-import { cesteCount, stateLabel } from "@/lib/ceste";
+import { cesteCount, dayOf, stateLabel } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
 import { ETICHETTA_SIZE_LABELS } from "@/lib/etichetta";
-import { rettificaCauseLabel } from "@/lib/movimento";
+import { movimentoInSentence, rettificaCauseLabel } from "@/lib/movimento";
 
 /** A Registro row as the screen receives it. */
 export type RegistroRow = {
@@ -21,6 +22,14 @@ export type RegistroRow = {
   campagna: string | null;
   /** Whether the action left a Rettifica behind it (#21). */
   producedRettifica: boolean;
+  /** The action this row corrects, where this row is a correction (#28). */
+  corrects: {
+    _id: Id<"registro">;
+    at: number;
+    kind: PlainMovimentoKind;
+  } | null;
+  /** The Rettifiche that corrected this row afterwards, where any did. */
+  correctedBy: { _id: Id<"registro">; at: number; numero: number }[];
   action: Action;
 };
 
@@ -125,16 +134,40 @@ const whom = (cliente: RegistroRow["cliente"]) =>
 const numeriInSentence = (numeri: number[]) => numeri.join(", ");
 
 /**
+ * The other half of a correction, said after the action itself: what a
+ * Rettifica of *errore* puts right, and what put this row right afterwards.
+ *
+ * The pair reads from whichever end the Admin happens to be looking at, which
+ * is the point of writing the wrong Movimento down and leaving it there: the
+ * Registro shows the mistake and the correction, never one without the other
+ * (ADR-0004, #28).
+ */
+const asOneOfAPair = ({ corrects, correctedBy }: RegistroRow) => {
+  const puts =
+    corrects === null
+      ? ""
+      : ` Corregge ${movimentoInSentence[corrects.kind]} del ${dayOf(corrects.at)}.`;
+  if (correctedBy.length === 0) {
+    return puts;
+  }
+  const numeri = correctedBy.map((one) => one.numero).join(", ");
+  const [first] = correctedBy;
+  return correctedBy.length === 1
+    ? `${puts} Corretto il ${dayOf(first.at)} da una Rettifica sulla Cesta ${numeri}.`
+    : `${puts} Corretto da ${correctedBy.length} Rettifiche, sulle Ceste ${numeri}.`;
+};
+
+/**
  * One Registro row as an Italian sentence: who did what, to whom, and to which
  * Ceste. Rendered here on the device rather than stored, so that the row keeps
  * the structured fields the filters read and the mill keeps a line it can read
  * out loud.
  */
-export const registroSentence = ({
-  operatore,
-  cliente,
-  action,
-}: RegistroRow): string => {
+export const registroSentence = (row: RegistroRow): string =>
+  `${whatWasDone(row)}${asOneOfAPair(row)}`;
+
+/** The action itself, before anything is said about correcting it. */
+const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
   switch (action.kind) {
     case "censimento": {
       const forma = formaInSentence[action.forma];
@@ -157,11 +190,14 @@ export const registroSentence = ({
     case "rettifica": {
       // Where the Rettifica left her, and, where that is a Cliente's hands,
       // whose: the row already names him, and the sentence says why he is on
-      // it.
+      // it. A Cesta *is* Fuori, Disponibile or Dismessa, and she is *in*
+      // Attesa molitura, so that the line reads like Italian.
       const becomes =
         action.becomes === "fuori"
           ? `Fuori con ${whom(cliente)}`
-          : stateLabel[action.becomes];
+          : action.becomes === "attesa_molitura"
+            ? "in Attesa molitura"
+            : stateLabel[action.becomes];
       const note = action.note === undefined ? "" : ` Nota: «${action.note}»`;
       return `${operatore} ha registrato una Rettifica sulla Cesta ${action.numero}: ${rettificaCauseLabel[action.cause].toLowerCase()}. Adesso è ${becomes}.${note}`;
     }

@@ -135,6 +135,8 @@ describe("a Ritiro at the counter", () => {
       // the same: the counter is not blocked by the calendar either (#19).
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: {
         kind: "ritiro",
         numeri: [1, 2, 3, 4, 5, 6],
@@ -317,6 +319,8 @@ describe("a Rientro at the counter", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: { kind: "rientro", numeri: [1, 2, 3, 4] },
     });
     // Back at the mill, still full: not yet Disponibile, and no longer Fuori.
@@ -608,6 +612,8 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       cliente: null,
       campagna: null,
       producedRettifica: false,
+      corrects: null,
+      correctedBy: [],
       action: { kind: "svuotamento", numeri: [1, 2, 3, 4, 5] },
     });
     expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
@@ -643,6 +649,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
 
     const history = await marco.query(api.movimenti.byCesta, { cestaId });
     expect(history).toContainEqual({
+      _id: expect.any(String),
       kind: "rettifica",
       // Where the app had her, and with whom: the belief the Svuotamento
       // corrected, written down beside what actually happened.
@@ -691,6 +698,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     expect(
       await marco.query(api.movimenti.byCesta, { cestaId }),
     ).toContainEqual({
+      _id: expect.any(String),
       kind: "rettifica",
       rettifica: {
         cause: "discrepanza",
@@ -826,6 +834,7 @@ describe("a Rettifica", () => {
 
     const history = await gabriele.query(api.movimenti.byCesta, { cestaId });
     expect(history[0]).toEqual({
+      _id: expect.any(String),
       kind: "rettifica",
       // Why she left the fleet, where the app had her, and where the Rettifica
       // leaves her: the explanation ADR-0004 refuses to do without.
@@ -854,6 +863,8 @@ describe("a Rettifica", () => {
       // The row an Admin's own correction leaves is a row that produced a
       // Rettifica, like the counter's discrepanze (#21).
       producedRettifica: true,
+      corrects: null,
+      correctedBy: [],
       action: {
         kind: "rettifica",
         numero: 3,
@@ -1249,6 +1260,7 @@ describe("the counter is never blocked", () => {
 
     const [correction] = await discrepanze(marco, cestaId);
     expect(correction).toEqual({
+      _id: expect.any(String),
       kind: "rettifica",
       rettifica: {
         cause: "discrepanza",
@@ -1596,5 +1608,351 @@ describe("the counter is never blocked", () => {
     // And nothing was written off along the way: a Rettifica of *discrepanza*
     // records what the app believed, it never retires a Cesta (#20).
     expect(ceste.filter((cesta) => cesta.state === "dismessa")).toEqual([]);
+  });
+});
+
+/**
+ * The correction for a Movimento that should never have been registered as it
+ * was: a Cesta scanned that never went on the trailer, a Ritiro attributed to
+ * the wrong one of two namesakes, a Svuotamento tapped by mistake. The wrong
+ * Movimento stays exactly as written, and an Admin says where the Cesta really
+ * is (#28, ADR-0004).
+ */
+describe("a Rettifica for an Errore di registrazione", () => {
+  /** The newest Movimento of a kind against a Cesta, as her page reads it. */
+  const lastMovimento = async (
+    device: Device,
+    cestaId: Id<"ceste">,
+    kind: "ritiro" | "rientro" | "svuotamento" | "rettifica",
+  ) => {
+    const found = (await device.query(api.movimenti.byCesta, { cestaId })).find(
+      (movimento) => movimento.kind === kind,
+    );
+    if (found === undefined) {
+      throw new Error(`No ${kind} was ever recorded against this Cesta.`);
+    }
+    return found;
+  };
+
+  test("a Cesta scanned by mistake goes back to Disponibile, and her Ritiro stays as written", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    // He took two and the app says three: the third was scanned off the stack
+    // beside the trailer and never left the yard.
+    const [, , scannedByMistake] = await takeAway(marco, giuseppe, [
+      "4",
+      "5",
+      "6",
+    ]);
+    const ritiro = await lastMovimento(gabriele, scannedByMistake, "ritiro");
+
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId: scannedByMistake,
+      cause: "errore",
+      corrects: ritiro._id,
+      becomes: "disponibile",
+      note: "Ne ha caricate due, non tre.",
+    });
+
+    // She is on the shelf and counted again, and he is holding the two he
+    // actually drove away with.
+    const ceste = await gabriele.query(api.ceste.list, {});
+    expect(ceste.find((cesta) => cesta.numero === 6)?.state).toBe(
+      "disponibile",
+    );
+    expect(await gabriele.query(api.ceste.disponibiliByPortata, {})).toEqual([
+      { portata: 400, count: 8 },
+      { portata: 250, count: 0 },
+    ]);
+    expect(
+      (
+        await gabriele.query(api.clienti.get, { clienteId: giuseppe })
+      )?.cesteFuori.map((cesta) => cesta.numero),
+    ).toEqual([4, 5]);
+
+    // The Ritiro is untouched: it still says what Marco registered, and the
+    // Rettifica beside it says what was really the case (ADR-0004).
+    const history = await gabriele.query(api.movimenti.byCesta, {
+      cestaId: scannedByMistake,
+    });
+    expect(history.map((movimento) => movimento.kind)).toEqual([
+      "rettifica",
+      "ritiro",
+    ]);
+    expect(history[1]).toMatchObject({
+      _id: ritiro._id,
+      cliente: { name: "Giuseppe Amato", alias: [] },
+      operatore: "Marco",
+      at: ritiro.at,
+    });
+    expect(history[0].rettifica).toEqual({
+      cause: "errore",
+      believedState: "fuori",
+      becomes: "disponibile",
+      corrects: ritiro._id,
+      note: "Ne ha caricate due, non tre.",
+    });
+  });
+
+  test("a Ritiro written against the wrong namesake is put right, and the days Fuori still count from it", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    // Two Giuseppe Amato, told apart at the counter by their Soprannomi.
+    const turi = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      alias: ["Turi"],
+    });
+    const ciccio = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      alias: ["Ciccio"],
+    });
+    // Marco wrote the Ritiro against the wrong one of the two.
+    const [cestaId] = await takeAway(marco, turi, ["3"]);
+    const ritiro = await lastMovimento(gabriele, cestaId, "ritiro");
+
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId,
+      cause: "errore",
+      corrects: ritiro._id,
+      becomes: "fuori",
+      clienteId: ciccio,
+      note: "Era Ciccio, non Turi.",
+    });
+
+    // She is Ciccio's now, and Turi is holding nothing.
+    expect(
+      await gabriele.query(api.clienti.get, { clienteId: turi }),
+    ).toMatchObject({ cesteFuori: [] });
+    const his = await gabriele.query(api.clienti.get, { clienteId: ciccio });
+    expect(his?.cesteFuori.map((cesta) => cesta.numero)).toEqual([3]);
+
+    // And she has been Fuori since the Ritiro that took her out of the yard,
+    // not since the Rettifica: the correction says whose she is, it does not
+    // say she left today, and the days the mill will chase Ciccio for are the
+    // days she has actually been gone (#22).
+    const rettifica = await lastMovimento(gabriele, cestaId, "rettifica");
+    expect(rettifica.at).toBeGreaterThan(ritiro.at);
+    expect(his?.cesteFuori[0].since).toBe(ritiro.at);
+  });
+
+  test("a Svuotamento tapped by mistake puts her back in the yard, under the name on her tape", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    // She came back full with his name on her tape, and then the tile beside
+    // hers was tapped with a dirty hand.
+    const [cestaId] = await bringBack(marco, giuseppe, ["7"]);
+    await marco.mutation(api.movimenti.svuotamento, { cesteIds: [cestaId] });
+    const svuotamento = await lastMovimento(gabriele, cestaId, "svuotamento");
+
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId,
+      cause: "errore",
+      corrects: svuotamento._id,
+      becomes: "attesa_molitura",
+      note: "Era ancora piena.",
+    });
+
+    // She is standing full in the yard again, in his group on the Svuotamento
+    // screen, because the tape never came off her (#18).
+    expect(
+      (await marco.query(api.ceste.attesaMolitura, {})).map((cesta) => [
+        cesta.numero,
+        cesta.cliente?.name,
+      ]),
+    ).toEqual([[7, "Giuseppe Amato"]]);
+    const groups = await marco.query(api.ceste.attesaMolituraByCliente, {});
+    expect(groups).toHaveLength(1);
+    expect(groups[0].cliente?.name).toBe("Giuseppe Amato");
+    expect(groups[0].ceste.map((cesta) => cesta.numero)).toEqual([7]);
+
+    // And she is off the shelf: a count that still had her Disponibile would
+    // promise the next Cliente a Cesta full of somebody else's olives.
+    expect(await marco.query(api.ceste.disponibiliByPortata, {})).toEqual([
+      { portata: 400, count: 9 },
+      { portata: 250, count: 0 },
+    ]);
+    // She is not Fuori and nobody is chased for her: the tape is not a debt.
+    expect(
+      await gabriele.query(api.clienti.get, { clienteId: giuseppe }),
+    ).toMatchObject({ cesteFuori: [] });
+  });
+
+  test("a correction that leaves her Fuori names the Cliente, and one that does not names nobody", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const giuseppe = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [cestaId] = await takeAway(gabriele, giuseppe, ["8"]);
+    const ritiro = await lastMovimento(gabriele, cestaId, "ritiro");
+    const correction = {
+      cestaId,
+      cause: "errore",
+      corrects: ritiro._id,
+    } as const;
+
+    // Fuori with nobody is not a place a Cesta can be: a Cesta is Fuori
+    // because somebody has her, and that is the whole of what Fuori means.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        ...correction,
+        becomes: "fuori",
+      }),
+    ).rejects.toThrow();
+    // And a Cesta at the mill is in nobody's hands.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        ...correction,
+        becomes: "disponibile",
+        clienteId: giuseppe,
+      }),
+    ).rejects.toThrow();
+    // A Cesta leaves the fleet because she is lost or because she is broken.
+    // A correction of a Movimento is neither (ADR-0004).
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        ...correction,
+        becomes: "dismessa",
+      }),
+    ).rejects.toThrow();
+    // And no other cause says where she is, because each of them says it by
+    // being what it is.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        cestaId,
+        cause: "rotta",
+        becomes: "disponibile",
+      }),
+    ).rejects.toThrow();
+
+    // Nothing of the refusals was written: she is still Fuori with Giuseppe,
+    // and the Ritiro is still her only Movimento.
+    const ceste = await gabriele.query(api.ceste.list, {});
+    expect(ceste.find((cesta) => cesta.numero === 8)?.state).toBe("fuori");
+    expect(
+      (await gabriele.query(api.movimenti.byCesta, { cestaId })).map(
+        (movimento) => movimento.kind,
+      ),
+    ).toEqual(["ritiro"]);
+  });
+
+  test("a correction names one of this Cesta's own movements, and never a Rettifica", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const salvatore = await marco.mutation(api.clienti.create, {
+      name: "Salvatore Russo",
+    });
+    const [cestaId] = await takeAway(marco, giuseppe, ["1"]);
+    const ritiro = await lastMovimento(marco, cestaId, "ritiro");
+    // Another Cesta, and a Rettifica the app wrote itself when she went out on
+    // the wrong trailer (#21).
+    const [hers] = await takeAway(marco, giuseppe, ["2"]);
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: salvatore,
+      cesteIds: [hers],
+    });
+    const discrepanza = await lastMovimento(marco, hers, "rettifica");
+    const hersRitiro = await lastMovimento(marco, hers, "ritiro");
+
+    // A correction with no Movimento to correct has nothing to correct.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        cestaId,
+        cause: "errore",
+        becomes: "disponibile",
+      }),
+    ).rejects.toThrow();
+    // Another Cesta's Ritiro is not this Cesta's mistake.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        cestaId,
+        cause: "errore",
+        corrects: hersRitiro._id,
+        becomes: "disponibile",
+      }),
+    ).rejects.toThrow();
+    // And a Rettifica is not corrected. It does not say a Cesta moved, it says
+    // where she is, and an Admin who reads it wrong records another one about
+    // the Cesta rather than about a record of a movement.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        cestaId: hers,
+        cause: "errore",
+        corrects: discrepanza._id,
+        becomes: "disponibile",
+      }),
+    ).rejects.toThrow();
+    // Nor does any other cause name a Movimento: only a misregistration is
+    // about one.
+    await expect(
+      gabriele.mutation(api.movimenti.rettifica, {
+        cestaId,
+        cause: "persa",
+        corrects: ritiro._id,
+      }),
+    ).rejects.toThrow();
+
+    // Both Ceste are where the counter left them, with nothing written over.
+    const ceste = await gabriele.query(api.ceste.list, {});
+    expect(ceste.find((cesta) => cesta.numero === 1)?.state).toBe("fuori");
+    expect(ceste.find((cesta) => cesta.numero === 2)?.state).toBe("fuori");
+    expect(
+      (await gabriele.query(api.movimenti.byCesta, { cestaId })).map(
+        (movimento) => movimento.kind,
+      ),
+    ).toEqual(["ritiro"]);
+  });
+
+  test("the counter cannot correct a registration: a Rettifica is an Admin's", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const [cestaId] = await takeAway(marco, giuseppe, ["9"]);
+    const ritiro = await lastMovimento(marco, cestaId, "ritiro");
+    const correction = {
+      cestaId,
+      cause: "errore",
+      corrects: ritiro._id,
+      becomes: "disponibile",
+    } as const;
+
+    // Whoever made the mistake is not who puts it right: the Operatore who
+    // scanned her cannot unscan her, and a stranger cannot either.
+    await expect(
+      marco.mutation(api.movimenti.rettifica, correction),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(api.movimenti.rettifica, correction),
+    ).rejects.toThrow();
+
+    const ceste = await marco.query(api.ceste.list, {});
+    expect(ceste.find((cesta) => cesta.numero === 9)?.state).toBe("fuori");
+    expect(
+      (await marco.query(api.movimenti.byCesta, { cestaId })).map(
+        (movimento) => movimento.kind,
+      ),
+    ).toEqual(["ritiro"]);
   });
 });

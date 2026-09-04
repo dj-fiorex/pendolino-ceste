@@ -13,7 +13,11 @@ import { api } from "@/convex/_generated/api";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
 import { formaLabel, stateClass, stateLabel } from "@/lib/ceste";
 import { clienteLabel } from "@/lib/cliente";
-import { movimentoLabel, rettificaLine } from "@/lib/movimento";
+import {
+  movimentoInSentence,
+  movimentoLabel,
+  rettificaLine,
+} from "@/lib/movimento";
 import { cn } from "@/lib/utils";
 
 /** The mill is in Italy, and so is every hour it writes down. */
@@ -57,6 +61,25 @@ export default async function CestaPage({
     cestaId: cesta._id,
   });
 
+  // What each correction of a misregistration puts right, said the way the
+  // history below names it: the two Movimenti are on the same page and the
+  // wrong one is still there to read (ADR-0004, #28).
+  const corrects = new Map(
+    movimenti.flatMap((movimento) => {
+      const put = movimenti.find(
+        (other) => other._id === movimento.rettifica?.corrects,
+      );
+      return put === undefined
+        ? []
+        : [
+            [
+              movimento._id,
+              `${movimentoInSentence[put.kind]} del ${whenLabel.format(put.at)}`,
+            ] as const,
+          ];
+    }),
+  );
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
       <div className="space-y-2">
@@ -92,7 +115,10 @@ export default async function CestaPage({
       {operatore.role === "admin" && (
         <div className="grid gap-3">
           <CampagnaBar />
-          <RettificaForm cesta={cesta} />
+          {/* Her history goes in as well as being shown below it: a correction
+              of a misregistration picks the Movimento it puts right out of it
+              (#28). */}
+          <RettificaForm cesta={cesta} movimenti={movimenti} />
         </div>
       )}
 
@@ -110,7 +136,7 @@ export default async function CestaPage({
             <ul className="grid gap-2">
               {movimenti.map((movimento) => (
                 <li
-                  key={`${movimento.kind}-${movimento.at}`}
+                  key={movimento._id}
                   className="flex items-baseline justify-between gap-3 rounded-lg border bg-card px-4 py-3"
                 >
                   <div>
@@ -123,6 +149,14 @@ export default async function CestaPage({
                     {movimento.rettifica !== null && (
                       <p className="text-sm">
                         {rettificaLine(movimento.rettifica)}
+                      </p>
+                    )}
+                    {/* And, on a correction of a misregistration, which of the
+                        Movimenti below it puts right — the one that stays
+                        exactly as it was written (ADR-0004, #28). */}
+                    {corrects.get(movimento._id) !== undefined && (
+                      <p className="text-sm text-muted-foreground">
+                        Corregge {corrects.get(movimento._id)}
                       </p>
                     )}
                     {movimento.rettifica?.note !== undefined && (

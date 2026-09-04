@@ -84,6 +84,8 @@ describe("the Etichetta settings", () => {
         cliente: null,
         campagna: null,
         producedRettifica: false,
+        corrects: null,
+        correctedBy: [],
         action: {
           kind: "etichette_settings",
           changes: [

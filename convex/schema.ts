@@ -26,11 +26,12 @@ export const state = v.union(
 );
 
 /**
- * What a Movimento is: one Cesta changing state on one occasion. Each ticket
- * adds its member here as it adds its mutation — the Rettifica of *errore*,
- * which corrects a Movimento registered wrongly, follows with #28.
+ * What a Movimento is: one Cesta changing state on one occasion. The three
+ * that happen in the yard, and the Rettifica that says what no Ritiro and no
+ * Rientro explains — including the one written against a Movimento here,
+ * because an *errore* corrects a movement that did happen (#28).
  */
-const plainMovimentoKind = v.union(
+export const plainMovimentoKind = v.union(
   v.literal("ritiro"),
   v.literal("rientro"),
   v.literal("svuotamento"),
@@ -66,23 +67,41 @@ export const expectedBefore = {
 } as const satisfies Record<PlainMovimentoKind, State>;
 
 /**
- * The causes an Admin chooses from, each a different fact about a Cesta: one
- * lost to a Cliente, one broken at the mill, one that turned up again. Losing
- * a Cesta and breaking one are counted apart because they are apart — a
- * reason is what a Rettifica exists to attach (ADR-0004).
- *
- * *Errore*, which corrects a Movimento registered wrongly, arrives with #28.
+ * The causes that say by themselves what became of a Cesta: one lost to a
+ * Cliente, one broken at the mill, one that turned up again. Losing a Cesta
+ * and breaking one are counted apart because they are apart — a reason is what
+ * a Rettifica exists to attach (ADR-0004).
  */
-export const adminRettificaCause = v.union(
+export const settledRettificaCause = v.union(
   v.literal("persa"),
   v.literal("rotta"),
   v.literal("ritrovata"),
 );
 
+export type SettledRettificaCause = Infer<typeof settledRettificaCause>;
+
+/**
+ * The causes an Admin chooses from: the three above, and *errore*, which says
+ * a Movimento was registered wrongly.
+ *
+ * *Errore* is the one cause that does not say where it leaves the Cesta. The
+ * others are facts about her — she is lost, she is broken, she is back — and
+ * each has one ending. A misregistration is a fact about the record instead,
+ * and the same mistake can leave her anywhere: scanned onto a trailer she
+ * never went on, attributed to the wrong one of two namesakes, or emptied on
+ * screen while she stands full in the yard. So the Admin names the state she
+ * is really in, and names the Movimento being corrected, which stays exactly
+ * as it was written (ADR-0004).
+ */
+export const adminRettificaCause = v.union(
+  ...settledRettificaCause.members,
+  v.literal("errore"),
+);
+
 export type AdminRettificaCause = Infer<typeof adminRettificaCause>;
 
 /**
- * Why a Rettifica was written: the three an Admin chooses, and *discrepanza*,
+ * Why a Rettifica was written: the four an Admin chooses, and *discrepanza*,
  * the one the app writes itself as a Movimento goes through on a Cesta that
  * was not where the app believed (ADR-0005). No Admin ever chooses that one,
  * which is why the mutation they record a Rettifica through takes the narrower
@@ -113,6 +132,10 @@ export const rettificaFields = {
   // says so itself — and a discrepanza says where the Movimento beside it left
   // her, which is how "Fuori since" finds the correction that put her there.
   becomes: state,
+  // The Movimento an *errore* corrects, and nothing on every other cause. The
+  // wrong Movimento is not edited and not deleted (ADR-0004): the pair is the
+  // record, one saying what was written down and the other what was the case.
+  corrects: v.optional(v.id("movimenti")),
   // What the Admin wrote beside the cause, where they wrote anything. Never in
   // place of it: a Rettifica with no reason is a delete wearing a different hat
   // (ADR-0004).
@@ -131,10 +154,13 @@ export type Rettifica = Infer<
  * One rule in two voices, as the namesake rule is: the mutation moves the Cesta
  * by it, and the form turns it into the sentence that says what confirming will
  * do. It is also the whole of the way to Dismessa — no other mutation writes
- * that state (spec #1, story 37).
+ * that state, an *errore* included (spec #1, story 37).
+ *
+ * *Errore* is not asked here at all. It is the cause whose ending the Admin
+ * names rather than the cause deciding, and the type says so.
  */
 export const rettificaLeaves = (
-  cause: AdminRettificaCause,
+  cause: SettledRettificaCause,
   /** Whether the Admin named the Cliente the Cesta turned up at. */
   withCliente: boolean,
 ): State =>
@@ -590,6 +616,15 @@ export default defineSchema({
     // rows a deployment already holds are: none of them is rewritten to say
     // otherwise (ADR-0004).
     producedRettifica: v.optional(v.boolean()),
+    // The row this one corrects: the action a Rettifica of *errore* says was
+    // registered wrongly, and nothing on every other row (#28).
+    //
+    // Here beside the Operatore and the Cliente rather than inside the action,
+    // for the reason they are: it is read for through an index. The correction
+    // is written days after the action it corrects and the corrected row is
+    // never edited to point back (ADR-0004), so the Registro finds the pair
+    // from this end and reads the other one off this index.
+    corrects: v.optional(v.id("registro")),
     action,
   })
     // The two filters the Registro offers besides the day, which the built-in
@@ -597,5 +632,8 @@ export default defineSchema({
     // last field, so a Cliente's day and an Operatore's day are range reads
     // too.
     .index("by_cliente", ["clienteId"])
-    .index("by_operatore", ["operatoreId"]),
+    .index("by_operatore", ["operatoreId"])
+    // The Rettifiche that correct one action, so that a row can say it was
+    // corrected without ever having been rewritten to say so.
+    .index("by_corrects", ["corrects"]),
 });
