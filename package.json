@@ -23,6 +23,7 @@
   "homepage": "https://github.com/dj-fiorex/pendolino-ceste#readme",
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.5",
+    "barcode-detector": "^3.2.2",
     "better-auth": "1.6.30",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

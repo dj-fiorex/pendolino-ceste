@@ -168,6 +168,30 @@ async function cestaByNumero(
 }
 
 /**
+ * The Cesta whose Etichetta carries a Codice, or null when none does. What a
+ * camera reading the QR on that Etichetta hands back is the bare Codice and
+ * nothing else (ADR-0007), so the whole string is what she is looked up by:
+ * `400-Q-017` is not Cesta 17 wearing the wrong Forma, it is a Codice this
+ * mill never printed, and no Cesta answers to it.
+ *
+ * Trimmed only, because a decoder that pads what it read is a decoder, not a
+ * second way of writing a Codice.
+ */
+async function cestaByCodice(
+  ctx: QueryCtx,
+  read: string,
+): Promise<Doc<"ceste"> | null> {
+  const codice = read.trim();
+  if (codice === "") {
+    return null;
+  }
+  return await ctx.db
+    .query("ceste")
+    .withIndex("by_codice", (q) => q.eq("codice", codice))
+    .unique();
+}
+
+/**
  * A Cesta as the screens that work one at a time receive her: what is printed
  * on her Etichetta, where the app believes she is, and whom it believes has
  * her.
@@ -183,6 +207,21 @@ const foundCesta = v.object({
   portata,
   state,
   cliente: v.union(v.null(), v.object(clienteShape)),
+});
+
+/**
+ * That same Cesta, made once and read by both ways of naming her. A numero
+ * typed at the counter and a Codice read off her QR are the same Cesta and
+ * have to come back identical (ADR-0007, #23): the one projection is what
+ * makes them so, rather than two that happen to agree today.
+ */
+const asFoundCesta = async (ctx: QueryCtx, cesta: Doc<"ceste">) => ({
+  _id: cesta._id,
+  numero: cesta.numero,
+  codice: cesta.codice,
+  portata: cesta.portata,
+  state: cesta.state,
+  cliente: cesta.state === "fuori" ? await clienteWith(ctx, cesta) : null,
 });
 
 /**
@@ -208,17 +247,29 @@ export const byNumero = query({
   handler: async (ctx, args) => {
     await requireOperatore(ctx);
     const cesta = await cestaByNumero(ctx, args.numero);
-    if (cesta === null) {
-      return null;
-    }
-    return {
-      _id: cesta._id,
-      numero: cesta.numero,
-      codice: cesta.codice,
-      portata: cesta.portata,
-      state: cesta.state,
-      cliente: cesta.state === "fuori" ? await clienteWith(ctx, cesta) : null,
-    };
+    return cesta === null ? null : await asFoundCesta(ctx, cesta);
+  },
+});
+
+/**
+ * The Cesta a camera has just read, or null when the Codice it read belongs to
+ * no Cesta — a label from somewhere else, or a QR that decoded to something
+ * that was never a Codice. Nothing is added for one, exactly as nothing is
+ * added for a numero that answers to nobody: there is no Cesta to record.
+ *
+ * The same Cesta as `byNumero` finds, in the same shape and with the same
+ * Cliente on her, because the Codice is only the numero with her Portata and
+ * her Forma written round it (ADR-0007). Scanning `400-R-017` and typing 17 or
+ * 017 are one act at the counter and have to be one act here: the camera is
+ * quicker, and that is the whole of the difference (#23).
+ */
+export const byCodice = query({
+  args: { codice: v.string() },
+  returns: v.union(v.null(), foundCesta),
+  handler: async (ctx, args) => {
+    await requireOperatore(ctx);
+    const cesta = await cestaByCodice(ctx, args.codice);
+    return cesta === null ? null : await asFoundCesta(ctx, cesta);
   },
 });
 
