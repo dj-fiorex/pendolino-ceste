@@ -11,8 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { signedInOperatore } from "@/lib/auth-server";
-
-const roleLabel = { admin: "Admin", operatore: "Operatore" } as const;
+import { roleLabel } from "@/lib/operatore";
 
 export default async function Home() {
   const { signedIn, operatore } = await signedInOperatore();
@@ -74,9 +73,10 @@ export default async function Home() {
           {operatore.role === "admin" && (
             <Card>
               <CardHeader>
-                <CardTitle>Il Registro e le Campagne</CardTitle>
+                <CardTitle>Il Registro, le Campagne e chi lavora qui</CardTitle>
                 <CardDescription>
-                  Chi ha fatto cosa, e quando. E la stagione a cui appartiene.
+                  Chi ha fatto cosa, e quando. La stagione a cui appartiene. E
+                  chi può entrare.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
@@ -85,6 +85,9 @@ export default async function Home() {
                 </Button>
                 <Button variant="outline" asChild className="h-12 text-base">
                   <Link href="/campagne">Le Campagne</Link>
+                </Button>
+                <Button variant="outline" asChild className="h-12 text-base">
+                  <Link href="/operatori">Gli Operatori</Link>
                 </Button>
               </CardContent>
             </Card>

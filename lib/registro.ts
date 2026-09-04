@@ -10,6 +10,7 @@ import { cesteCount, stateLabel } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
 import { ETICHETTA_SIZE_LABELS } from "@/lib/etichetta";
 import { rettificaCauseLabel } from "@/lib/movimento";
+import { roleLabel } from "@/lib/operatore";
 
 /** A Registro row as the screen receives it. */
 export type RegistroRow = {
@@ -179,5 +180,15 @@ export const registroSentence = ({
       return `${operatore} ha riaperto la Campagna ${action.name}.`;
     case "etichette_settings":
       return `${operatore} ha cambiato le Etichette: ${changesInSentence(action.changes, etichettaFieldLabel, etichettaValue)}.`;
+    case "operatore_invitato":
+      return `${operatore} ha invitato ${action.name} (${action.email}) come ${roleLabel[action.role]}.`;
+    case "invito_accettato":
+      return `${operatore} ha accettato l'invito come ${roleLabel[action.role]}.`;
+    case "operatore_reset_inviato":
+      return `${operatore} ha mandato a ${action.name} (${action.email}) un link per rifare la password.`;
+    case "operatore_promosso":
+      return `${operatore} ha promosso ${action.name} da ${roleLabel[action.before]} a ${roleLabel[action.after]}.`;
+    case "operatore_disattivato":
+      return `${operatore} ha disattivato l'account di ${action.name}.`;
   }
 };

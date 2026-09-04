@@ -20,12 +20,21 @@ npx convex dev --once          # push the schema and functions, write .env.local
 npm run dev                    # Next on :3000 and `convex dev` side by side
 ```
 
-Two variables live on the Convex deployment rather than in `.env.local`:
+Some variables live on the Convex deployment rather than in `.env.local`:
 
 ```bash
 npx convex env set SITE_URL http://localhost:3000
 npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+npx convex env set RESEND_API_KEY re_...
+npx convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
 ```
+
+The two Resend ones carry the mill's email: the invitation an Admin sends to a
+new Operatore, and the link that replaces a forgotten password (ADR-0008).
+`RESEND_FROM` has to be an address on a domain the Resend account has verified,
+and defaults to Resend's own test sender. A deployment with no `RESEND_API_KEY`
+runs and counts Ceste exactly as one with it — nothing sends, and an invitation
+shows on the Operatori screen as one that never went out.
 
 `.env.example` lists what belongs in `.env.local`.
 
@@ -40,7 +49,12 @@ npx convex run seed:createFirstAdmin \
   '{"name":"Gabriele","email":"gabriele@example.com","password":"..."}'
 ```
 
-It refuses to run a second time.
+It refuses to run a second time. Everybody after that first Admin arrives by
+invitation: an Admin invites them by email from **Gli Operatori**, they choose
+their own password from the link, and an Admin sends the same kind of link
+again when somebody forgets theirs. Nobody hands out a password, and an
+Operatore who leaves is deactivated rather than deleted — they can no longer
+sign in, and everything they registered stays under their name (ADR-0004).
 
 The dev deployment named in `.env.local` already has its Admin:
 `gabriele@frantoio.example`, password `olio-di-ottobre`. It is written down

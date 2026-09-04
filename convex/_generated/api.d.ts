@@ -8,10 +8,13 @@
  * @module
  */
 
+import type * as accessLinks from "../accessLinks.js";
+import type * as accounts from "../accounts.js";
 import type * as auth from "../auth.js";
 import type * as campagne from "../campagne.js";
 import type * as ceste from "../ceste.js";
 import type * as clienti from "../clienti.js";
+import type * as email from "../email.js";
 import type * as etichette from "../etichette.js";
 import type * as http from "../http.js";
 import type * as movimenti from "../movimenti.js";
@@ -26,10 +29,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accessLinks: typeof accessLinks;
+  accounts: typeof accounts;
   auth: typeof auth;
   campagne: typeof campagne;
   ceste: typeof ceste;
   clienti: typeof clienti;
+  email: typeof email;
   etichette: typeof etichette;
   http: typeof http;
   movimenti: typeof movimenti;
