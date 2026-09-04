@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { useCampagnaChoice } from "@/components/campagna-bar";
@@ -20,6 +20,8 @@ import { api } from "@/convex/_generated/api";
 import { expectedBefore } from "@/convex/schema";
 import {
   cesteCount,
+  dayOf,
+  daysSince,
   warningLine,
   whereTheAppHasHer,
   type FoundCesta,
@@ -53,6 +55,12 @@ export function RitiroFlow() {
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState<{ cliente: Cliente; count: number } | null>(
     null,
+  );
+  // What this Cliente is already holding, before a single Cesta of this Ritiro
+  // is added: the Cliente's own read, the one the Rientro and his page make.
+  const held = useQuery(
+    api.clienti.get,
+    cliente === null ? "skip" : { clienteId: cliente._id },
   );
 
   if (done !== null) {
@@ -109,6 +117,12 @@ export function RitiroFlow() {
   // they were added: each of them goes out with a Rettifica beside her.
   const notWhereTheAppHadThem = ceste.filter((cesta) => !asExpected(cesta));
 
+  // What this Cliente is holding already, by numero, and since when the oldest
+  // of them has been his.
+  const alreadyOut = held?.cesteFuori ?? [];
+  const outSince = alreadyOut.flatMap((cesta) => cesta.since ?? []);
+  const oldestOut = outSince.length === 0 ? null : Math.min(...outSince);
+
   /**
    * One more Cesta on this Ritiro, however she was read. The camera and the
    * numero field say the same thing about her because they say it from here:
@@ -162,6 +176,31 @@ export function RitiroFlow() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* What he already has out, said as soon as he is picked and before
+          anything is confirmed. Which ones by numero, each with the day the
+          Ritiro that took her out was registered, because the argument over
+          "two or three" happens here, in front of an Operatore who cannot read
+          the Registro (#22).
+
+          It never gates the button: the Ceste are on the trailer either way
+          and the counter is never blocked (ADR-0005). */}
+      {alreadyOut.length > 0 && (
+        <Warning>
+          <span className="font-semibold">
+            Ha già {cesteCount(alreadyOut.length)} Fuori
+            {oldestOut === null ? "" : `, da ${daysSince(oldestOut)}`}:
+          </span>{" "}
+          {alreadyOut
+            .map((cesta) =>
+              cesta.since === null
+                ? `${cesta.numero}`
+                : `${cesta.numero} dal ${dayOf(cesta.since)}`,
+            )
+            .join(" · ")}
+          . Il Ritiro va avanti lo stesso.
+        </Warning>
+      )}
 
       <div className="flex items-baseline justify-between text-sm text-muted-foreground">
         <span>Questo Ritiro · tocca per togliere</span>

@@ -19,8 +19,10 @@ import type * as etichette from "../etichette.js";
 import type * as http from "../http.js";
 import type * as movimenti from "../movimenti.js";
 import type * as operatori from "../operatori.js";
+import type * as recupero from "../recupero.js";
 import type * as registro from "../registro.js";
 import type * as seed from "../seed.js";
+import type * as settings from "../settings.js";
 
 import type {
   ApiFromModules,
@@ -40,8 +42,10 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   movimenti: typeof movimenti;
   operatori: typeof operatori;
+  recupero: typeof recupero;
   registro: typeof registro;
   seed: typeof seed;
+  settings: typeof settings;
 }>;
 
 /**

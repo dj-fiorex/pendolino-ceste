@@ -121,8 +121,28 @@ export const codiceParts = (codice: string) => {
 export const dayOf = (at: number) =>
   new Date(at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 
-/** How many days ago something happened, as the counter counts them. */
-export const daysSince = (at: number) => {
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  return days === 1 ? "1 giorno" : `${days} giorni`;
-};
+/** A number of days, as the counter says it out loud. */
+export const daysLabel = (days: number) =>
+  days === 1 ? "1 giorno" : `${days} giorni`;
+
+/** How many whole days ago something happened, as the counter counts them. */
+export const daysAgo = (at: number) =>
+  Math.floor((Date.now() - at) / 86_400_000);
+
+/** How many days ago something happened, as the counter says it. */
+export const daysSince = (at: number) => daysLabel(daysAgo(at));
+
+/**
+ * Whether a Cesta Fuori since a moment counts In ritardo: Fuori for more days
+ * than the Soglia di ritardo (CONTEXT.md). One rule in one place, so that
+ * every row the Lista di recupero highlights is highlighted by one reading.
+ *
+ * It decides a colour and nothing else. Being late moves no Cesta and takes
+ * nobody off the list — the query hands back everybody holding Ceste and the
+ * Soglia beside them, and this is all the Soglia is ever asked (#22).
+ *
+ * A Cesta whose date the app does not know is not late but unknown: colouring
+ * her on a guess would say something the app cannot claim to know (ADR-0005).
+ */
+export const inRitardo = (since: number | null, sogliaRitardo: number) =>
+  since !== null && daysAgo(since) > sogliaRitardo;

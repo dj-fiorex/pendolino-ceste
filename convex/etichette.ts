@@ -7,35 +7,20 @@ import {
   etichettaSettingsFields,
   MAX_MILL_TEXT,
   type EtichettaSettingField,
+  type EtichettaSettings,
 } from "./schema";
+import { millSettings, saveMillSettings } from "./settings";
 
 /**
- * What an Etichetta says when nobody has decided otherwise: the size the mill
- * assumed while the screens were drawn, and no mill name or telephone, because
- * the app cannot know them. The switches start on, so that typing the name is
- * enough to see it on the label.
+ * What an Etichetta says, out of the one row the whole mill's settings share
+ * with the Soglia di ritardo. Read through that row rather than off the table,
+ * so that a setting nobody has ever touched answers the same way here as it
+ * does wherever else it is read (#22).
  */
-const DEFAULT_SETTINGS = {
-  etichettaSize: "100x150",
-  millName: "",
-  millNameOnEtichetta: true,
-  millPhone: "",
-  millPhoneOnEtichetta: true,
-} as const;
-
-/** The settings as they stand, whether or not anybody has ever set them. */
-async function currentSettings(ctx: QueryCtx) {
-  const stored = await ctx.db.query("settings").first();
-  if (stored === null) {
-    return { ...DEFAULT_SETTINGS };
-  }
-  return {
-    etichettaSize: stored.etichettaSize,
-    millName: stored.millName,
-    millNameOnEtichetta: stored.millNameOnEtichetta,
-    millPhone: stored.millPhone,
-    millPhoneOnEtichetta: stored.millPhoneOnEtichetta,
-  };
+async function currentSettings(ctx: QueryCtx): Promise<EtichettaSettings> {
+  const { sogliaRitardo: _sogliaRitardo, ...etichetta } =
+    await millSettings(ctx);
+  return etichetta;
 }
 
 /**
@@ -92,12 +77,7 @@ export const setSettings = mutation({
       return null;
     }
 
-    const stored = await ctx.db.query("settings").first();
-    if (stored === null) {
-      await ctx.db.insert("settings", wanted);
-    } else {
-      await ctx.db.patch(stored._id, wanted);
-    }
+    await saveMillSettings(ctx, wanted);
     await writeRegistroRow(ctx, {
       operatoreId: admin._id,
       action: { kind: "etichette_settings", changes },
