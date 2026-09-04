@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Tracks the olive baskets of an oil mill",
   "private": true,
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "dev": "npx convex dev --start \"next dev\"",
+    "preinstall": "npx only-allow pnpm",
+    "dev": "convex dev --start \"next dev\"",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

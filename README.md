@@ -15,19 +15,19 @@ copy is Italian; code, comments and docs are English.
 ## Running it
 
 ```bash
-npm install
-npx convex dev --once          # push the schema and functions, write .env.local
-npm run dev                    # Next on :3000 and `convex dev` side by side
+pnpm install
+pnpm convex dev --once          # push the schema and functions, write .env.local
+pnpm dev                        # Next on :3000 and `convex dev` side by side
 ```
 
 Some variables live on the Convex deployment rather than in `.env.local`:
 
 ```bash
-npx convex env set SITE_URL http://localhost:3000
-npx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
-npx convex env set RESEND_API_KEY re_...
-npx convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
-npx convex env set RESEND_TEST_MODE false
+pnpm convex env set SITE_URL http://localhost:3000
+pnpm convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+pnpm convex env set RESEND_API_KEY re_...
+pnpm convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
+pnpm convex env set RESEND_TEST_MODE false
 ```
 
 The Resend ones carry the mill's email: the invitation an Admin sends to a new
@@ -56,7 +56,7 @@ account after the first arrives by an Admin's invitation. A fresh deployment is
 opened by seeding one Admin, once:
 
 ```bash
-npx convex run seed:createFirstAdmin \
+pnpm convex run seed:createFirstAdmin \
   '{"name":"Gabriele","email":"gabriele@example.com","password":"..."}'
 ```
 
@@ -75,7 +75,7 @@ nobody can sign in to is a screen nobody can check.
 ## Tests
 
 ```bash
-npm test
+pnpm test
 ```
 
 Tests drive the app through its public Convex functions with `convex-test` under
@@ -85,5 +85,5 @@ seam this suite uses: no table reads, no mocks, no React.
 ## Typechecking
 
 ```bash
-npm run typecheck
+pnpm typecheck
 ```
