@@ -4,9 +4,9 @@ import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { useCampagnaChoice } from "@/components/campagna-bar";
+import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
-import { NumeroField } from "@/components/numero-field";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,8 +40,9 @@ const asExpected = (cesta: FoundCesta) => cesta.state === expectedBefore.ritiro;
  *
  * Variant B of the prototype the mill chose (#31), the same shape as the
  * Rientro: the Ceste of this Ritiro are tiles a tap takes back off, and the
- * numero and the confirmation sit together in the bar at the bottom, where the
- * camera docks beside them when #23 arrives.
+ * camera, the numero and the confirmation sit together in the bar at the
+ * bottom — the camera never behind a switch, because a label on a stacked
+ * Cesta can be on the face nobody can see (#23).
  */
 export function RitiroFlow() {
   const recordRitiro = useMutation(api.movimenti.ritiro);
@@ -108,6 +109,40 @@ export function RitiroFlow() {
   // they were added: each of them goes out with a Rettifica beside her.
   const notWhereTheAppHadThem = ceste.filter((cesta) => !asExpected(cesta));
 
+  /**
+   * One more Cesta on this Ritiro, however she was read. The camera and the
+   * numero field say the same thing about her because they say it from here:
+   * scanning `400-R-017` and typing 17 are one act at the counter (#23).
+   */
+  const addCesta = (cesta: FoundCesta) => {
+    // The same Cesta added twice — typed after being scanned, say — is the one
+    // Cesta she already was, and saying so is all that is left.
+    if (ceste.some((added) => added._id === cesta._id)) {
+      return `${cesta.codice} è già nell'elenco.`;
+    }
+    // Added onto the list as it stands when the Cesta lands on it, not as it
+    // stood when this was written: the camera can read two labels in one frame,
+    // and a Ritiro that quietly dropped the first of them would be a Ritiro
+    // short of a Cesta.
+    setCeste((current) =>
+      current.some((added) => added._id === cesta._id)
+        ? current
+        : [...current, cesta],
+    );
+    // A Cesta the app did not have Disponibile goes out with the Cliente all
+    // the same: she is in the yard and he is loading her, and the counter is
+    // never blocked (ADR-0005).
+    if (asExpected(cesta)) {
+      return null;
+    }
+    // A written-off Cesta is the one case where the movement leaves her where
+    // she was: she counts again only once an Admin records the Rettifica of
+    // ritrovata on her own page (#20).
+    return cesta.state === "dismessa"
+      ? `${cesta.codice} risulta Dismessa: la registro lo stesso, ma torna a contare solo con una Rettifica di un Admin.`
+      : `${cesta.codice} risulta ${whereTheAppHasHer(cesta)}: la registro lo stesso, con una Rettifica.`;
+  };
+
   return (
     <div className="grid gap-4 pb-4">
       <Card>
@@ -135,8 +170,7 @@ export function RitiroFlow() {
 
       {ceste.length === 0 ? (
         <p className="text-muted-foreground">
-          Scrivi il numero di ogni Cesta, una alla volta. Lo zero davanti non
-          serve.
+          Ancora nessuna Cesta. Lo zero davanti al numero non serve.
         </p>
       ) : (
         <ul className="flex flex-wrap gap-2">
@@ -179,29 +213,11 @@ export function RitiroFlow() {
       )}
 
       <div className="sticky bottom-4 grid gap-3 rounded-xl border bg-card p-3 shadow-lg">
-        <NumeroField
+        <CestaReader
           label="Numero della Cesta"
           submitLabel="Aggiungi"
-          onCesta={(cesta) => {
-            // The same Cesta added twice — typed after being scanned, say — is
-            // the one Cesta she already was, and saying so is all that is left.
-            if (ceste.some((added) => added._id === cesta._id)) {
-              return `${cesta.codice} è già nell'elenco.`;
-            }
-            setCeste([...ceste, cesta]);
-            // A Cesta the app did not have Disponibile goes out with the
-            // Cliente all the same: she is in the yard and he is loading her,
-            // and the counter is never blocked (ADR-0005).
-            if (asExpected(cesta)) {
-              return null;
-            }
-            // A written-off Cesta is the one case where the movement leaves her
-            // where she was: she counts again only once an Admin records the
-            // Rettifica of ritrovata on her own page (#20).
-            return cesta.state === "dismessa"
-              ? `${cesta.codice} risulta Dismessa: la registro lo stesso, ma torna a contare solo con una Rettifica di un Admin.`
-              : `${cesta.codice} risulta ${whereTheAppHasHer(cesta)}: la registro lo stesso, con una Rettifica.`;
-          }}
+          codici={ceste.map((cesta) => cesta.codice)}
+          onCesta={addCesta}
         />
         <Button
           className="h-14 w-full text-lg"

@@ -4,9 +4,9 @@ import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { useCampagnaChoice } from "@/components/campagna-bar";
+import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
 import { ClientePicker } from "@/components/cliente-picker";
-import { NumeroField } from "@/components/numero-field";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -160,6 +160,39 @@ export function RientroFlow() {
         !fuori.some((his) => his._id === cesta._id),
     );
 
+    /**
+     * One more Cesta off the trailer, however she was read. The camera and the
+     * numero field say the same thing about her because they say it from here:
+     * scanning `400-R-017` and typing 17 are one act at the counter (#23).
+     */
+    const addCesta = (cesta: FoundCesta) => {
+      const his = fuori.some((one) => one._id === cesta._id);
+      // Both lists are added to as they stand when the Cesta lands on them, not
+      // as they stood when this was written: the camera can read two labels in
+      // one frame, and a Rientro that quietly dropped the first of them would
+      // leave a Cesta Fuori that is standing in the yard.
+      if (!his) {
+        setAlsoHere((current) =>
+          current.some((one) => one._id === cesta._id)
+            ? current
+            : [...current, cesta],
+        );
+      }
+      if (ticked.includes(cesta._id)) {
+        return `${cesta.codice} è già spuntata.`;
+      }
+      setTicked((current) =>
+        current.includes(cesta._id) ? current : [...current, cesta._id],
+      );
+      // The app not having her out with the man driving her back is the same
+      // size of surprise whether it had her at the mill or with somebody else:
+      // either way it was wrong about whose she was, and she comes back all
+      // the same (ADR-0005).
+      return his
+        ? null
+        : `${warningLine(cesta)}: rientra lo stesso, con una Rettifica.`;
+    };
+
     const confirm = async () => {
       setPending(true);
       setFailed(false);
@@ -211,7 +244,7 @@ export function RientroFlow() {
 
         {onTheTrailer.length === 0 ? (
           <p className="text-muted-foreground">
-            Scrivi il numero di ogni Cesta che sta rientrando.
+            Ancora nessuna Cesta sul rimorchio.
           </p>
         ) : (
           <ul className="flex flex-wrap gap-2">
@@ -262,26 +295,13 @@ export function RientroFlow() {
         )}
 
         <div className="sticky bottom-4 grid gap-3 rounded-xl border bg-card p-3 shadow-lg">
-          <NumeroField
+          <CestaReader
             label="Numero della Cesta"
             submitLabel="Aggiungi"
-            onCesta={(cesta) => {
-              const his = fuori.some((one) => one._id === cesta._id);
-              if (!his && !alsoHere.some((one) => one._id === cesta._id)) {
-                setAlsoHere([...alsoHere, cesta]);
-              }
-              if (ticked.includes(cesta._id)) {
-                return `${cesta.codice} è già spuntata.`;
-              }
-              setTicked([...ticked, cesta._id]);
-              // The app not having her out with the man driving her back is the
-              // same size of surprise whether it had her at the mill or with
-              // somebody else: either way it was wrong about whose she was, and
-              // she comes back all the same (ADR-0005).
-              return his
-                ? null
-                : `${warningLine(cesta)}: rientra lo stesso, con una Rettifica.`;
-            }}
+            codici={onTheTrailer
+              .filter((cesta) => ticked.includes(cesta._id))
+              .map((cesta) => cesta.codice)}
+            onCesta={addCesta}
           />
           <Button
             className="h-14 w-full text-lg"
@@ -354,15 +374,21 @@ export function RientroFlow() {
     );
   }
 
+  // The load is not open yet, so the camera has nothing to hand over twice:
+  // the first Cesta it reads is the one that names the Cliente, and this
+  // screen gives way to his.
+  const identify = (cesta: FoundCesta) => {
+    setIdentifiedBy(cesta);
+    return null;
+  };
+
   return (
     <div className="grid gap-4">
-      <NumeroField
+      <CestaReader
         label="Numero di una Cesta del carico"
         submitLabel="Cerca"
-        onCesta={(cesta) => {
-          setIdentifiedBy(cesta);
-          return null;
-        }}
+        codici={[]}
+        onCesta={identify}
       />
       <p className="text-muted-foreground">
         Basta una Cesta qualsiasi del carico: l&apos;app dice di chi è, e il

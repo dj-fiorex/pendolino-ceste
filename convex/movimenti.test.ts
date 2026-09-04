@@ -59,6 +59,15 @@ const typeNumero = async (device: Device, numero: string) => {
   return cesta._id;
 };
 
+/** The Cesta the camera has just read off an Etichetta, as the screen adds her. */
+const scanCodice = async (device: Device, codice: string) => {
+  const cesta = await device.query(api.ceste.byCodice, { codice });
+  if (cesta === null) {
+    throw new Error(`No Cesta answers to the Codice ${codice}.`);
+  }
+  return cesta._id;
+};
+
 /** A Ritiro of the numeri given, so that there is a load to bring back. */
 const takeAway = async (
   device: Device,
@@ -247,6 +256,153 @@ describe("a Ritiro at the counter", () => {
     ).rejects.toThrow();
     await expect(
       t.query(api.movimenti.byCliente, { clienteId }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("a Cesta read by camera or by eye", () => {
+  test("the Codice the QR carries and the numero typed find the same Cesta", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+
+    const scanned = await gabriele.query(api.ceste.byCodice, {
+      codice: "400-R-007",
+    });
+
+    expect(scanned).toEqual({
+      _id: expect.any(String),
+      numero: 7,
+      codice: "400-R-007",
+      portata: 400,
+      state: "disponibile",
+      cliente: null,
+    });
+    expect(scanned).toEqual(
+      await gabriele.query(api.ceste.byNumero, { numero: "7" }),
+    );
+  });
+
+  test("the two readings stay one Cesta wherever she goes", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      alias: ["Turi"],
+    });
+
+    // The camera and the keyboard, asked the same question about Cesta 4: the
+    // Codice off her QR, her numero, and her numero with the zeros her
+    // Etichetta prints. One Cesta, and one answer.
+    const bothReadings = async () => {
+      const scanned = await marco.query(api.ceste.byCodice, {
+        codice: "400-R-004",
+      });
+      expect(scanned).toEqual(
+        await marco.query(api.ceste.byNumero, { numero: "4" }),
+      );
+      expect(scanned).toEqual(
+        await marco.query(api.ceste.byNumero, { numero: "004" }),
+      );
+      return scanned;
+    };
+
+    expect(await bothReadings()).toMatchObject({
+      state: "disponibile",
+      cliente: null,
+    });
+
+    const cestaId = await typeNumero(marco, "4");
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId,
+      cesteIds: [cestaId],
+    });
+    expect(await bothReadings()).toMatchObject({
+      state: "fuori",
+      cliente: { name: "Giuseppe Amato", alias: ["Turi"] },
+    });
+
+    await marco.mutation(api.movimenti.rientro, {
+      clienteId,
+      cesteIds: [cestaId],
+    });
+    expect(await bothReadings()).toMatchObject({
+      state: "attesa_molitura",
+      cliente: null,
+    });
+
+    // Written off, and still the same Cesta to both: a screen that says what
+    // she is beats one pretending she never was (ADR-0005).
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId,
+      cause: "rotta",
+    });
+    expect(await bothReadings()).toMatchObject({
+      state: "dismessa",
+      cliente: null,
+    });
+  });
+
+  test("the same Cesta scanned and then typed is one Cesta, and one Movimento", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    // Read off the label, and then typed because the Operatore did not trust
+    // the beep. The Ritiro is of one Cesta all the same (#23).
+    const scanned = await scanCodice(marco, "400-R-003");
+    const typed = await typeNumero(marco, "003");
+    expect(scanned).toBe(typed);
+
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId,
+      cesteIds: [scanned, typed],
+    });
+
+    const movimenti = await marco.query(api.movimenti.byCliente, { clienteId });
+    expect(movimenti).toHaveLength(1);
+    expect(movimenti[0]).toMatchObject({ kind: "ritiro", codice: "400-R-003" });
+  });
+
+  test("a Codice no Cesta answers to is reported, and nothing is added", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+
+    // A Codice this mill never printed: Cesta 7 is rettangolare, and the Q one
+    // is somebody else's label rather than hers read loosely (ADR-0007).
+    expect(
+      await gabriele.query(api.ceste.byCodice, { codice: "400-Q-007" }),
+    ).toBeNull();
+    expect(
+      await gabriele.query(api.ceste.byCodice, { codice: "400-R-999" }),
+    ).toBeNull();
+    // A QR that decoded to something that was never a Codice at all.
+    expect(
+      await gabriele.query(api.ceste.byCodice, {
+        codice: "https://example.com",
+      }),
+    ).toBeNull();
+    expect(await gabriele.query(api.ceste.byCodice, { codice: "" })).toBeNull();
+    // The bare numero is what the counter types, never what the QR carries.
+    expect(
+      await gabriele.query(api.ceste.byCodice, { codice: "7" }),
+    ).toBeNull();
+  });
+
+  test("nobody signed in reads a Codice", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+
+    await expect(
+      t.query(api.ceste.byCodice, { codice: "400-R-001" }),
     ).rejects.toThrow();
   });
 });

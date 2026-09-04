@@ -604,6 +604,11 @@ export default defineSchema({
     // Also the sequence: the highest numero handed out so far is the first row
     // of this index read backwards.
     .index("by_numero", ["numero"])
+    // The Cesta a camera has just read: the QR on her Etichetta carries her
+    // Codice and nothing else (ADR-0007), so this is what a scan is looked up
+    // by. No two Ceste ever share one — the Codice is generated once from a
+    // numero nothing reuses.
+    .index("by_codice", ["codice"])
     .index("by_state", ["state"])
     // Which Ceste a Cliente is holding: the Lista di recupero's own read (#22),
     // and the warning before an Admin deactivates somebody.
