@@ -15,9 +15,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { cesteCount, dayOf, daysSince, type FoundCesta } from "@/lib/ceste";
+import {
+  cesteCount,
+  dayOf,
+  daysSince,
+  warningLine,
+  type FoundCesta,
+} from "@/lib/ceste";
 import { clienteLabel, type Cliente } from "@/lib/cliente";
 
 /** A Cesta on the trailer, whether or not the app believed she was his. */
@@ -45,8 +52,10 @@ export function RientroFlow() {
   const [searching, setSearching] = useState(false);
   const [ticked, setTicked] = useState<Id<"ceste">[]>([]);
   // Ceste typed on the trailer that the app does not believe are his. They
-  // come back with him anyway (ADR-0005), so they belong on the screen.
-  const [alsoHere, setAlsoHere] = useState<OnTheTrailer[]>([]);
+  // come back with him anyway (ADR-0005), so they belong on the screen — and
+  // they are kept whole, because the warning has to say where the app did have
+  // them and with whom (#21).
+  const [alsoHere, setAlsoHere] = useState<FoundCesta[]>([]);
   const [done, setDone] = useState<{ cliente: Cliente; count: number } | null>(
     null,
   );
@@ -141,6 +150,15 @@ export function RientroFlow() {
       .filter((since) => since !== null)
       .sort((one, other) => one - other)[0];
     const stayingOut = fuori.filter((cesta) => !ticked.includes(cesta._id));
+    // The Ceste on the trailer that the app does not have Fuori with the man
+    // driving it — never went out, or went out with somebody else. Read against
+    // the load as it stands now, so that changing the Cliente mid-Rientro
+    // changes who is a surprise and who is not.
+    const notWhereTheAppHadThem = alsoHere.filter(
+      (cesta) =>
+        ticked.includes(cesta._id) &&
+        !fuori.some((his) => his._id === cesta._id),
+    );
 
     const confirm = async () => {
       setPending(true);
@@ -210,7 +228,7 @@ export function RientroFlow() {
         )}
 
         {stayingOut.length > 0 && (
-          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-50">
+          <Warning>
             <span className="font-semibold">
               {stayingOut.length === 1 ? "Resta" : "Restano"} Fuori con{" "}
               {cliente.name}:
@@ -218,7 +236,22 @@ export function RientroFlow() {
             <span className="font-display tabular-nums">
               {stayingOut.map((cesta) => cesta.codice).join(" · ")}
             </span>
-          </p>
+          </Warning>
+        )}
+
+        {/* Said once as each Cesta is ticked, and then again here until the
+            Rientro is confirmed: the tiles scroll and the warning must not
+            scroll away with them. It gates nothing — the load is on the
+            weighbridge either way (ADR-0005). */}
+        {notWhereTheAppHadThem.length > 0 && (
+          <Warning>
+            <span className="font-semibold">
+              {notWhereTheAppHadThem.length === 1
+                ? "Rientra lo stesso, con una Rettifica:"
+                : "Rientrano lo stesso, con una Rettifica per ognuna:"}
+            </span>{" "}
+            {notWhereTheAppHadThem.map(warningLine).join(" · ")}.
+          </Warning>
         )}
 
         {failed && (
@@ -241,9 +274,13 @@ export function RientroFlow() {
                 return `${cesta.codice} è già spuntata.`;
               }
               setTicked([...ticked, cesta._id]);
+              // The app not having her out with the man driving her back is the
+              // same size of surprise whether it had her at the mill or with
+              // somebody else: either way it was wrong about whose she was, and
+              // she comes back all the same (ADR-0005).
               return his
                 ? null
-                : `${cesta.codice} non risulta di ${cliente.name}: rientra lo stesso.`;
+                : `${warningLine(cesta)}: rientra lo stesso, con una Rettifica.`;
             }}
           />
           <Button

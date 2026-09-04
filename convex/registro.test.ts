@@ -178,6 +178,7 @@ describe("the Registro of a day", () => {
       operatore: "Marco",
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
+      producedRettifica: false,
       action: {
         kind: "cliente_modificato",
         changes: [

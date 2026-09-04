@@ -17,9 +17,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { cesteCount, dayOf, stateLabel, type FoundCesta } from "@/lib/ceste";
+import { expectedBefore } from "@/convex/schema";
+import {
+  cesteCount,
+  dayOf,
+  whereTheAppHasHer,
+  type FoundCesta,
+} from "@/lib/ceste";
 import { playConfirmation } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
@@ -149,9 +156,9 @@ export function SvuotamentoScreen() {
           : [...current, cesta],
       );
     }
-    return cesta.state === "attesa_molitura"
+    return cesta.state === expectedBefore.svuotamento
       ? `${cesta.codice} selezionata.`
-      : `${cesta.codice} risulta ${stateLabel[cesta.state]}: verrà svuotata con una Rettifica.`;
+      : `${cesta.codice} risulta ${whereTheAppHasHer(cesta)}: verrà svuotata lo stesso, con una Rettifica.`;
   };
 
   const confirm = async () => {
@@ -232,9 +239,7 @@ export function SvuotamentoScreen() {
                       </span>
                     </button>
                     {group.warning !== null && (
-                      <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-50">
-                        {group.warning}
-                      </p>
+                      <Warning>{group.warning}</Warning>
                     )}
                   </CardHeader>
                   {/* Tiles are a fixed 96 px and wrap: three to a row on the

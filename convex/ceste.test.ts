@@ -159,6 +159,7 @@ describe("Censimento", () => {
         // A Censimento concerns no Cliente.
         cliente: null,
         campagna: null,
+        producedRettifica: false,
         action: {
           kind: "censimento",
           portata: 400,

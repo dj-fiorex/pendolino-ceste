@@ -19,6 +19,8 @@ export type RegistroRow = {
   cliente: ClienteName | null;
   /** The Campagna it belongs to, and nobody on the rows that predate them. */
   campagna: string | null;
+  /** Whether the action left a Rettifica behind it (#21). */
+  producedRettifica: boolean;
   action: Action;
 };
 
