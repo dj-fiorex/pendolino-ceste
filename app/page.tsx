@@ -65,6 +65,11 @@ export default async function Home() {
               <Button variant="outline" asChild className="h-12 text-base">
                 <Link href="/attesa-molitura">Attesa molitura</Link>
               </Button>
+              {/* Every Operatore's, not an Admin's: chasing a Cesta on a quiet
+                  afternoon is counter work (spec #1, #22). */}
+              <Button variant="outline" asChild className="h-12 text-base">
+                <Link href="/recupero">Lista di recupero</Link>
+              </Button>
               <Button variant="outline" asChild className="h-12 text-base">
                 <Link href="/clienti">I Clienti</Link>
               </Button>

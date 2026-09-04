@@ -243,6 +243,36 @@ export const etichettaSettingField = v.union(
 
 export type EtichettaSettingField = Infer<typeof etichettaSettingField>;
 
+/**
+ * How many days a Cesta may be Fuori before she counts In ritardo, until an
+ * Admin says otherwise. Ten, which is the mill's own guess at how long a
+ * harvest sits at a Cliente's before somebody should be telephoned.
+ *
+ * It decides highlighting on the Lista di recupero and nothing else: being
+ * late moves no Cesta and hides nobody (CONTEXT.md, #22).
+ */
+export const DEFAULT_SOGLIA_RITARDO = 10;
+
+/**
+ * What the whole mill has settled on: what an Etichetta says, and the Soglia
+ * di ritardo the Lista di recupero highlights by. One row for all of it, so
+ * the table, the mutations that write it and the screens that read it take
+ * their shape from here.
+ */
+export const settingsFields = {
+  ...etichettaSettingsFields,
+  // Optional because a row can predate the setting: one written when the mill
+  // had only Etichette to settle carries no Soglia, and reads as the app's own
+  // ten rather than being rewritten to say so (ADR-0004). An Admin who sets
+  // the Soglia writes it; nothing else does.
+  sogliaRitardo: v.optional(v.number()),
+};
+
+/** The settings row as it is stored — the Soglia only where one was set. */
+export type StoredSettings = Infer<
+  ReturnType<typeof v.object<typeof settingsFields>>
+>;
+
 /** A value as it is stored: no leading, trailing or doubled spaces. */
 export const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
 
@@ -479,6 +509,14 @@ export const action = v.union(
     ),
   }),
   v.object({
+    kind: v.literal("soglia_ritardo"),
+    // How many days a Cesta could be Fuori before she was called late, and how
+    // many she can now. One field, so the row says it outright rather than
+    // through a list of changes: the Soglia is one number for the whole mill.
+    before: v.number(),
+    after: v.number(),
+  }),
+  v.object({
     kind: v.literal("operatore_invitato"),
     // The person as the Admin wrote them down. An invitation is all there is
     // of them until they accept, so the row says who was asked and at which
@@ -662,10 +700,10 @@ export default defineSchema({
     .index("by_name", ["name"]),
 
   // What the whole mill has settled on, as one row and no more: the Etichetta
-  // the print shop prints, and, when #22 arrives, the Soglia di ritardo beside
-  // it. An empty table means nobody has changed anything yet, and every setting
-  // reads as the app's own.
-  settings: defineTable(etichettaSettingsFields),
+  // the print shop prints, and the Soglia di ritardo beside it. An empty table
+  // means nobody has changed anything yet, and every setting reads as the
+  // app's own.
+  settings: defineTable(settingsFields),
 
   // The mill's seasons. At most one is open at any moment — enforced in the
   // mutation that opens one and not only in the screen that offers it — and

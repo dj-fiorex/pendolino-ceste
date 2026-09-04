@@ -7,7 +7,7 @@ import type {
   Forma,
   PlainMovimentoKind,
 } from "@/convex/schema";
-import { cesteCount, dayOf, stateInSentence } from "@/lib/ceste";
+import { cesteCount, dayOf, daysLabel, stateInSentence } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
 import { ETICHETTA_SIZE_LABELS } from "@/lib/etichetta";
 import { movimentoInSentence, rettificaCauseLabel } from "@/lib/movimento";
@@ -212,6 +212,8 @@ const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
       return `${operatore} ha riaperto la Campagna ${action.name}.`;
     case "etichette_settings":
       return `${operatore} ha cambiato le Etichette: ${changesInSentence(action.changes, etichettaFieldLabel, etichettaValue)}.`;
+    case "soglia_ritardo":
+      return `${operatore} ha cambiato la Soglia di ritardo da ${daysLabel(action.before)} a ${daysLabel(action.after)}.`;
     case "operatore_invitato":
       return `${operatore} ha invitato ${action.name} (${action.email}) come ${roleLabel[action.role]}.`;
     case "invito_accettato":

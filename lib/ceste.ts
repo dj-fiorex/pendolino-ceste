@@ -121,8 +121,46 @@ export const codiceParts = (codice: string) => {
 export const dayOf = (at: number) =>
   new Date(at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 
-/** How many days ago something happened, as the counter counts them. */
+/** A number of days, as the counter says it out loud. */
+export const daysLabel = (days: number) =>
+  days === 1 ? "1 giorno" : `${days} giorni`;
+
+/** How many whole days ago something happened, as the counter counts them. */
+export const daysAgo = (at: number) =>
+  Math.floor((Date.now() - at) / 86_400_000);
+
+/**
+ * How many days ago something happened, as the counter says it. A Cesta that
+ * went out this morning has been out "oggi" and not "0 giorni": on a peak day
+ * of the Campagna most of what the screens date is same-day, and nobody at the
+ * counter counts a day that has not finished.
+ */
 export const daysSince = (at: number) => {
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  return days === 1 ? "1 giorno" : `${days} giorni`;
+  const days = daysAgo(at);
+  return days === 0 ? "oggi" : daysLabel(days);
+};
+
+/**
+ * Whether a Cesta Fuori since a moment counts In ritardo: Fuori for more days
+ * than the Soglia di ritardo (CONTEXT.md). One rule in one place, so that
+ * every row the Lista di recupero highlights is highlighted by one reading.
+ *
+ * It decides a colour and nothing else. Being late moves no Cesta and takes
+ * nobody off the list — the query hands back everybody holding Ceste and the
+ * Soglia beside them, and this is all the Soglia is ever asked (#22).
+ *
+ * A Cesta whose date the app does not know is not late but unknown: colouring
+ * her on a guess would say something the app cannot claim to know (ADR-0005).
+ */
+export const inRitardo = (since: number | null, sogliaRitardo: number) =>
+  since !== null && daysAgo(since) > sogliaRitardo;
+
+/**
+ * The oldest date among a set of Ceste, and nothing where none of them carries
+ * one: how long a Cliente has been holding something of the mill's, which is
+ * the figure the counter is told and the Lista di recupero is ordered by (#22).
+ */
+export const oldestSince = (ceste: { since: number | null }[]) => {
+  const dates = ceste.flatMap((cesta) => cesta.since ?? []);
+  return dates.length === 0 ? null : Math.min(...dates);
 };
