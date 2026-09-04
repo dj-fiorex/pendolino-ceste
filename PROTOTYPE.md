@@ -67,4 +67,12 @@ Everything prototype is marked `PROTOTYPE (#shell)` in its header comment:
 
 ## Verdict
 
-_To be recorded here and on #32 once the owner has flipped through._
+**A — "Banco" wins, and ships as it is built here.** Nothing is taken from B
+or C: the bottom tab bar over Banco, Ceste, Recupero and Altro on the phone,
+the permanent sidebar in three groups on the desktop, and the dashboard home —
+four figures, then the three Movimenti, then the head of the Lista di recupero
+— are the shell.
+
+Recorded by the owner on 4 September 2026, on #32. B and C stay here, with the
+switcher, as the record of what was tried; A is rewritten properly on `main`,
+without the variant machinery.
