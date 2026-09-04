@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { RecuperoList } from "@/components/recupero-list";
 import { signedInOperatore } from "@/lib/auth-server";
@@ -22,14 +21,8 @@ export default async function Recupero() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-4 md:p-6 lg:max-w-4xl">
       <div className="space-y-2">
-        <Link
-          href="/"
-          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Indietro
-        </Link>
         {/* The mill's own name for this list (CONTEXT.md), with what it is
             said underneath for whoever has not heard it called that yet. */}
         <h1 className="font-display text-3xl font-bold tracking-tight">

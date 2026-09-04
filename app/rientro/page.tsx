@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CampagnaBar } from "@/components/campagna-bar";
 import { RientroFlow } from "@/components/rientro-flow";
 import { signedInOperatore } from "@/lib/auth-server";
 
@@ -18,14 +16,8 @@ export default async function Rientro() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-4 md:p-6 lg:max-w-4xl">
       <div className="space-y-2">
-        <Link
-          href="/"
-          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Indietro
-        </Link>
         <h1 className="font-display text-3xl font-bold tracking-tight">
           Rientro
         </h1>
@@ -33,7 +25,6 @@ export default async function Rientro() {
           Chi riporta le Ceste piene, e quali sono.
         </p>
       </div>
-      <CampagnaBar />
       <RientroFlow />
     </main>
   );

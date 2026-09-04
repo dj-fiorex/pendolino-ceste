@@ -68,7 +68,7 @@ export default async function Etichette({
   ]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <div className="space-y-2">
         <Link
           href="/ceste"

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { RegistroList } from "@/components/registro-list";
 import { todayAtTheMill } from "@/convex/schema";
@@ -19,14 +18,8 @@ export default async function Registro() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 md:p-6 lg:max-w-5xl">
       <div className="space-y-2">
-        <Link
-          href="/"
-          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Indietro
-        </Link>
         <h1 className="font-display text-3xl font-bold tracking-tight">
           Il Registro
         </h1>

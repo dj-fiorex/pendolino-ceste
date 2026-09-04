@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Source_Sans_3 } from "next/font/google";
 import type { ReactNode } from "react";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
+import { PrototypeShell } from "@/components/prototype/shell";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { getToken } from "@/lib/auth-server";
 import "./globals.css";
@@ -53,7 +54,8 @@ export default async function RootLayout({
         className={`${bricolage.variable} ${sourceSans.variable} font-sans antialiased`}
       >
         <ConvexClientProvider initialToken={initialToken}>
-          {children}
+          {/* PROTOTYPE (#shell): the three shells hang here, one per device. */}
+          <PrototypeShell>{children}</PrototypeShell>
         </ConvexClientProvider>
         <ServiceWorkerRegistration />
       </body>
