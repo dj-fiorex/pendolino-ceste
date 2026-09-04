@@ -19,6 +19,42 @@ export const mediaInSentence: Record<MediaKind, string> = {
 };
 
 /**
+ * The two there are, in the order a screen offers them: what a question about
+ * *which* of them — which the Operatore took, which the device did not keep —
+ * is asked over.
+ *
+ * Read off `mediaLabel` rather than written out again, as the Etichetta sizes
+ * are read off their own labels, so that a third kind cannot be added to one
+ * and forgotten in the other.
+ */
+export const mediaKinds = Object.keys(mediaLabel) as MediaKind[];
+
+/**
+ * The ones a sentence is about, listed as the counter would say them: "la
+ * firma", "la firma e la foto".
+ *
+ * Every line that has something to say about what was taken is about a list of
+ * these, so the list is put together in one place and the sentences differ
+ * only where they mean different things.
+ */
+export const mediaListed = (kinds: MediaKind[]) =>
+  kinds.map((kind) => mediaInSentence[kind]).join(" e ");
+
+/**
+ * The line that says what the Operatore took is not on the device any more and
+ * has to be taken again (#24).
+ *
+ * Said on the offer that brings a half-done Ritiro back, so that resuming is
+ * not mistaken for getting the signature back with it, and said again beside
+ * the buttons for as long as it stands — a warning that has scrolled away is a
+ * warning nobody sees at the moment they confirm.
+ */
+export const toRetakeLine = (kinds: MediaKind[]) =>
+  `Il telefono non conserva ${mediaListed(kinds)}: ${
+    kinds.length === 1 ? "se serve, rifalla" : "se servono, rifalle"
+  }.`;
+
+/**
  * The longest side a photograph of a load is kept at. Enough to read a number
  * plate or tell one trailer from another months later, which is the whole of
  * what the photograph is for, and small enough to go up over the mill's signal
