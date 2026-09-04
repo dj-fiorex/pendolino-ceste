@@ -43,6 +43,28 @@ export const movimentoKind = v.union(
 
 export type MovimentoKind = Infer<typeof movimentoKind>;
 
+export type PlainMovimentoKind = Infer<typeof plainMovimentoKind>;
+
+/**
+ * Where each Movimento expects to find a Cesta before it moves her: at the
+ * mill and empty for a Ritiro, out with a Cliente for a Rientro, back and
+ * still full for a Svuotamento.
+ *
+ * Expects, and never requires. A Cesta anywhere else goes through all the
+ * same, with a Rettifica of *discrepanza* beside her saying where the app had
+ * her: the physical event is already under way, and a validation that refuses
+ * it does not correct reality, it only removes the app from it (ADR-0005).
+ *
+ * One rule in two voices, as `rettificaLeaves` is: the mutation writes the
+ * Rettifica by it, and the counter screens turn it into the line that warns the
+ * Operatore before they confirm — a warning that neither stops nor gates them.
+ */
+export const expectedBefore = {
+  ritiro: "disponibile",
+  rientro: "fuori",
+  svuotamento: "attesa_molitura",
+} as const satisfies Record<PlainMovimentoKind, State>;
+
 /**
  * The causes an Admin chooses from, each a different fact about a Cesta: one
  * lost to a Cliente, one broken at the mill, one that turned up again. Losing
@@ -557,6 +579,17 @@ export default defineSchema({
     // (ADR-0006), and absent on the same terms as on a Movimento: the rows
     // written before this table knew about Campagne carry none.
     campagnaId: v.optional(v.id("campagne")),
+    // Whether this action left a Rettifica behind it — the app wrong about a
+    // Cesta at the counter, or an Admin saying what became of one. A Ritiro of
+    // six Ceste with two discrepanze is still one row, and this is the flag
+    // that lets the Registro pick those rows out (#21, #27).
+    //
+    // Written here rather than counted at read time, because the alternative
+    // is a second read per row on the query the Registro screen makes all day.
+    // Absent on the rows written before the flag existed, which is what the
+    // rows a deployment already holds are: none of them is rewritten to say
+    // otherwise (ADR-0004).
+    producedRettifica: v.optional(v.boolean()),
     action,
   })
     // The two filters the Registro offers besides the day, which the built-in

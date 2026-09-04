@@ -19,7 +19,7 @@ export const day = v.object({ from: v.number(), to: v.number() });
 type Day = Infer<typeof day>;
 
 /**
- * What narrows a read of the Registro. All three are optional, and a read with
+ * What narrows a read of the Registro. All four are optional, and a read with
  * none of them is the whole Registro, which no screen asks for: the screen
  * always names a day.
  */
@@ -27,6 +27,10 @@ const filters = {
   day: v.optional(day),
   clienteId: v.optional(v.id("clienti")),
   operatoreId: v.optional(v.id("operatori")),
+  // The actions that left a Rettifica behind them, or the ones that did not:
+  // "show me where the app was wrong on Tuesday" is a question the mill has
+  // never been able to ask (#21).
+  producedRettifica: v.optional(v.boolean()),
 };
 
 type Filters = Infer<ReturnType<typeof v.object<typeof filters>>>;
@@ -60,11 +64,25 @@ export async function writeRegistroRow(
      * record can carry a Campagna that is closed.
      */
     campagnaId?: Id<"campagne">;
+    /**
+     * Whether the action is about to write a Rettifica: an Admin recording one
+     * on a Cesta, or the counter correcting what the app believed as a
+     * movement goes through (#21). Settled by the caller before the row is
+     * written, because the Rettifiche hang off the row and the row cannot name
+     * them afterwards without being edited (ADR-0004).
+     *
+     * Every other action leaves none, and says so by saying nothing.
+     */
+    producedRettifica?: boolean;
     action: Action;
   },
 ): Promise<Id<"registro">> {
   const campagnaId = row.campagnaId ?? (await openCampagna(ctx))?._id;
-  return await ctx.db.insert("registro", { ...row, campagnaId });
+  return await ctx.db.insert("registro", {
+    ...row,
+    campagnaId,
+    producedRettifica: row.producedRettifica ?? false,
+  });
 }
 
 /**
@@ -93,14 +111,38 @@ const within = <Range extends CreationTimeRange>(
     : q.gte("_creationTime", day.from).lt("_creationTime", day.to);
 
 /**
+ * Whether a row left a Rettifica behind it. The rows written before the flag
+ * existed left none that anything can say for them, and read as such (#21).
+ */
+const leftARettifica = (row: Doc<"registro">) => row.producedRettifica ?? false;
+
+/**
  * The rows a set of filters leaves, newest first.
+ *
+ * Whether the action left a Rettifica sifts what the indexes hand back rather
+ * than leading on an index of its own, because the screen always names a day
+ * and a day is a handful of rows. A read that names no day reads the whole
+ * Registro to answer it, which is the same cost that read already had.
+ */
+async function rowsMatching(
+  ctx: QueryCtx,
+  filters: Filters,
+): Promise<Doc<"registro">[]> {
+  const rows = await rowsIndexedBy(ctx, filters);
+  return filters.producedRettifica === undefined
+    ? rows
+    : rows.filter((row) => leftARettifica(row) === filters.producedRettifica);
+}
+
+/**
+ * The rows the three indexed filters leave, newest first.
  *
  * Whichever of the Cliente and the Operatore is asked for leads on its own
  * index; the other, on the rare read that asks for both, sifts the handful of
  * rows that come back. With neither, the day is a range read on the built-in
  * index — and that is the read the screen makes all day.
  */
-async function rowsMatching(
+async function rowsIndexedBy(
   ctx: QueryCtx,
   { day, clienteId, operatoreId }: Filters,
 ): Promise<Doc<"registro">[]> {
@@ -199,6 +241,9 @@ export const list = query({
       // The Campagna the action belonged to, and nobody on the rows that
       // predate the mill's first one.
       campagna: v.union(v.null(), v.string()),
+      // Whether the action left a Rettifica behind it, so that the screen can
+      // mark the row and offer the day's discrepanze on their own (#21, #27).
+      producedRettifica: v.boolean(),
       action,
     }),
   ),
@@ -218,6 +263,7 @@ export const list = query({
               ? null
               : { name: cliente.name, alias: cliente.alias },
           campagna: await campagnaNameOf(ctx, row),
+          producedRettifica: leftARettifica(row),
           action: row.action,
         };
       }),

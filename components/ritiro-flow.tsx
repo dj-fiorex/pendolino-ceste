@@ -15,9 +15,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
-import { cesteCount, type FoundCesta } from "@/lib/ceste";
+import { expectedBefore } from "@/convex/schema";
+import {
+  cesteCount,
+  warningLine,
+  whereTheAppHasHer,
+  type FoundCesta,
+} from "@/lib/ceste";
 import { clienteLabel, type Cliente } from "@/lib/cliente";
+
+/**
+ * Whether the app had a Cesta where a Ritiro expects to find her: at the mill,
+ * empty, ready for the next Cliente. One rule in two voices — the mutation
+ * writes the Rettifica of *discrepanza* by it, and this screen writes the
+ * warning by it (ADR-0005, #21).
+ */
+const asExpected = (cesta: FoundCesta) => cesta.state === expectedBefore.ritiro;
 
 /**
  * The counter: the Cliente in front of the Operatore, then their Ceste one at
@@ -89,6 +104,10 @@ export function RitiroFlow() {
     }
   };
 
+  // The Ceste of this Ritiro the app did not have Disponibile, in the order
+  // they were added: each of them goes out with a Rettifica beside her.
+  const notWhereTheAppHadThem = ceste.filter((cesta) => !asExpected(cesta));
+
   return (
     <div className="grid gap-4 pb-4">
       <Card>
@@ -137,6 +156,21 @@ export function RitiroFlow() {
         </ul>
       )}
 
+      {/* Said once as each Cesta goes in, and then again here for as long as
+          she is in the Ritiro: a warning that has scrolled away is a warning
+          nobody sees at the moment they confirm. It never gates the button —
+          the Cesta is on the trailer either way (ADR-0005). */}
+      {notWhereTheAppHadThem.length > 0 && (
+        <Warning>
+          <span className="font-semibold">
+            {notWhereTheAppHadThem.length === 1
+              ? "La registro lo stesso, con una Rettifica:"
+              : "Le registro lo stesso, con una Rettifica per ognuna:"}
+          </span>{" "}
+          {notWhereTheAppHadThem.map(warningLine).join(" · ")}.
+        </Warning>
+      )}
+
       {failed && (
         <p role="alert" className="text-sm text-destructive">
           Non è stato possibile registrare il Ritiro. Controlla la connessione e
@@ -155,14 +189,18 @@ export function RitiroFlow() {
               return `${cesta.codice} è già nell'elenco.`;
             }
             setCeste([...ceste, cesta]);
-            // A Cesta an Admin has written off goes out with the Cliente all
-            // the same: she is in the yard and he is loading her, and the
-            // counter is never blocked (ADR-0005). The app says what it knows —
-            // she counts again only once an Admin records the Rettifica of
-            // ritrovata on her own page (#20).
+            // A Cesta the app did not have Disponibile goes out with the
+            // Cliente all the same: she is in the yard and he is loading her,
+            // and the counter is never blocked (ADR-0005).
+            if (asExpected(cesta)) {
+              return null;
+            }
+            // A written-off Cesta is the one case where the movement leaves her
+            // where she was: she counts again only once an Admin records the
+            // Rettifica of ritrovata on her own page (#20).
             return cesta.state === "dismessa"
               ? `${cesta.codice} risulta Dismessa: la registro lo stesso, ma torna a contare solo con una Rettifica di un Admin.`
-              : null;
+              : `${cesta.codice} risulta ${whereTheAppHasHer(cesta)}: la registro lo stesso, con una Rettifica.`;
           }}
         />
         <Button

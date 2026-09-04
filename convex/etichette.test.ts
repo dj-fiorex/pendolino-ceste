@@ -83,6 +83,7 @@ describe("the Etichetta settings", () => {
         operatore: "Gabriele",
         cliente: null,
         campagna: null,
+        producedRettifica: false,
         action: {
           kind: "etichette_settings",
           changes: [

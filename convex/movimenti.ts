@@ -11,10 +11,12 @@ import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
   adminRettificaCause,
+  expectedBefore,
   movimentoKind,
   rettificaFields,
   rettificaLeaves,
   type MovimentoKind,
+  type PlainMovimentoKind,
   type State,
 } from "./schema";
 
@@ -63,6 +65,11 @@ async function lastMovimento(
  * Cliente's, where that is newer, because a Cesta found in somebody's yard has
  * been theirs since the Admin said so and not since a Ritiro that may never
  * have happened (#20).
+ *
+ * A Ritiro on a Cesta the app already had Fuori writes a discrepanza that also
+ * leaves her Fuori (#21). It lands in the same instant as the Ritiro beside it,
+ * so the later of the two is that instant either way and this reads the same
+ * answer whichever it picks.
  */
 export async function fuoriSince(
   ctx: QueryCtx,
@@ -116,6 +123,30 @@ const campagnaArg = { campagnaId: v.optional(v.id("campagne")) };
  */
 const inTheFleet = (cesta: Doc<"ceste">) => cesta.state !== "dismessa";
 
+/**
+ * Whether a Cesta is where the Movimento about to move her expected to find
+ * her: where `expectedBefore` says, and, on a Rientro, with the very Cliente
+ * driving her back.
+ *
+ * The Cliente counts on a Rientro because "she is out with somebody else" is
+ * the same size of surprise as "she was never out at all": either way the app
+ * was wrong about whose she was, and a Cesta the app believes belongs to Tizio
+ * coming back on Caio's trailer is exactly the fact the mill has never been
+ * able to see (ADR-0005).
+ *
+ * Nothing refuses her for the answer. All it decides is whether a Rettifica of
+ * *discrepanza* is written beside the Movimento, saying what the app believed
+ * at the time.
+ */
+const asExpected = (
+  kind: PlainMovimentoKind,
+  cesta: Doc<"ceste">,
+  /** The Cliente at the counter, where there is one. */
+  clienteId?: Id<"clienti">,
+) =>
+  cesta.state === expectedBefore[kind] &&
+  (kind !== "rientro" || cesta.clienteId === clienteId);
+
 /** What either movement at the counter is: a Cliente, and the Ceste added. */
 const counterArgs = {
   clienteId: v.id("clienti"),
@@ -133,10 +164,9 @@ const counterArgs = {
  * else, still in Attesa molitura, or never taken out at all. The Cesta is in
  * the yard and the Cliente is loading her: the app records what happens rather
  * than authorising it, and a Cesta on the wrong trailer is exactly the fact the
- * mill has never been able to see (ADR-0005). Reporting those mismatches as a
- * Rettifica is #21's — save for the one this ticket makes possible, a Cesta an
- * Admin has written off, which is corrected here because nothing else would say
- * she had turned up at all (#20).
+ * mill has never been able to see (ADR-0005). Each of those Ceste moves with a
+ * Rettifica of *discrepanza* beside her, carrying the belief the movement went
+ * through on, and the Operatore is told before they confirm rather than after.
  *
  * The Cliente moved to is always the one actually present, which is what makes
  * a Rientro of somebody else's Cesta come to rest under the name the paper tape
@@ -173,10 +203,20 @@ async function recordAtTheCounter(
   }
   const inFleet = ceste.flatMap((cesta) => (cesta === null ? [] : [cesta]));
 
+  // Which of them the app was wrong about, settled before any of them moves:
+  // the Registro row says whether the action produced a Rettifica, and the row
+  // is written first, because every Movimento under it carries its id.
+  const surprises = new Set(
+    inFleet
+      .filter((cesta) => !asExpected(kind, cesta, cliente._id))
+      .map((cesta) => cesta._id),
+  );
+
   const registroId = await writeRegistroRow(ctx, {
     operatoreId: operatore._id,
     clienteId: cliente._id,
     campagnaId,
+    producedRettifica: surprises.size > 0,
     action: {
       kind,
       numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
@@ -184,13 +224,18 @@ async function recordAtTheCounter(
   });
 
   for (const cesta of inFleet) {
-    if (inTheFleet(cesta)) {
-      await ctx.db.patch(cesta._id, { state: becomes, clienteId: cliente._id });
-    } else {
-      // She is not the mill's to move, and she is standing at the counter all
-      // the same. Written before the Movimento and under the same Registro row,
-      // as the Svuotamento's is (ADR-0006), and saying she stays where she is:
-      // an Admin's *ritrovata* is what brings her back (#20).
+    // Where the movement leaves her: with the Cliente at the counter, unless an
+    // Admin has written her off, in which case it moves nothing. She is
+    // Dismessa, standing in the yard, and only an Admin's *ritrovata* brings
+    // her back into the fleet (#20).
+    const leavesHer = inTheFleet(cesta) ? becomes : cesta.state;
+    if (surprises.has(cesta._id)) {
+      // She was not where the app had her, and she is moving all the same.
+      // Written before the Movimento and under the same Registro row, as the
+      // Svuotamento's is (ADR-0006), and naming the Cliente the app believed
+      // was holding her, so that the correction turns up in that Cliente's own
+      // history — which is where the mill would go looking for why a Cesta
+      // stopped being counted against them.
       await ctx.db.insert("movimenti", {
         kind: "rettifica",
         cestaId: cesta._id,
@@ -201,8 +246,14 @@ async function recordAtTheCounter(
         rettifica: {
           cause: "discrepanza",
           believedState: cesta.state,
-          becomes: cesta.state,
+          becomes: leavesHer,
         },
+      });
+    }
+    if (inTheFleet(cesta)) {
+      await ctx.db.patch(cesta._id, {
+        state: leavesHer,
+        clienteId: cliente._id,
       });
     }
     await ctx.db.insert("movimenti", {
@@ -278,9 +329,18 @@ export const svuotamento = mutation({
     }
     const inFleet = ceste.flatMap((cesta) => (cesta === null ? [] : [cesta]));
 
+    // The ones the app did not have waiting to be milled, settled before any
+    // of them moves, for the same reason as at the counter.
+    const surprises = new Set(
+      inFleet
+        .filter((cesta) => !asExpected("svuotamento", cesta))
+        .map((cesta) => cesta._id),
+    );
+
     const registroId = await writeRegistroRow(ctx, {
       operatoreId: operatore._id,
       campagnaId,
+      producedRettifica: surprises.size > 0,
       action: {
         kind: "svuotamento",
         numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
@@ -297,7 +357,7 @@ export const svuotamento = mutation({
       // Written before she moves, and under the same Registro row as the
       // Svuotamento that moved her: the correction and the movement are one
       // action a person took (ADR-0006).
-      if (cesta.state !== "attesa_molitura") {
+      if (surprises.has(cesta._id)) {
         await ctx.db.insert("movimenti", {
           kind: "rettifica",
           cestaId: cesta._id,
@@ -387,6 +447,10 @@ export const rettifica = mutation({
       operatoreId: admin._id,
       clienteId,
       campagnaId,
+      // The one action that is a Rettifica rather than merely leaving one
+      // behind: a read of the Registro for what produced a Rettifica finds the
+      // Admin's own corrections beside the counter's discrepanze.
+      producedRettifica: true,
       action: {
         kind: "rettifica",
         numero: cesta.numero,
