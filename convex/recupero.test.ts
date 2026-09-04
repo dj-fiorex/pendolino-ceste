@@ -103,6 +103,7 @@ describe("the Soglia di ritardo", () => {
         producedRettifica: false,
         corrects: null,
         correctedBy: [],
+        media: { signature: null, photo: null },
         action: { kind: "soglia_ritardo", before: 10, after: 14 },
       },
     ]);
