@@ -14,7 +14,7 @@ export default async function Censimento() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-4 md:p-6 lg:max-w-4xl">
       <div className="space-y-2">
         <Link
           href="/ceste"

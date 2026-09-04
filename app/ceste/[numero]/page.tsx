@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CampagnaBar } from "@/components/campagna-bar";
 import { MediaKept } from "@/components/media-kept";
 import { RettificaForm } from "@/components/rettifica-form";
 import {
@@ -82,7 +81,7 @@ export default async function CestaPage({
   );
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-4 md:p-6 lg:max-w-4xl">
       <div className="space-y-2">
         <Link
           href="/ceste"
@@ -115,7 +114,6 @@ export default async function CestaPage({
 
       {operatore.role === "admin" && (
         <div className="grid gap-3">
-          <CampagnaBar />
           {/* Her history goes in as well as being shown below it: a correction
               of a misregistration picks the Movimento it puts right out of it
               (#28). */}
