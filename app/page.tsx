@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CampagnaBar } from "@/components/campagna-bar";
+import { HomeDashboard, type HomeData } from "@/components/home-dashboard";
 import { SignOutButton } from "@/components/sign-out-button";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,18 +8,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { signedInOperatore } from "@/lib/auth-server";
-import { roleLabel } from "@/lib/operatore";
+import { api } from "@/convex/_generated/api";
+import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
+import { inRitardo } from "@/lib/ceste";
+import { clienteLabel } from "@/lib/cliente";
 
+/**
+ * The home: how the frantoio stands right now — how many Ceste are Disponibili,
+ * how many are Fuori, how many wait to be milled, and who is over the Soglia —
+ * with the three Movimenti beside it (#32).
+ *
+ * The figures are read here, on the server, so that the counter opening the app
+ * on a peak morning gets them with the page rather than after it.
+ */
 export default async function Home() {
   const { signedIn, operatore } = await signedInOperatore();
   if (!signedIn) {
     redirect("/accedi");
   }
 
-  return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 p-6">
-      {operatore === null ? (
+  if (operatore === null) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-col justify-center gap-8 p-6">
         <Card>
           <CardHeader>
             <CardTitle>Questo account non è abilitato</CardTitle>
@@ -33,86 +41,33 @@ export default async function Home() {
             <SignOutButton />
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="space-y-2">
-            <p className="text-muted-foreground">Sei entrato come</p>
-            <h1 className="font-display text-3xl font-bold tracking-tight">
-              {operatore.name}
-            </h1>
-            <p className="inline-flex rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground">
-              {roleLabel[operatore.role]}
-            </p>
-          </div>
-          <CampagnaBar />
-          <Card>
-            <CardHeader>
-              <CardTitle>Il banco</CardTitle>
-              <CardDescription>
-                Chi ritira, chi riporta, e quali Ceste si svuotano.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Button asChild className="h-12 text-base">
-                <Link href="/ritiro">Nuovo Ritiro</Link>
-              </Button>
-              <Button asChild className="h-12 text-base">
-                <Link href="/rientro">Nuovo Rientro</Link>
-              </Button>
-              <Button asChild className="h-12 text-base">
-                <Link href="/svuotamento">Svuotamento</Link>
-              </Button>
-              <Button variant="outline" asChild className="h-12 text-base">
-                <Link href="/attesa-molitura">Attesa molitura</Link>
-              </Button>
-              {/* Every Operatore's, not an Admin's: chasing a Cesta on a quiet
-                  afternoon is counter work (spec #1, #22). */}
-              <Button variant="outline" asChild className="h-12 text-base">
-                <Link href="/recupero">Lista di recupero</Link>
-              </Button>
-              <Button variant="outline" asChild className="h-12 text-base">
-                <Link href="/clienti">I Clienti</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          {operatore.role === "admin" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Il Registro, le Campagne e chi lavora qui</CardTitle>
-                <CardDescription>
-                  Chi ha fatto cosa, e quando. La stagione a cui appartiene. E
-                  chi può entrare.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3">
-                <Button variant="outline" asChild className="h-12 text-base">
-                  <Link href="/registro">Apri il Registro</Link>
-                </Button>
-                <Button variant="outline" asChild className="h-12 text-base">
-                  <Link href="/campagne">Le Campagne</Link>
-                </Button>
-                <Button variant="outline" asChild className="h-12 text-base">
-                  <Link href="/operatori">Gli Operatori</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Le Ceste</CardTitle>
-              <CardDescription>
-                Quante Ceste ci sono, di che Portata, e dove sono.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Button variant="outline" asChild className="h-12 text-base">
-                <Link href="/ceste">Vedi le Ceste</Link>
-              </Button>
-              <SignOutButton />
-            </CardContent>
-          </Card>
-        </>
-      )}
+      </main>
+    );
+  }
+
+  const [ceste, disponibili, recupero] = await Promise.all([
+    fetchAuthQuery(api.ceste.list, {}),
+    fetchAuthQuery(api.ceste.disponibiliByPortata, {}),
+    fetchAuthQuery(api.recupero.list, {}),
+  ]);
+
+  const data: HomeData = {
+    operatore: { name: operatore.name },
+    disponibili,
+    fuori: ceste.filter((cesta) => cesta.state === "fuori").length,
+    attesa: ceste.filter((cesta) => cesta.state === "attesa_molitura").length,
+    clienti: recupero.clienti.map((row) => ({
+      name: clienteLabel(row.cliente),
+      ceste: row.ceste.length,
+      since: row.since,
+      late: inRitardo(row.since, recupero.sogliaRitardo),
+      phone: row.cliente.phone,
+    })),
+  };
+
+  return (
+    <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-4 lg:px-8 lg:py-6">
+      <HomeDashboard data={data} />
     </main>
   );
 }

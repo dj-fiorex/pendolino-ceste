@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Source_Sans_3 } from "next/font/google";
 import type { ReactNode } from "react";
+import { AppShell } from "@/components/app-shell";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { getToken } from "@/lib/auth-server";
@@ -53,7 +54,7 @@ export default async function RootLayout({
         className={`${bricolage.variable} ${sourceSans.variable} font-sans antialiased`}
       >
         <ConvexClientProvider initialToken={initialToken}>
-          {children}
+          <AppShell>{children}</AppShell>
         </ConvexClientProvider>
         <ServiceWorkerRegistration />
       </body>
