@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ClienteDetail } from "@/components/cliente-detail";
+import { SmsHistory } from "@/components/sms-history";
 import {
   Card,
   CardContent,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { phoneInNational } from "@/convex/phone";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
 import { cesteCount } from "@/lib/ceste";
 import { clienteLabel } from "@/lib/cliente";
@@ -64,7 +66,10 @@ export default async function ClientePage({
           {clienteLabel(cliente)}
         </h1>
         <p className="text-muted-foreground">
-          {cliente.phone ?? "Telefono non lo sappiamo"}
+          {cliente.phone === null
+            ? "Telefono non lo sappiamo"
+            : phoneInNational(cliente.phone)}
+          {cliente.smsOptOut && " · niente SMS"}
         </p>
         {!cliente.active && (
           <p className="inline-flex rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground">
@@ -108,8 +113,10 @@ export default async function ClientePage({
       <ClienteDetail
         cliente={cliente}
         codiciFuori={cliente.cesteFuori.map((cesta) => cesta.codice)}
-        canDeactivate={operatore.role === "admin"}
+        isAdmin={operatore.role === "admin"}
       />
+
+      <SmsHistory clienteId={cliente._id} />
 
       {movimenti.length > 0 && (
         <Card>

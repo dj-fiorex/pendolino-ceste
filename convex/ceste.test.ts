@@ -163,6 +163,7 @@ describe("Censimento", () => {
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },
+        sms: null,
         action: {
           kind: "censimento",
           portata: 400,

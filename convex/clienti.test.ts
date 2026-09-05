@@ -51,6 +51,7 @@ describe("the Cliente at the counter", () => {
         name: "Giuseppe Amato",
         alias: [],
         phone: null,
+        smsOptOut: false,
       },
     ]);
   });
@@ -72,6 +73,7 @@ describe("two Clienti with the same name", () => {
         name: "Giuseppe Amato",
         alias: [],
         phone: null,
+        smsOptOut: false,
       },
     ]);
   });
@@ -93,12 +95,14 @@ describe("two Clienti with the same name", () => {
         name: "Giuseppe Amato",
         alias: [],
         phone: null,
+        smsOptOut: false,
       },
       {
         _id: expect.any(String),
         name: "Giuseppe Amato",
         alias: ["Turi"],
-        phone: "333 111 2222",
+        phone: "+393331112222",
+        smsOptOut: false,
       },
     ]);
   });
@@ -151,6 +155,7 @@ describe("two Clienti with the same name", () => {
         name: "Giuseppe Amato",
         alias: [],
         phone: null,
+        smsOptOut: false,
         active: false,
       },
     ]);
@@ -203,6 +208,7 @@ describe("the Registro", () => {
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },
+        sms: null,
         action: {
           kind: "cliente_creato",
           name: "Giuseppe Amato",
@@ -225,6 +231,7 @@ describe("correcting a Cliente", () => {
       name: "Giuseppe Amato",
       alias: ["Turi", "u' pilota"],
       phone: "333 111 2222",
+      smsOptOut: false,
     });
 
     expect(await marco.query(api.clienti.search, { term: "pilota" })).toEqual([
@@ -232,7 +239,8 @@ describe("correcting a Cliente", () => {
         _id: clienteId,
         name: "Giuseppe Amato",
         alias: ["Turi", "u' pilota"],
-        phone: "333 111 2222",
+        phone: "+393331112222",
+        smsOptOut: false,
       },
     ]);
   });
@@ -251,6 +259,7 @@ describe("correcting a Cliente", () => {
       name: "Giuseppe Amato",
       alias: [],
       phone: "333 999 8888",
+      smsOptOut: false,
     });
 
     const registro = await gabriele.query(api.registro.list, {});
@@ -264,10 +273,15 @@ describe("correcting a Cliente", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: {
         kind: "cliente_modificato",
         changes: [
-          { field: "phone", before: "333 111 2222", after: "333 999 8888" },
+          {
+            field: "phone",
+            before: "+393331112222",
+            after: "+393339998888",
+          },
         ],
       },
     });
@@ -286,6 +300,7 @@ describe("correcting a Cliente", () => {
       name: "  Giuseppe   Amato ",
       alias: ["Turi"],
       phone: "",
+      smsOptOut: false,
     });
 
     expect(await gabriele.query(api.registro.list, {})).toHaveLength(1);
@@ -305,6 +320,7 @@ describe("correcting a Cliente", () => {
         name: "Giuseppe Amato",
         alias: [],
         phone: "",
+        smsOptOut: false,
       }),
     ).rejects.toThrow();
 
@@ -314,8 +330,93 @@ describe("correcting a Cliente", () => {
         name: "Salvatore Russo",
         alias: [],
         phone: null,
+        smsOptOut: false,
       },
     ]);
+  });
+});
+
+describe("the telephone", () => {
+  test("is kept as a carrier takes it, however the counter wrote it", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+
+    for (const [typed, kept] of [
+      ["347 1234567", "+393471234567"],
+      ["3471234567", "+393471234567"],
+      ["+39 347 123 4567", "+393471234567"],
+      ["0039 347 1234567", "+393471234567"],
+      // A landline: a good number to call, and one no SMS will reach.
+      ["0931 000000", "+390931000000"],
+      // Whoever winters abroad and still brings olives in October.
+      ["+49 151 12345678", "+4915112345678"],
+    ]) {
+      const clienteId = await marco.mutation(api.clienti.create, {
+        name: `Cliente ${typed}`,
+        phone: typed,
+      });
+      const cliente = await marco.query(api.clienti.get, { clienteId });
+      expect(cliente?.phone).toBe(kept);
+    }
+  });
+
+  test("a number nobody could call is refused, at the moment it can be asked for", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+
+    await expect(
+      marco.mutation(api.clienti.create, {
+        name: "Giuseppe Amato",
+        phone: "chiedere al figlio",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      marco.mutation(api.clienti.create, {
+        name: "Giuseppe Amato",
+        phone: "347 12",
+      }),
+    ).rejects.toThrow();
+
+    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual(
+      [],
+    );
+  });
+
+  test("having none is not a mistake: the counter is never blocked", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      phone: "   ",
+    });
+
+    expect(
+      (await marco.query(api.clienti.get, { clienteId }))?.phone,
+    ).toBeNull();
+  });
+
+  test("a correction is refused the same way, and changes nothing", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      phone: "347 1234567",
+    });
+
+    await expect(
+      marco.mutation(api.clienti.update, {
+        clienteId,
+        name: "Giuseppe Amato",
+        alias: [],
+        phone: "347",
+        smsOptOut: false,
+      }),
+    ).rejects.toThrow();
+
+    expect((await marco.query(api.clienti.get, { clienteId }))?.phone).toBe(
+      "+393471234567",
+    );
   });
 });
 
@@ -393,6 +494,7 @@ describe("deactivating a Cliente", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: {
         kind: "cliente_disattivato",
         name: "Giuseppe Amato",

@@ -4,6 +4,7 @@ import {
   ClipboardListIcon,
   HomeIcon,
   ListChecksIcon,
+  MessageSquareTextIcon,
   PackageOpenIcon,
   PhoneCallIcon,
   TruckIcon,
@@ -104,6 +105,13 @@ export const administration: NavItem[] = [
     label: "Le Campagne",
     hint: "La stagione a cui appartiene quello che si registra.",
     icon: CalendarRangeIcon,
+    adminOnly: true,
+  },
+  {
+    href: "/sms",
+    label: "Gli SMS",
+    hint: "Cosa scriviamo ai Clienti, e cosa è partito.",
+    icon: MessageSquareTextIcon,
     adminOnly: true,
   },
   {

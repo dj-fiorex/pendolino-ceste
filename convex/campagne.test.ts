@@ -287,6 +287,7 @@ describe("closing a Campagna", () => {
           name: "Giuseppe Amato",
           alias: ["Turi"],
           phone: null,
+          smsOptOut: false,
         },
         ceste: [
           { numero: 3, codice: "400-R-003" },

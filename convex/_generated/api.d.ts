@@ -20,10 +20,13 @@ import type * as http from "../http.js";
 import type * as media from "../media.js";
 import type * as movimenti from "../movimenti.js";
 import type * as operatori from "../operatori.js";
+import type * as phone from "../phone.js";
 import type * as recupero from "../recupero.js";
 import type * as registro from "../registro.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
+import type * as sms from "../sms.js";
+import type * as template from "../template.js";
 
 import type {
   ApiFromModules,
@@ -44,10 +47,13 @@ declare const fullApi: ApiFromModules<{
   media: typeof media;
   movimenti: typeof movimenti;
   operatori: typeof operatori;
+  phone: typeof phone;
   recupero: typeof recupero;
   registro: typeof registro;
   seed: typeof seed;
   settings: typeof settings;
+  sms: typeof sms;
+  template: typeof template;
 }>;
 
 /**

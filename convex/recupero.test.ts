@@ -104,6 +104,7 @@ describe("the Soglia di ritardo", () => {
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },
+        sms: null,
         action: { kind: "soglia_ritardo", before: 10, after: 14 },
       },
     ]);
@@ -222,7 +223,8 @@ describe("the Lista di recupero", () => {
           _id: clienteId,
           name: "Giuseppe Amato",
           alias: ["Turi"],
-          phone: "0931 000 000",
+          phone: "+390931000000",
+          smsOptOut: false,
         },
         active: true,
         since: expect.any(Number),

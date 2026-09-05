@@ -18,9 +18,18 @@ import { millSettings, saveMillSettings } from "./settings";
  * does wherever else it is read (#22).
  */
 async function currentSettings(ctx: QueryCtx): Promise<EtichettaSettings> {
-  const { sogliaRitardo: _sogliaRitardo, ...etichetta } =
-    await millSettings(ctx);
-  return etichetta;
+  // Named field by field rather than by taking everything the row is not: the
+  // mill keeps its Soglia and its Sms in the same row, and a settling that
+  // dropped only the ones it knew about would hand this query whatever the
+  // next feature adds.
+  const settings = await millSettings(ctx);
+  return {
+    etichettaSize: settings.etichettaSize,
+    millName: settings.millName,
+    millNameOnEtichetta: settings.millNameOnEtichetta,
+    millPhone: settings.millPhone,
+    millPhoneOnEtichetta: settings.millPhoneOnEtichetta,
+  };
 }
 
 /**

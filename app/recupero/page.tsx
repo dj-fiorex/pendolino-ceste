@@ -7,9 +7,9 @@ import { signedInOperatore } from "@/lib/auth-server";
  * the telephone to call.
  *
  * Every Operatore's, not an Admin's: chasing a Cesta on a quiet afternoon is
- * counter work (spec #1). Only the Soglia di ritardo below the list is an
- * Admin's, and the mutation refuses everybody else regardless of what this
- * page offers.
+ * counter work (spec #1). Two things on it are an Admin's — the Soglia di
+ * ritardo below the list, and writing an SMS to somebody on it — and the
+ * mutations refuse everybody else regardless of what this page offers.
  */
 export default async function Recupero() {
   const { signedIn, operatore } = await signedInOperatore();
@@ -34,7 +34,7 @@ export default async function Recupero() {
           Rientro o una Rettifica.
         </p>
       </div>
-      <RecuperoList canSetSoglia={operatore.role === "admin"} />
+      <RecuperoList isAdmin={operatore.role === "admin"} />
     </main>
   );
 }

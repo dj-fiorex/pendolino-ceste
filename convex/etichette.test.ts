@@ -87,6 +87,7 @@ describe("the Etichetta settings", () => {
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },
+        sms: null,
         action: {
           kind: "etichette_settings",
           changes: [

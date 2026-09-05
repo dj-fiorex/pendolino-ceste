@@ -10,6 +10,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { dayBounds } from "@/convex/schema";
 import { clienteLabel } from "@/lib/cliente";
 import { registroSentence, saysItsCampagna, timeOf } from "@/lib/registro";
+import { smsDeliveryLabel, smsWentWrong } from "@/lib/sms";
+import { cn } from "@/lib/utils";
 
 /** The option that narrows nothing, and the value the DOM gives it. */
 const NARROWS_NOTHING = "";
@@ -179,6 +181,21 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
                     is the whole Ritiro rather than one of its six Ceste
                     (ADR-0006, #25). */}
                 <MediaKept media={row.media} />
+                {/* Whether this action got its message out. Said here and not
+                    at the counter: an Operatore registering a Ritiro has a
+                    queue in front of them, and an Sms is nothing they can act
+                    on (ADR-0005). */}
+                {row.sms !== null && (
+                  <p
+                    className={cn(
+                      "text-sm text-muted-foreground",
+                      smsWentWrong(row.sms.delivery) &&
+                        "font-semibold text-amber-700 dark:text-amber-300",
+                    )}
+                  >
+                    SMS · {smsDeliveryLabel(row.sms.delivery)}
+                  </p>
+                )}
               </div>
             </li>
           ))}

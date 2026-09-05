@@ -147,6 +147,7 @@ describe("a Ritiro at the counter", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: {
         kind: "ritiro",
         numeri: [1, 2, 3, 4, 5, 6],
@@ -182,6 +183,7 @@ describe("a Ritiro at the counter", () => {
       name: "Giuseppe Amato",
       alias: [],
       phone: null,
+      smsOptOut: false,
       active: true,
       cesteFuori: [1, 2, 3, 4, 5, 6].map((numero) => ({
         _id: expect.any(String),
@@ -631,7 +633,8 @@ describe("a Rientro at the counter", () => {
         _id: clienteId,
         name: "Giuseppe Amato",
         alias: ["Turi"],
-        phone: "349 1234567",
+        phone: "+393491234567",
+        smsOptOut: false,
       },
     });
     // A Cesta the app believes at the mill names nobody, and the screen falls
@@ -675,6 +678,7 @@ describe("a Rientro at the counter", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: { kind: "rientro", numeri: [1, 2, 3, 4] },
     });
     // Back at the mill, still full: not yet Disponibile, and no longer Fuori.
@@ -760,6 +764,7 @@ describe("a Rientro at the counter", () => {
           name: "Salvatore Russo",
           alias: [],
           phone: null,
+          smsOptOut: false,
         },
       },
     ]);
@@ -969,6 +974,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: { kind: "svuotamento", numeri: [1, 2, 3, 4, 5] },
     });
     expect(await marco.query(api.ceste.attesaMolitura, {})).toEqual([]);
@@ -1227,6 +1233,7 @@ describe("a Rettifica", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: {
         kind: "rettifica",
         numero: 3,

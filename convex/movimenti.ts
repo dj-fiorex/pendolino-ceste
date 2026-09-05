@@ -9,6 +9,7 @@ import {
 import { campagnaFor } from "./campagne";
 import { linksToMedia, NO_MEDIA } from "./media";
 import { requireAdmin, requireOperatore } from "./operatori";
+import { sendMovimentoSms } from "./sms";
 import { writeRegistroRow } from "./registro";
 import {
   adminRettificaCause,
@@ -344,6 +345,20 @@ async function recordAtTheCounter(
       registroId,
     });
   }
+
+  // The receipt the movement sends of itself, last of all, so that what it
+  // tells the Cliente he still holds is read after the Ceste have moved. It
+  // hands the message to the scheduler and nothing else: whatever a carrier
+  // makes of it happens outside this transaction and never at the counter
+  // (ADR-0005).
+  await sendMovimentoSms(ctx, {
+    kind,
+    cliente,
+    numeri,
+    registroId,
+    operatoreId: operatore._id,
+    campagnaId,
+  });
   return null;
 }
 

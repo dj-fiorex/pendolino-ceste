@@ -11,6 +11,8 @@ export type ClienteName = { name: string; alias: string[] };
 export type Cliente = ClienteName & {
   _id: Id<"clienti">;
   phone: string | null;
+  /** Whether they have asked not to be written to (CONTEXT.md, Sms). */
+  smsOptOut: boolean;
 };
 
 /**

@@ -28,6 +28,10 @@ pnpm convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
 pnpm convex env set RESEND_API_KEY re_...
 pnpm convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
 pnpm convex env set RESEND_TEST_MODE false
+pnpm convex env set TWILIO_ACCOUNT_SID AC...
+pnpm convex env set TWILIO_AUTH_TOKEN ...
+pnpm convex env set TWILIO_FROM Principe
+pnpm convex env set TWILIO_TEST_MODE false
 ```
 
 The Resend ones carry the mill's email: the invitation an Admin sends to a new
@@ -46,6 +50,21 @@ which makes it what a development deployment wants. Anything other than `true`
 or `false` is refused, and the refusal reaches the Admin on the same screen: a
 typo that quietly posted real mail, or quietly swallowed an invitation, is
 worse than one that says so.
+
+The Twilio ones carry the mill's SMS: the receipt a Ritiro and a Rientro send
+to the Cliente, and the messages an Admin writes by hand from **Gli SMS** or
+from a Cliente's own page. `TWILIO_FROM` is what the Cliente sees in place of a
+sender — a number, or a name of at most eleven characters registered with
+Twilio, which nobody can reply to. `TWILIO_TEST_MODE=true` works exactly as
+`RESEND_TEST_MODE` does: the message is written down and built, nothing is
+handed to Twilio, and the row says it was not sent. A deployment with no Twilio
+account counts Ceste exactly as one with it — the Ritiro is registered, the
+message is written down, and the row says it never left. Nothing at the counter
+ever waits on a carrier (ADR-0005).
+
+Both automatic messages start switched off, so that trying the app out does not
+text two hundred farmers. An Admin turns each one on from **Gli SMS**, where the
+words are edited and previewed first.
 
 `.env.example` lists what belongs in `.env.local`.
 

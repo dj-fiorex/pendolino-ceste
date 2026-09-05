@@ -5,14 +5,26 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
+import { readPhone } from "@/convex/phone";
 import { namesakeClash } from "@/convex/schema";
 import { clienteLabel, readAlias, type Cliente } from "@/lib/cliente";
 
 /** What the form holds, which is everything a Cliente is at the counter. */
-export type ClienteFields = { name: string; alias: string[]; phone: string };
+export type ClienteFields = {
+  name: string;
+  alias: string[];
+  phone: string;
+  smsOptOut: boolean;
+};
 
-const EMPTY: ClienteFields = { name: "", alias: [], phone: "" };
+const EMPTY: ClienteFields = {
+  name: "",
+  alias: [],
+  phone: "",
+  smsOptOut: false,
+};
 
 /**
  * A Cliente being written down: the name, and whatever else they offer while
@@ -43,10 +55,15 @@ export function ClienteForm({
   const [name, setName] = useState(initial.name);
   const [alias, setAlias] = useState(initial.alias.join(", "));
   const [phone, setPhone] = useState(initial.phone);
+  const [smsOptOut, setSmsOptOut] = useState(initial.smsOptOut);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const typedAlias = readAlias(alias);
+  // What the number turns out to be, said as the Operatore types it. A
+  // landline is not a mistake: it is a good number that no SMS will reach, and
+  // the form says so rather than refusing it (ADR-0009).
+  const reading = readPhone(phone);
   const found = useQuery(api.clienti.namesakes, { name });
   // The Cliente being corrected is never their own namesake.
   const namesakes = (found ?? []).filter((other) => other._id !== cliente?._id);
@@ -55,6 +72,12 @@ export function ClienteForm({
     event.preventDefault();
     if (name.trim() === "") {
       setError("Scrivi il nome del Cliente.");
+      return;
+    }
+    if (reading.kind === "unreadable") {
+      setError(
+        "Questo numero non si può chiamare. Scrivilo per intero, oppure lascialo vuoto.",
+      );
       return;
     }
     if (found === undefined) {
@@ -78,7 +101,7 @@ export function ClienteForm({
     setError(null);
     setPending(true);
     try {
-      await onSubmit({ name, alias: typedAlias, phone });
+      await onSubmit({ name, alias: typedAlias, phone, smsOptOut });
     } catch {
       setError(
         "Non è stato possibile salvare. Se un altro Cliente ha già questo nome, distinguilo con un Soprannome.",
@@ -168,7 +191,37 @@ export function ClienteForm({
           onChange={(event) => setPhone(event.target.value)}
           className="h-12 text-base"
         />
+        {reading.kind === "unreadable" && (
+          <p className="text-sm text-destructive">
+            Questo numero non si può chiamare. Scrivilo per intero, oppure
+            lascialo vuoto.
+          </p>
+        )}
+        {reading.kind === "landline" && (
+          <p className="text-sm text-muted-foreground">
+            È un numero fisso: si può chiamare, ma gli SMS non ci arrivano.
+          </p>
+        )}
       </div>
+
+      {/* Solo su un Cliente già in anagrafica: uno nuovo gli SMS li riceve, e
+          si toglie quando lo dice — al banco o per telefono, perché a questi
+          messaggi non si può rispondere. */}
+      {cliente !== null && (
+        <div className="flex items-start justify-between gap-3">
+          <div className="grid gap-1">
+            <Label htmlFor="cliente-sms">Non mandargli SMS</Label>
+            <p className="text-sm text-muted-foreground">
+              Resta nella Lista di recupero e si può chiamare come prima.
+            </p>
+          </div>
+          <Switch
+            id="cliente-sms"
+            checked={smsOptOut}
+            onCheckedChange={setSmsOptOut}
+          />
+        </div>
+      )}
 
       {error !== null && (
         <p role="alert" className="text-sm text-destructive">

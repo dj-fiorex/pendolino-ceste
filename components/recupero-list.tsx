@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
+import { SmsComposer } from "@/components/sms-composer";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
+import { phoneInNational } from "@/convex/phone";
 import {
   cesteCount,
   dayOf,
@@ -138,7 +140,7 @@ function CestaFuori({
  * Readable by every Operatore, so that telephoning somebody on a quiet
  * afternoon does not need an Admin (spec #1).
  */
-export function RecuperoList({ canSetSoglia }: { canSetSoglia: boolean }) {
+export function RecuperoList({ isAdmin }: { isAdmin: boolean }) {
   const list = useQuery(api.recupero.list, {});
 
   if (list === undefined) {
@@ -217,15 +219,25 @@ export function RecuperoList({ canSetSoglia }: { canSetSoglia: boolean }) {
                     Telefono non lo sappiamo.
                   </p>
                 ) : (
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="mt-3 h-11 w-full text-base"
-                  >
-                    <a href={`tel:${row.cliente.phone}`}>
-                      Chiama {row.cliente.phone}
-                    </a>
-                  </Button>
+                  // Chiama e Scrivi uno accanto all'altro: è così che va un
+                  // sollecito. Scrivere è di un Admin, chiamare di chiunque.
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-11 text-base"
+                    >
+                      <a href={`tel:${row.cliente.phone}`}>
+                        Chiama {phoneInNational(row.cliente.phone)}
+                      </a>
+                    </Button>
+                    {isAdmin && (
+                      <SmsComposer
+                        cliente={row.cliente}
+                        className="h-11 text-base"
+                      />
+                    )}
+                  </div>
                 )}
               </li>
             );
@@ -233,7 +245,7 @@ export function RecuperoList({ canSetSoglia }: { canSetSoglia: boolean }) {
         </ol>
       )}
 
-      {canSetSoglia ? (
+      {isAdmin ? (
         <SogliaForm sogliaRitardo={sogliaRitardo} />
       ) : (
         <p className="text-sm text-muted-foreground">

@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { fuoriSince } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
+import { readPhone } from "./phone";
 import { writeRegistroRow } from "./registro";
 import {
   comparableName,
@@ -20,6 +21,10 @@ export const clienteShape = {
   name: v.string(),
   alias: v.array(v.string()),
   phone: v.union(v.null(), v.string()),
+  // Whether the mill writes to them. Answered here rather than left absent, so
+  // that no screen has to know that a Cliente entered before the app sent any
+  // Sms simply says nothing about it.
+  smsOptOut: v.boolean(),
 };
 
 export const asCliente = (cliente: Doc<"clienti">) => ({
@@ -27,7 +32,27 @@ export const asCliente = (cliente: Doc<"clienti">) => ({
   name: cliente.name,
   alias: cliente.alias,
   phone: cliente.phone,
+  smsOptOut: cliente.smsOptOut === true,
 });
+
+/**
+ * A telephone as the registry keeps it: E.164, or nothing where the Cliente
+ * gave none. A number that reads as neither is refused (ADR-0009).
+ *
+ * The refusal never reaches a Cliente who simply has no telephone: the field
+ * may be empty, and leaving it empty is what keeps the counter moving while a
+ * queue waits. What it refuses is four digits and a shrug — at the moment the
+ * Operatore can still ask the man in front of them.
+ */
+function phoneToStore(typed: string): string | null {
+  const reading = readPhone(typed);
+  if (reading.kind === "unreadable") {
+    throw new Error(
+      "This telephone is not a number anybody could call: write it in full, or leave it empty.",
+    );
+  }
+  return reading.kind === "empty" ? null : reading.e164;
+}
 
 /**
  * The whole registry, by name, deactivated Clienti included.
@@ -154,13 +179,13 @@ export const create = mutation({
     const operatore = await requireOperatore(ctx);
     const name = tidy(args.name);
     const alias = (args.alias ?? []).map(tidy).filter((one) => one !== "");
-    const phone = tidy(args.phone ?? "");
+    const phone = phoneToStore(args.phone ?? "");
     refuseANamesake(await allClienti(ctx), { name, alias });
 
     const clienteId = await ctx.db.insert("clienti", {
       name,
       alias,
-      phone: phone === "" ? null : phone,
+      phone,
       // The one-way mirror fills this in when it exists (ADR-0003); until then
       // a Cliente entered at the counter answers to no Gestionale record.
       gestionaleId: null,
@@ -192,6 +217,11 @@ export const update = mutation({
     name: v.string(),
     alias: v.array(v.string()),
     phone: v.string(),
+    // Whether this Cliente has asked not to be written to. Corrected by every
+    // Operatore, like the rest of the registry: nobody can reply to an Sms the
+    // app sends, so "basta messaggi" is only ever said to whoever is at the
+    // counter, and they have to be able to act on it there.
+    smsOptOut: v.boolean(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -200,11 +230,11 @@ export const update = mutation({
     if (cliente === null) {
       throw new Error("This Cliente is not in the registry.");
     }
-    const phone = tidy(args.phone);
     const wanted = {
       name: tidy(args.name),
       alias: args.alias.map(tidy).filter((one) => one !== ""),
-      phone: phone === "" ? null : phone,
+      phone: phoneToStore(args.phone),
+      smsOptOut: args.smsOptOut,
     };
     refuseANamesake(await allClienti(ctx), {
       _id: cliente._id,
@@ -215,6 +245,11 @@ export const update = mutation({
       { field: "name" as const, before: cliente.name, after: wanted.name },
       { field: "alias" as const, before: cliente.alias, after: wanted.alias },
       { field: "phone" as const, before: cliente.phone, after: wanted.phone },
+      {
+        field: "smsOptOut" as const,
+        before: cliente.smsOptOut === true,
+        after: wanted.smsOptOut,
+      },
     ].filter(
       (change) =>
         JSON.stringify(change.before) !== JSON.stringify(change.after),

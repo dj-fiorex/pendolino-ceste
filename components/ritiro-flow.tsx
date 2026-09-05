@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
+import { phoneInNational } from "@/convex/phone";
 import { expectedBefore, type MediaKind } from "@/convex/schema";
 import {
   cesteCount,
@@ -411,7 +412,12 @@ export function RitiroFlow() {
         <CardHeader>
           <CardTitle>{clienteLabel(cliente)}</CardTitle>
           <CardDescription>
-            {cliente.phone ?? "Telefono non lo sappiamo"}
+            {/* Il telefono di chi è al banco, o che non ce l'abbiamo: è
+                l'unico momento in cui glielo si può chiedere. Non dice niente
+                degli SMS — al banco non servono a niente (ADR-0005). */}
+            {cliente.phone === null
+              ? "Telefono non lo sappiamo"
+              : phoneInNational(cliente.phone)}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -116,3 +116,9 @@ _Avoid_: Scaduta, overdue, expired
 **Soglia di ritardo** (late threshold):
 The number of days after which a Cesta Fuori counts as In ritardo. One value for the whole mill, set by an Admin.
 _Avoid_: Timeout, scadenza, limite
+
+### Contact
+
+**Sms**:
+The only thing the app ever says to a Cliente, who never holds an account in it: the receipt a Ritiro or a Rientro sends of itself, or a text an Admin writes by hand. One per action and never one per Cesta — six Ceste leaving together are one Sms — and never one the counter waits for.
+_Avoid_: Messaggio, notifica, notification, avviso, testo

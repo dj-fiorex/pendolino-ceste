@@ -6,6 +6,8 @@ import type {
   EtichettaSize,
   Forma,
   PlainMovimentoKind,
+  SmsDelivery,
+  SmsSettingField,
 } from "@/convex/schema";
 import { cesteCount, dayOf, daysLabel, stateInSentence } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
@@ -31,6 +33,8 @@ export type RegistroRow = {
   } | null;
   /** The Rettifiche that corrected this row afterwards, where any did. */
   correctedBy: { _id: Id<"registro">; at: number; numero: number }[];
+  /** What became of the Sms this action sent, where it sent one. */
+  sms: { delivery: SmsDelivery } | null;
   action: Action;
 };
 
@@ -65,6 +69,14 @@ const clienteFieldLabel: Record<ClienteField, string> = {
   name: "il nome",
   alias: "i soprannomi",
   phone: "il telefono",
+  smsOptOut: "gli SMS bloccati",
+};
+
+const smsFieldLabel: Record<SmsSettingField, string> = {
+  smsRitiroTemplate: "il testo del Ritiro",
+  smsRitiroOn: "l'invio al Ritiro",
+  smsRientroTemplate: "il testo del Rientro",
+  smsRientroOn: "l'invio al Rientro",
 };
 
 const etichettaFieldLabel: Record<EtichettaSettingField, string> = {
@@ -214,6 +226,16 @@ const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
       return `${operatore} ha cambiato le Etichette: ${changesInSentence(action.changes, etichettaFieldLabel, etichettaValue)}.`;
     case "soglia_ritardo":
       return `${operatore} ha cambiato la Soglia di ritardo da ${daysLabel(action.before)} a ${daysLabel(action.after)}.`;
+    case "sms_inviato": {
+      // The words the Admin wrote, quoted whole: the Registro is where the
+      // mill reads what was said in its name (ADR-0006).
+      const anyway = action.overrodeOptOut
+        ? " Aveva chiesto di non ricevere SMS."
+        : "";
+      return `${operatore} ha scritto a ${whom(cliente)} (${action.to}): «${action.body}»${anyway}`;
+    }
+    case "sms_settings":
+      return `${operatore} ha cambiato gli SMS: ${changesInSentence(action.changes, smsFieldLabel, quoted)}.`;
     case "operatore_invitato":
       return `${operatore} ha invitato ${action.name} (${action.email}) come ${roleLabel[action.role]}.`;
     case "invito_accettato":

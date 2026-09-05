@@ -169,6 +169,7 @@ describe("the Registro of a day", () => {
       name: "Giuseppe Amato",
       alias: [],
       phone: "333 999 8888",
+      smsOptOut: false,
     });
 
     const rows = await gabriele.query(api.registro.list, { day: today() });
@@ -182,10 +183,11 @@ describe("the Registro of a day", () => {
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
+      sms: null,
       action: {
         kind: "cliente_modificato",
         changes: [
-          { field: "phone", before: "333 111 2222", after: "333 999 8888" },
+          { field: "phone", before: "+393331112222", after: "+393339998888" },
         ],
       },
     });
@@ -300,6 +302,7 @@ describe("narrowing the Registro", () => {
       name: "Giuseppe Amato",
       alias: [],
       phone: "333 111 2222",
+      smsOptOut: false,
     });
 
     return { gabriele, giuseppe, salvatore };

@@ -9,6 +9,7 @@ import {
   action,
   mediaLinks,
   plainMovimentoKind,
+  smsDelivery,
   type Action,
   type PlainMovimentoKind,
 } from "./schema";
@@ -281,6 +282,23 @@ async function correctedByOf(ctx: QueryCtx, row: Doc<"registro">) {
   );
 }
 
+/**
+ * What became of the Sms this action sent, where it sent one: the answer to
+ * "did that Ritiro text him", read here rather than counted at the screen.
+ *
+ * Read through the Sms table's own index rather than off the row, because an
+ * Sms learns whether it arrived minutes after the action was recorded and a
+ * Registro row is never edited (ADR-0004). An action that sent none — most of
+ * them — says so with a null.
+ */
+async function smsOf(ctx: QueryCtx, row: Doc<"registro">) {
+  const sms = await ctx.db
+    .query("sms")
+    .withIndex("by_registro", (q) => q.eq("registroId", row._id))
+    .first();
+  return sms === null ? null : { delivery: sms.delivery };
+}
+
 /** The Cliente a row concerns, where it concerns one. Never deleted either. */
 async function clienteOf(
   ctx: QueryCtx,
@@ -351,6 +369,9 @@ export const list = query({
       // signature and one photograph most obviously belong (ADR-0006, #25).
       // Every other kind of action carried neither.
       media: mediaLinks,
+      // What became of the Sms this action sent, and nothing on the actions
+      // that sent none.
+      sms: v.union(v.null(), v.object({ delivery: smsDelivery })),
       action,
     }),
   ),
@@ -374,6 +395,7 @@ export const list = query({
           corrects: await correctsOf(ctx, row),
           correctedBy: await correctedByOf(ctx, row),
           media: await linksToMedia(ctx, row.action),
+          sms: await smsOf(ctx, row),
           action: row.action,
         };
       }),

@@ -257,13 +257,104 @@ export type EtichettaSettingField = Infer<typeof etichettaSettingField>;
 export const DEFAULT_SOGLIA_RITARDO = 10;
 
 /**
- * What the whole mill has settled on: what an Etichetta says, and the Soglia
- * di ritardo the Lista di recupero highlights by. One row for all of it, so
- * the table, the mutations that write it and the screens that read it take
- * their shape from here.
+ * Which Sms this is: the receipt a Ritiro or a Rientro sends of itself, or the
+ * one an Admin wrote by hand (CONTEXT.md).
+ */
+export const smsKind = v.union(
+  v.literal("ritiro"),
+  v.literal("rientro"),
+  v.literal("manuale"),
+);
+
+export type SmsKind = Infer<typeof smsKind>;
+
+/**
+ * Why a message the mill meant to send could not go: the Cliente gave no
+ * telephone, gave a landline, or gave something no carrier will take.
+ *
+ * These are the only reasons a row is written for a message that never left.
+ * A Ritiro whose Sms was switched off, or whose Cliente asked not to be
+ * written to, writes nothing at all: the mill decided that on purpose, and a
+ * row a season saying so is noise rather than a record.
+ */
+export const smsUnsendable = v.union(
+  v.literal("no_phone"),
+  v.literal("landline"),
+  v.literal("unreadable"),
+);
+
+export type SmsUnsendable = Infer<typeof smsUnsendable>;
+
+/**
+ * What became of one Sms, from the moment it was written to the moment a
+ * carrier said whether it arrived.
+ *
+ * Wider than an email's `emailDelivery` by one step, because an Sms has one
+ * more: Twilio accepting a message says only that it took it, and delivery is
+ * reported minutes later on a callback. So *sent* and *delivered* are two
+ * different pieces of news, and the mill is told which of them it has.
+ */
+export const smsDelivery = v.union(
+  // Written and handed to the scheduler; nothing has been tried yet.
+  v.object({ kind: v.literal("queued"), at: v.number() }),
+  v.object({ kind: v.literal("sent"), at: v.number() }),
+  v.object({ kind: v.literal("delivered"), at: v.number() }),
+  // On a deployment in prova nothing is handed over (TWILIO_TEST_MODE).
+  v.object({ kind: v.literal("withheld"), at: v.number() }),
+  v.object({ kind: v.literal("failed"), at: v.number(), reason: v.string() }),
+  v.object({
+    kind: v.literal("unsendable"),
+    at: v.number(),
+    reason: smsUnsendable,
+  }),
+);
+
+export type SmsDelivery = Infer<typeof smsDelivery>;
+
+/**
+ * What the mill has settled about its Sms: the words each automatic message
+ * says, and whether it is sent at all.
+ *
+ * Two switches and no third one over them. Both off is the whole feature off,
+ * and a master switch would only be a second place to look when nothing is
+ * arriving.
+ */
+export const smsSettingsFields = {
+  smsRitiroTemplate: v.string(),
+  smsRitiroOn: v.boolean(),
+  smsRientroTemplate: v.string(),
+  smsRientroOn: v.boolean(),
+};
+
+export type SmsSettings = Infer<
+  ReturnType<typeof v.object<typeof smsSettingsFields>>
+>;
+
+/** Each of them named, so that a Registro row can say which one changed. */
+export const smsSettingField = v.union(
+  v.literal("smsRitiroTemplate"),
+  v.literal("smsRitiroOn"),
+  v.literal("smsRientroTemplate"),
+  v.literal("smsRientroOn"),
+);
+
+export type SmsSettingField = Infer<typeof smsSettingField>;
+
+/**
+ * What the whole mill has settled on: what an Etichetta says, the Soglia di
+ * ritardo the Lista di recupero highlights by, and what its Sms say. One row
+ * for all of it, so the table, the mutations that write it and the screens
+ * that read it take their shape from here.
  */
 export const settingsFields = {
   ...etichettaSettingsFields,
+  // Optional on the same terms as the Soglia below: a row written before the
+  // mill sent any Sms carries none of these, and reads as the app's own words
+  // with both switches off until an Admin settles them (ADR-0004).
+  smsRitiroTemplate: v.optional(v.string()),
+  smsRitiroOn: v.optional(v.boolean()),
+  smsRientroTemplate: v.optional(v.string()),
+  smsRientroOn: v.optional(v.boolean()),
   // Optional because a row can predate the setting: one written when the mill
   // had only Etichette to settle carries no Soglia, and reads as the app's own
   // ten rather than being rewritten to say so (ADR-0004). An Admin who sets
@@ -339,6 +430,11 @@ export const clienteField = v.union(
   v.literal("name"),
   v.literal("alias"),
   v.literal("phone"),
+  // Whether the mill writes to them. Corrected here, beside the telephone,
+  // rather than on the Admin's own Sms screen: nobody can reply to a message
+  // this app sends, so "basta messaggi" is only ever heard at the counter or
+  // on the telephone, and whoever hears it has to be able to act on it.
+  v.literal("smsOptOut"),
 );
 
 export type ClienteField = Infer<typeof clienteField>;
@@ -476,8 +572,8 @@ export const action = v.union(
     changes: v.array(
       v.object({
         field: clienteField,
-        before: v.union(v.null(), v.string(), v.array(v.string())),
-        after: v.union(v.null(), v.string(), v.array(v.string())),
+        before: v.union(v.null(), v.string(), v.array(v.string()), v.boolean()),
+        after: v.union(v.null(), v.string(), v.array(v.string()), v.boolean()),
       }),
     ),
   }),
@@ -563,6 +659,34 @@ export const action = v.union(
     // through a list of changes: the Soglia is one number for the whole mill.
     before: v.number(),
     after: v.number(),
+  }),
+  v.object({
+    kind: v.literal("sms_inviato"),
+    // The words that went out and the number they went to, as they were sent:
+    // an Admin wrote this one himself, and the Registro is where the mill can
+    // read what was said in its name (ADR-0006).
+    //
+    // Only the manual Sms is an action. The receipt a Ritiro sends is the
+    // Ritiro's doing, not a person's, and hangs off that Ritiro's own row.
+    body: v.string(),
+    to: v.string(),
+    // Whether the Admin went ahead knowing the Cliente had asked not to be
+    // written to. The override is the part of this that has to be on the
+    // record; sending to somebody who never objected is unremarkable.
+    overrodeOptOut: v.boolean(),
+  }),
+  v.object({
+    kind: v.literal("sms_settings"),
+    // Only what actually changed, with the words before and the words after —
+    // a template is worth quoting in full, because "the Ritiro message
+    // changed" is not something a reader can check.
+    changes: v.array(
+      v.object({
+        field: smsSettingField,
+        before: v.union(v.string(), v.boolean()),
+        after: v.union(v.string(), v.boolean()),
+      }),
+    ),
   }),
   v.object({
     kind: v.literal("operatore_invitato"),
@@ -757,6 +881,15 @@ export default defineSchema({
     // exists (ADR-0003). Nothing populates it yet, and nothing ever writes
     // back to the Gestionale.
     gestionaleId: v.union(v.null(), v.string()),
+    // Whether this Cliente has asked not to be written to. Absent means the
+    // mill writes to them, so that a registry entered before the app sent any
+    // Sms is not read as two hundred refusals (ADR-0004).
+    //
+    // It stops the automatic Sms outright. It warns before a manual one and
+    // does not stop it: the Lista di recupero exists because Ceste go missing,
+    // and an Admin chasing one keeps the mill's last written channel — with
+    // the override on the Registro row.
+    smsOptOut: v.optional(v.boolean()),
     active: v.boolean(),
   })
     // The registry is read whole and sorted by name: this is that order.
@@ -807,6 +940,49 @@ export default defineSchema({
     // Rientro and on the Lista di recupero (#22), and the Rientro that brought
     // her back, which dates a Cliente's stack on the Svuotamento screen (#18).
     .index("by_cesta_and_kind", ["cestaId", "kind"]),
+
+  // Every Sms the mill has sent, and every one it meant to send and could not.
+  //
+  // Its own table rather than a field on the Registro row that caused it,
+  // because a delivery is reported minutes after the send and a Registro row
+  // is never edited (ADR-0004, ADR-0006). Written and then patched as the news
+  // comes in — which is a thing this table may do and that one may not.
+  sms: defineTable({
+    clienteId: v.id("clienti"),
+    kind: smsKind,
+    // The words as they actually went out, with this Cliente's own name and
+    // Ceste already written into them. Kept rather than re-rendered, because
+    // the template will be edited and the Cesta count will change, and what
+    // the mill needs months later is what it said, not what it would say now.
+    body: v.string(),
+    // The number dialled, in the shape a carrier takes, and nothing where the
+    // message never got that far.
+    to: v.union(v.null(), v.string()),
+    // The action this Sms belongs to: the Ritiro or Rientro that sent it of
+    // itself, or the Admin's own act of writing it. Every Sms has one, which
+    // is how the Registro row can say whether it texted anybody.
+    registroId: v.id("registro"),
+    // Who was at the counter, or who wrote it. The same Operatore the Registro
+    // row names, kept here so that this table reads on its own.
+    operatoreId: v.id("operatori"),
+    // The Campagna it belongs to, on the same terms as everywhere else: the
+    // season the action belonged to, and none where the mill had none open.
+    campagnaId: v.optional(v.id("campagne")),
+    delivery: smsDelivery,
+    // What Twilio called the message, which is what a delivery callback names
+    // it by afterwards. Absent until Twilio has taken it, and on every message
+    // that never left.
+    twilioSid: v.optional(v.string()),
+  })
+    // One Cliente's own: what the mill has written to this person, which the
+    // Operatore about to telephone them reads before dialling.
+    .index("by_cliente", ["clienteId"])
+    // Whether the action that caused it got its message out (#21).
+    .index("by_registro", ["registroId"])
+    // The season's own list, which is the Admin screen's read.
+    .index("by_campagna", ["campagnaId"])
+    // The row a delivery callback is about, found by the name Twilio gave it.
+    .index("by_twilioSid", ["twilioSid"]),
 
   // One row per action a person took, however many Ceste it moved (ADR-0006).
   // Written inside the mutation making the change, never edited and never
