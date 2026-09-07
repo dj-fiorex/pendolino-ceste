@@ -4,7 +4,7 @@ import betterAuthTest from "@convex-dev/better-auth/test";
 import { convexTest, type TestConvex } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
-import schema from "./schema";
+import schema, { MAX_SEARCH_RESULTS } from "./schema";
 
 // Every test drives the app through its public Convex functions, the one seam
 // this suite uses: no table is read or written directly, and nothing is mocked
@@ -54,6 +54,133 @@ describe("the Cliente at the counter", () => {
         smsOptOut: false,
       },
     ]);
+  });
+});
+
+describe("the name in the registry's own casing", () => {
+  test("shouting and whispering both read back capitalised", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+
+    await marco.mutation(api.clienti.create, { name: "MARIO ROSSI" });
+    await marco.mutation(api.clienti.create, { name: "de luca  giuseppe" });
+    await marco.mutation(api.clienti.create, { name: "D'AMATO ANNA" });
+
+    expect(
+      (await marco.query(api.clienti.search, { term: "" })).map(
+        (cliente) => cliente.name,
+      ),
+    ).toEqual(["D'Amato Anna", "De Luca Giuseppe", "Mario Rossi"]);
+  });
+
+  test("the Soprannome is left as the counter said it", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+
+    await marco.mutation(api.clienti.create, {
+      name: "AMATO GIUSEPPE",
+      alias: ["u' pilota"],
+    });
+
+    expect(await marco.query(api.clienti.search, { term: "pilota" })).toEqual([
+      {
+        _id: expect.any(String),
+        name: "Amato Giuseppe",
+        alias: ["u' pilota"],
+        phone: null,
+        smsOptOut: false,
+      },
+    ]);
+  });
+
+  test("casing tells nobody apart: the shouted namesake is still refused", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    await marco.mutation(api.clienti.create, { name: "Giuseppe Amato" });
+
+    await expect(
+      marco.mutation(api.clienti.create, { name: "GIUSEPPE AMATO" }),
+    ).rejects.toThrow();
+
+    expect(
+      await marco.query(api.clienti.namesakes, { name: "GIUSEPPE AMATO" }),
+    ).toHaveLength(1);
+  });
+
+  test("a correction is capitalised too", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    const clienteId = await marco.mutation(api.clienti.create, {
+      name: "Giusepe Amato",
+    });
+
+    await marco.mutation(api.clienti.update, {
+      clienteId,
+      name: "GIUSEPPE AMATO",
+      alias: [],
+      phone: "",
+      smsOptOut: false,
+    });
+
+    expect(await marco.query(api.clienti.get, { clienteId })).toMatchObject({
+      name: "Giuseppe Amato",
+    });
+  });
+});
+
+describe("finding a Cliente in a registry of thousands", () => {
+  test("a few letters of a surname are enough, and so are a few of a Soprannome", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    await marco.mutation(api.clienti.create, { name: "Cipolla Giuseppe" });
+    await marco.mutation(api.clienti.create, {
+      name: "Amato Salvatore",
+      alias: ["u' pilota"],
+    });
+
+    expect(
+      (await marco.query(api.clienti.search, { term: "cipo" })).map(
+        (cliente) => cliente.name,
+      ),
+    ).toEqual(["Cipolla Giuseppe"]);
+    expect(
+      (await marco.query(api.clienti.search, { term: "pilo" })).map(
+        (cliente) => cliente.name,
+      ),
+    ).toEqual(["Amato Salvatore"]);
+  });
+
+  test("reads back in name order, whoever was written down first", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    for (const name of ["Rossi Mario", "Rossi Anna", "Rossi Nicola"]) {
+      await marco.mutation(api.clienti.create, { name });
+    }
+
+    expect(
+      (await marco.query(api.clienti.search, { term: "rossi" })).map(
+        (cliente) => cliente.name,
+      ),
+    ).toEqual(["Rossi Anna", "Rossi Mario", "Rossi Nicola"]);
+  });
+
+  test("hands back no more than the counter can read", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    for (const numero of [...Array(MAX_SEARCH_RESULTS + 5).keys()]) {
+      await marco.mutation(api.clienti.create, {
+        name: `Rossi ${String(numero).padStart(2, "0")}`,
+      });
+    }
+
+    // Twenty of them, and in order — but which twenty is the search index's to
+    // decide, not the alphabet's (ADR-0010). Typing another letter is how the
+    // counter narrows it, which is what the picker's "keep typing" line says.
+    const found = await marco.query(api.clienti.search, { term: "rossi" });
+    const names = found.map((cliente) => cliente.name);
+
+    expect(found).toHaveLength(MAX_SEARCH_RESULTS);
+    expect(names).toEqual([...names].sort());
   });
 });
 

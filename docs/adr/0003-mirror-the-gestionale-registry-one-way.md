@@ -27,3 +27,15 @@ Which fields the mirror carries is not settled here, and waits on seeing the Ges
 ## Delivery note (2026-09-02)
 
 The daemon is not part of the first delivery (preventivo DB-2026-GB-001 lists it under "Idee per dopo"). The decision stands: the Cliente keeps its `gestionaleId` and the mirror's columns stay separate from the app's own, so that the daemon can arrive later without a migration. Until it does, `gestionaleId` is simply never set and the linking screen is not built.
+
+## Import note (2026-09-07)
+
+The mill's OleaPlus registry was imported from a CSV export taken by hand: 2,919 Clienti, ahead of the daemon and ahead of the first Campagna the app runs. It has been run against the dev deployment; production is imported separately, by the same script with `--prod`. That is the one-shot import this ADR considered and turned down. It is taken as a bootstrap and not as the standing plan — the daemon still arrives, and when it does it arrives through `convex/gestionale.ts`, keyed by the same OleaPlus `Codice`, so what the import wrote is what the daemon finds rather than what it duplicates. Importing the same export twice inserts nobody twice; that is what `clienti.by_gestionaleId` is for.
+
+The import only ever adds. It never edits a Cliente the counter already entered, never writes back, and writes no Registro rows: the Registro says which Operatore did what at the counter (ADR-0006), and nobody stood at a counter for this.
+
+It leaves two debts, recorded here rather than left to be found later.
+
+**The telephone is one column, not two.** This ADR says the mirror's phone and the counter's phone are kept apart, precisely so that no sync can quietly undo a correction an Operatore made on a busy day. The second column does not exist, so OleaPlus's numbers went into `clienti.phone`, which is the counter's own. Nothing is wrong today, because nothing writes that column but people. The moment the daemon writes a phone, it is writing over corrections — so the split into two columns is owed *before* the daemon sends its first phone number, not after.
+
+**406 rows are not in.** They are namesakes: OleaPlus holds eight men called CIPOLLA GIUSEPPE and nothing in a spreadsheet tells them apart. The import skips them rather than merging them or inserting rows the counter cannot choose between, and hands them back in `client_files/oleaplus-da-sistemare-2026-09-07.csv` for the mill to give a Soprannome at the counter. A further 28 records have no `Codice` in OleaPlus at all and so have no key to be imported under; they are in the same file. Until those two lists come back, the app's registry is smaller than the mill's by 434 people, any of whom can still be created at the counter in the ordinary way.

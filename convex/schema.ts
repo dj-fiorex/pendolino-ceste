@@ -374,24 +374,64 @@ export const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
  * A name as two Clienti are compared by it. "mario  rossi" and "Mario Rossi"
  * are one person at the counter, so neither case nor spacing tells two Clienti
  * apart.
+ *
+ * Stored on the Cliente as well as computed here, under `comparableName`, so
+ * that the registry can be asked for a name's namesakes by index rather than
+ * read whole and filtered (ADR-0010).
  */
 export const comparableName = (text: string) => tidy(text).toLowerCase();
 
-/** How many Clienti a search hands back, on screen as in the query. */
-export const MAX_SEARCH_RESULTS = 20;
+/**
+ * A name as the registry writes it: every word capitalised and nothing else,
+ * so that MARIO ROSSI shouted by the Gestionale and "mario rossi" typed at the
+ * counter both read back as Mario Rossi.
+ *
+ * One casing for the whole registry rather than whatever each source happened
+ * to use. Two reasons, and the second is the one that bites: a list where some
+ * rows shout is a list somebody reads twice, and `by_name` orders on the
+ * stored string, so lowercase rows sort past Z and land at the bottom of a
+ * registry ordered by name.
+ *
+ * A letter is capitalised where a letter starts a word, which for these names
+ * means after a space, an apostrophe or a hyphen: De Luca, D'Amato, Dell'Oro.
+ * It never decides that a name is misspelt — casing is all it touches, and
+ * comparableName is deliberately blind to it, so re-casing the registry moves
+ * nobody in or out of anybody else's namesakes.
+ */
+export const properName = (text: string) =>
+  tidy(text)
+    .toLowerCase()
+    .replace(
+      /(^|\P{L})(\p{L})/gu,
+      (_match, before: string, letter: string) => before + letter.toUpperCase(),
+    );
 
 /**
- * The Clienti already answering to a name. A deactivated one counts: they stay
- * on the Lista di recupero holding Ceste (ADR-0004), and two rows there that
- * nothing tells apart is the confusion this rule exists to prevent.
+ * A Cliente as the search index reads them: their name and every Alias on one
+ * line. The counter half-remembers a Soprannome as readily as a surname, so
+ * both are searched, and both are searched under the same comparison rule the
+ * rest of the registry uses (ADR-0010).
  */
-export const namesakesOf = <T extends { name: string }>(
-  clienti: T[],
-  name: string,
-) =>
-  clienti.filter(
-    (other) => comparableName(other.name) === comparableName(name),
-  );
+export const searchableNames = (cliente: {
+  name: string;
+  alias: string[];
+}) => [cliente.name, ...cliente.alias].map(comparableName).join(" ");
+
+/**
+ * The two fields the `clienti` indexes are built on, derived from the Cliente
+ * whose name and Alias they answer for.
+ *
+ * Handed back together, and spread into every insert and every patch that
+ * touches either, so that no write path can update a name and leave the
+ * registry findable under the old one. Nothing else may write them.
+ */
+export const indexedNames = (cliente: { name: string; alias: string[] }) => ({
+  comparableName: comparableName(cliente.name),
+  searchableNames: searchableNames(cliente),
+});
+
+/** How many Clienti a search hands back, on screen as in the query. */
+export const MAX_SEARCH_RESULTS = 20;
 
 /** Why an Alias fails to tell a Cliente apart from their namesakes. */
 export type NamesakeClash = "no_alias" | "shared_alias";
@@ -877,9 +917,9 @@ export default defineSchema({
     // Nullable rather than absent: the mill either knows a Cliente's telephone
     // or it does not, and the Lista di recupero has to say which (#22).
     phone: v.union(v.null(), v.string()),
-    // The Gestionale record this Cliente answers to, once the one-way mirror
-    // exists (ADR-0003). Nothing populates it yet, and nothing ever writes
-    // back to the Gestionale.
+    // The Gestionale record this Cliente answers to (ADR-0003). Set by the
+    // registry import for a Cliente who came from the Gestionale, and null for
+    // one entered at the counter. Nothing ever writes back to the Gestionale.
     gestionaleId: v.union(v.null(), v.string()),
     // Whether this Cliente has asked not to be written to. Absent means the
     // mill writes to them, so that a registry entered before the app sent any
@@ -891,9 +931,40 @@ export default defineSchema({
     // the override on the Registro row.
     smsOptOut: v.optional(v.boolean()),
     active: v.boolean(),
+    // The name as two Clienti are compared by it, stored so that the namesake
+    // rule is an index lookup and not a read of the whole registry (ADR-0010).
+    // Derived from `name` through `comparableName`, on every write, and never
+    // written by hand.
+    //
+    // Optional because a row can predate the field: the registry imported from
+    // OleaPlus carries none until the backfill has been through it, and a row
+    // still missing it is one `convex/backfill.ts` has yet to reach.
+    comparableName: v.optional(v.string()),
+    // The name and every Alias on one line, which is what the search index
+    // below actually searches (ADR-0010). Derived through `searchableNames`,
+    // optional on the same terms as the field above.
+    searchableNames: v.optional(v.string()),
   })
-    // The registry is read whole and sorted by name: this is that order.
-    .index("by_name", ["name"]),
+    // The registry a picker browses: in play, in the order a name is read in.
+    // The Clienti out of play sit at the other end of the same index rather
+    // than in a second one (ADR-0004).
+    .index("by_active_and_name", ["active", "name"])
+    // The Clienti already answering to a name, deactivated ones included,
+    // which is the read the namesake rule makes on every create and every
+    // rename (ADR-0010).
+    .index("by_comparableName", ["comparableName"])
+    // The Cliente a Gestionale record already answers to, which is what makes
+    // importing that registry a second time change nothing (ADR-0003). Rows
+    // entered at the counter share the null here and are never looked up by
+    // it.
+    .index("by_gestionaleId", ["gestionaleId"])
+    // What the box at the counter searches. Filtered on `active` in the index
+    // rather than after it, so that a registry of deactivated namesakes cannot
+    // crowd the twenty results a search hands back (ADR-0004).
+    .searchIndex("search_names", {
+      searchField: "searchableNames",
+      filterFields: ["active"],
+    }),
 
   // What the whole mill has settled on, as one row and no more: the Etichetta
   // the print shop prints, and the Soglia di ritardo beside it. An empty table

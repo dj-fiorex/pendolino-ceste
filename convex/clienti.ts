@@ -8,10 +8,11 @@ import { writeRegistroRow } from "./registro";
 import {
   comparableName,
   forma,
+  indexedNames,
   MAX_SEARCH_RESULTS,
   namesakeClash,
-  namesakesOf,
   portata,
+  properName,
   tidy,
 } from "./schema";
 
@@ -55,26 +56,39 @@ function phoneToStore(typed: string): string | null {
 }
 
 /**
- * The whole registry, by name, deactivated Clienti included.
+ * The Clienti already answering to a name, deactivated ones included, read
+ * straight off `by_comparableName`.
  *
- * Read whole and matched in memory rather than through a search index. The
- * mill's registry is a few hundred names on one counter, and matching here
- * finds a fragment anywhere in a name or an Alias — which is how somebody
- * types when they half-remember a Soprannome. A registry that ever grows to
- * thousands is the point to revisit it.
+ * This is the one read in the app that collects without a bound, and it is
+ * bounded by the rule it serves: two Clienti never share a name with no Alias
+ * to tell them apart, so a name reaches as many rows as the counter has
+ * Soprannomi for it — the mill's worst is eight men called Cipolla Giuseppe.
+ * The whole registry is never in the answer.
  */
-async function allClienti(ctx: QueryCtx): Promise<Doc<"clienti">[]> {
-  return await ctx.db.query("clienti").withIndex("by_name").collect();
+async function namesakesOf(
+  ctx: QueryCtx,
+  name: string,
+): Promise<Doc<"clienti">[]> {
+  return await ctx.db
+    .query("clienti")
+    .withIndex("by_comparableName", (q) =>
+      q.eq("comparableName", comparableName(name)),
+    )
+    .collect();
 }
 
 /**
- * The registry a picker, a search or a count reads: only the Clienti still in
- * play. A deactivated Cliente appears on the Lista di recupero until their
- * Ceste come back, and nowhere else (ADR-0004).
+ * The order the counter reads a list of Clienti in — by name, and by who was
+ * entered first where two share one.
+ *
+ * The search index hands its results back by relevance, which is not an order
+ * anybody at a counter can predict: the same twenty Clienti reshuffle as a
+ * letter is typed. They are sorted here instead, so that a search reads like
+ * the registry it is a slice of.
  */
-async function activeClienti(ctx: QueryCtx): Promise<Doc<"clienti">[]> {
-  return (await allClienti(ctx)).filter((cliente) => cliente.active);
-}
+const byName = (one: Doc<"clienti">, other: Doc<"clienti">) =>
+  comparableName(one.name).localeCompare(comparableName(other.name)) ||
+  one._creationTime - other._creationTime;
 
 /** The Ceste a Cliente is holding right now, by numero. */
 async function cesteFuoriOf(
@@ -98,13 +112,12 @@ async function cesteFuoriOf(
  * or picking the Cliente already there — because the app does not decide that
  * two people are one.
  */
-function refuseANamesake(
-  clienti: Doc<"clienti">[],
+async function refuseANamesake(
+  ctx: QueryCtx,
   cliente: { _id?: Id<"clienti">; name: string; alias: string[] },
-): void {
-  const namesakes = namesakesOf(
-    clienti.filter((other) => other._id !== cliente._id),
-    cliente.name,
+): Promise<void> {
+  const namesakes = (await namesakesOf(ctx, cliente.name)).filter(
+    (other) => other._id !== cliente._id,
   );
   switch (namesakeClash(cliente.alias, namesakes)) {
     case "no_alias":
@@ -121,8 +134,17 @@ function refuseANamesake(
 }
 
 /**
- * The Clienti whose name or Alias carries what the Operatore has typed. An
- * empty term is the whole registry, so that the same box browses and searches.
+ * The Clienti whose name or Alias begins with what the Operatore has typed. An
+ * empty term is the head of the registry, so that the same box browses and
+ * searches.
+ *
+ * Both halves read twenty rows off an index and no more (ADR-0010). The
+ * registry is three thousand names, this query re-runs on every keystroke, and
+ * what it used to do was read all three thousand each time.
+ *
+ * A deactivated Cliente is not offered here. They appear on the Lista di
+ * recupero until their Ceste come back, and nowhere else (ADR-0004) — which is
+ * why the search index filters on `active` rather than this handler.
  */
 export const search = query({
   args: { term: v.string() },
@@ -130,15 +152,21 @@ export const search = query({
   handler: async (ctx, args) => {
     await requireOperatore(ctx);
     const wanted = comparableName(args.term);
-    const clienti = await activeClienti(ctx);
-    return clienti
-      .filter((cliente) =>
-        [cliente.name, ...cliente.alias].some((name) =>
-          comparableName(name).includes(wanted),
-        ),
-      )
-      .slice(0, MAX_SEARCH_RESULTS)
-      .map(asCliente);
+    const found =
+      wanted === ""
+        ? // Nothing typed yet. A search index has no answer to an empty
+          // question, so browsing is the first page of the registry itself.
+          await ctx.db
+            .query("clienti")
+            .withIndex("by_active_and_name", (q) => q.eq("active", true))
+            .take(MAX_SEARCH_RESULTS)
+        : await ctx.db
+            .query("clienti")
+            .withSearchIndex("search_names", (q) =>
+              q.search("searchableNames", wanted).eq("active", true),
+            )
+            .take(MAX_SEARCH_RESULTS);
+    return found.sort(byName).map(asCliente);
   },
 });
 
@@ -156,10 +184,12 @@ export const namesakes = query({
     if (tidy(args.name) === "") {
       return [];
     }
-    return namesakesOf(await allClienti(ctx), args.name).map((cliente) => ({
-      ...asCliente(cliente),
-      active: cliente.active,
-    }));
+    return (await namesakesOf(ctx, args.name))
+      .sort(byName)
+      .map((cliente) => ({
+        ...asCliente(cliente),
+        active: cliente.active,
+      }));
   },
 });
 
@@ -177,10 +207,13 @@ export const create = mutation({
   returns: v.id("clienti"),
   handler: async (ctx, args) => {
     const operatore = await requireOperatore(ctx);
-    const name = tidy(args.name);
+    // The name in the registry's own casing, the Alias in the counter's. A
+    // Soprannome is what somebody is called rather than what they are named,
+    // and "u' pilota" shouted back as "U' Pilota" is not the same word.
+    const name = properName(args.name);
     const alias = (args.alias ?? []).map(tidy).filter((one) => one !== "");
     const phone = phoneToStore(args.phone ?? "");
-    refuseANamesake(await allClienti(ctx), { name, alias });
+    await refuseANamesake(ctx, { name, alias });
 
     const clienteId = await ctx.db.insert("clienti", {
       name,
@@ -190,6 +223,7 @@ export const create = mutation({
       // a Cliente entered at the counter answers to no Gestionale record.
       gestionaleId: null,
       active: true,
+      ...indexedNames({ name, alias }),
     });
 
     await writeRegistroRow(ctx, {
@@ -231,12 +265,12 @@ export const update = mutation({
       throw new Error("This Cliente is not in the registry.");
     }
     const wanted = {
-      name: tidy(args.name),
+      name: properName(args.name),
       alias: args.alias.map(tidy).filter((one) => one !== ""),
       phone: phoneToStore(args.phone),
       smsOptOut: args.smsOptOut,
     };
-    refuseANamesake(await allClienti(ctx), {
+    await refuseANamesake(ctx, {
       _id: cliente._id,
       ...wanted,
     });
@@ -259,7 +293,7 @@ export const update = mutation({
       return null;
     }
 
-    await ctx.db.patch(cliente._id, wanted);
+    await ctx.db.patch(cliente._id, { ...wanted, ...indexedNames(wanted) });
     await writeRegistroRow(ctx, {
       operatoreId: operatore._id,
       clienteId: cliente._id,
