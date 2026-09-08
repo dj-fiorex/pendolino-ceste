@@ -519,6 +519,8 @@ describe("a deployment in prova", () => {
     // Whatever the machine running the suite happens to have exported: no test
     // posts to Twilio, and none can be made to by an environment.
     vi.stubEnv("TWILIO_ACCOUNT_SID", undefined);
+    vi.stubEnv("TWILIO_API_KEY_SID", undefined);
+    vi.stubEnv("TWILIO_API_KEY_SECRET", undefined);
     vi.stubEnv("TWILIO_AUTH_TOKEN", undefined);
     vi.stubEnv("TWILIO_FROM", undefined);
     vi.stubEnv("TWILIO_TEST_MODE", testMode);

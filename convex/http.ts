@@ -16,6 +16,12 @@ authComponent.registerRoutes(http, createAuth);
  * appended after it in name order, signed with the account's auth token. The
  * token proves it, which is why the endpoint needs no secret of its own and
  * why an unsigned request is simply not answered.
+ *
+ * The account's auth token, and not the API key `sms.ts` sends with: Twilio
+ * signs with the one and never the other. A deployment holding only the key
+ * therefore sends its messages perfectly well and is deaf to what became of
+ * them — every callback fails here, and the rows stop at "in partenza" instead
+ * of reaching "consegnato".
  */
 async function fromTwilio(
   url: string,

@@ -29,6 +29,8 @@ pnpm convex env set RESEND_API_KEY re_...
 pnpm convex env set RESEND_FROM "Pendolino Ceste <ceste@frantoio.example>"
 pnpm convex env set RESEND_TEST_MODE false
 pnpm convex env set TWILIO_ACCOUNT_SID AC...
+pnpm convex env set TWILIO_API_KEY_SID SK...
+pnpm convex env set TWILIO_API_KEY_SECRET ...
 pnpm convex env set TWILIO_AUTH_TOKEN ...
 pnpm convex env set TWILIO_FROM Principe
 pnpm convex env set TWILIO_TEST_MODE false
@@ -53,9 +55,24 @@ worse than one that says so.
 
 The Twilio ones carry the mill's SMS: the receipt a Ritiro and a Rientro send
 to the Cliente, and the messages an Admin writes by hand from **Gli SMS** or
-from a Cliente's own page. `TWILIO_FROM` is what the Cliente sees in place of a
-sender — a number, or a name of at most eleven characters registered with
-Twilio, which nobody can reply to. `TWILIO_TEST_MODE=true` works exactly as
+from a Cliente's own page.
+
+Sending is done with an API key — `TWILIO_API_KEY_SID` and
+`TWILIO_API_KEY_SECRET` — against the account named by `TWILIO_ACCOUNT_SID`.
+Two credentials and not one, because a key is revoked and reissued from the
+Twilio console in a minute, while the account's auth token opens the account
+itself. `TWILIO_AUTH_TOKEN` is set all the same, and does one job: Twilio signs
+its delivery callbacks with the account token and with nothing else, so a
+deployment without it sends every message perfectly well and never learns which
+of them arrived.
+
+`TWILIO_FROM` is what the Cliente sees in place of a sender. It can be a
+number, but the mill uses a name — at most eleven characters, letters, digits
+and spaces with at least one letter — which Italy needs no registration for and
+which costs nothing, there being no telephone number to rent to carry it. The
+trade is that a name is one-way: nobody can reply to it, and Twilio's own STOP
+handling does not apply, so the Cliente who asks not to be written to is marked
+`smsOptOut` in the registry and nowhere else. `TWILIO_TEST_MODE=true` works exactly as
 `RESEND_TEST_MODE` does: the message is written down and built, nothing is
 handed to Twilio, and the row says it was not sent. A deployment with no Twilio
 account counts Ceste exactly as one with it — the Ritiro is registered, the

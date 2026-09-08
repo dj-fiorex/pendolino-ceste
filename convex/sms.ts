@@ -249,17 +249,38 @@ function testMode(): boolean {
   );
 }
 
-/** What a deployment cannot send without, read where it is needed. */
-function twilioAccount(): { sid: string; token: string; from: string } {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
+/**
+ * What a deployment cannot send without, read where it is needed.
+ *
+ * Two SIDs and not one, because Twilio's are two different things. The account
+ * is what the message is filed under and what gets billed for it, and it names
+ * the address the message is posted to; the API key only proves the caller is
+ * allowed to post it. Keeping them apart is the point: a key is revoked and
+ * reissued from the console in a minute, and the account's own password — the
+ * auth token, which opens everything — never has to be written onto a
+ * deployment to send a message.
+ *
+ * The auth token is still read, but in `http.ts` and for one job only: Twilio
+ * signs its delivery callbacks with the account token and with nothing else,
+ * so a deployment that has none is deaf to them. It cannot send without these
+ * four; it can send perfectly well without that one.
+ */
+function twilioAccount(): {
+  accountSid: string;
+  keySid: string;
+  keySecret: string;
+  from: string;
+} {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const keySid = process.env.TWILIO_API_KEY_SID;
+  const keySecret = process.env.TWILIO_API_KEY_SECRET;
   const from = process.env.TWILIO_FROM;
-  if (!sid || !token || !from) {
+  if (!accountSid || !keySid || !keySecret || !from) {
     throw new Error(
-      "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM are not all set on this deployment: no Sms can go out.",
+      "TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET and TWILIO_FROM are not all set on this deployment: no Sms can go out.",
     );
   }
-  return { sid, token, from };
+  return { accountSid, keySid, keySecret, from };
 }
 
 /**
@@ -274,18 +295,18 @@ function statusCallback(): string | null {
 
 /** The message itself, as Twilio's own API takes it. The name it gives back. */
 async function postToTwilio(to: string, body: string): Promise<string> {
-  const { sid, token, from } = twilioAccount();
+  const { accountSid, keySid, keySecret, from } = twilioAccount();
   const form = new URLSearchParams({ To: to, From: from, Body: body });
   const callback = statusCallback();
   if (callback !== null) {
     form.set("StatusCallback", callback);
   }
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
       method: "POST",
       headers: {
-        authorization: `Basic ${btoa(`${sid}:${token}`)}`,
+        authorization: `Basic ${btoa(`${keySid}:${keySecret}`)}`,
         "content-type": "application/x-www-form-urlencoded",
       },
       body: form.toString(),
