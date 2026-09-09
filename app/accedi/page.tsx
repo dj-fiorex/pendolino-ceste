@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { SignInForm } from "@/components/sign-in-form";
+import { InstallButton } from "@/components/pwa-provider";
 import {
   Card,
   CardContent,
@@ -37,6 +38,7 @@ export default async function SignIn() {
           <SignInForm />
         </CardContent>
       </Card>
+      <InstallButton />
     </main>
   );
 }

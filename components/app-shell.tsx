@@ -7,6 +7,7 @@ import { redirect, usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { CampagnaBar } from "@/components/campagna-bar";
 import { SignOutButton } from "@/components/sign-out-button";
+import { InstallButton } from "@/components/pwa-provider";
 import {
   Dialog,
   DialogContent,
@@ -120,6 +121,7 @@ function MoreMenu({
               );
             })}
         </div>
+        <InstallButton />
         <SignOutButton />
       </DialogContent>
     </Dialog>
@@ -187,7 +189,8 @@ function Chrome({
             pathname={pathname}
           />
         </nav>
-        <div className="pt-3">
+        <div className="grid gap-3 pt-3">
+          <InstallButton />
           <SignOutButton />
         </div>
       </aside>

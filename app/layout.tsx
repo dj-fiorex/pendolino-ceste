@@ -3,7 +3,7 @@ import { Bricolage_Grotesque, Source_Sans_3 } from "next/font/google";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
-import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
+import { PwaProvider } from "@/components/pwa-provider";
 import { getToken } from "@/lib/auth-server";
 import "./globals.css";
 
@@ -22,6 +22,7 @@ export const metadata: Metadata = {
   description: "Le Ceste del frantoio: chi le ha e dove sono.",
   applicationName: "Pendolino Ceste",
   manifest: "/manifest.webmanifest",
+  icons: { apple: "/apple-touch-icon.png" },
   appleWebApp: {
     capable: true,
     title: "Pendolino",
@@ -54,9 +55,10 @@ export default async function RootLayout({
         className={`${bricolage.variable} ${sourceSans.variable} font-sans antialiased`}
       >
         <ConvexClientProvider initialToken={initialToken}>
-          <AppShell>{children}</AppShell>
+          <PwaProvider>
+            <AppShell>{children}</AppShell>
+          </PwaProvider>
         </ConvexClientProvider>
-        <ServiceWorkerRegistration />
       </body>
     </html>
   );

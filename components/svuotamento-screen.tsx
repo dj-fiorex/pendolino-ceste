@@ -3,6 +3,16 @@
 import { useMutation, useQuery } from "convex/react";
 import { HashIcon } from "lucide-react";
 import { useState } from "react";
+import {
+  DraftStorageError,
+  MovementResumeOffer,
+  useMovementDraft,
+} from "@/components/movement-draft";
+import {
+  useMovementActivity,
+  useMovementConnection,
+} from "@/components/pwa-provider";
+import { saveMovementDraft } from "@/lib/movement-draft";
 import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaTile } from "@/components/cesta-tile";
 import { NumeroKeypad } from "@/components/numero-keypad";
@@ -64,6 +74,7 @@ const FROM_THE_KEYPAD = "keypad";
  * and the keypad behind one large key beside the confirm button.
  */
 export function SvuotamentoScreen() {
+  const connected = useMovementConnection();
   const empty = useMutation(api.movimenti.svuotamento);
   const { campagnaId, mustAsk } = useCampagnaChoice();
   const yard = useQuery(api.ceste.attesaMolituraByCliente);
@@ -74,6 +85,32 @@ export function SvuotamentoScreen() {
   const [keyed, setKeyed] = useState<FoundCesta[]>([]);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  const saved = useMovementDraft(
+    "svuotamento",
+    selected.length === 0
+      ? null
+      : { selected, keyed, confirmationPending: pending },
+  );
+  useMovementActivity(selected.length > 0, pending, !saved.storageFailed);
+
+  if (saved.offer === undefined) return <p role="status">Un attimo…</p>;
+  if (saved.offer !== null) {
+    const draft = saved.offer;
+    return (
+      <MovementResumeOffer
+        name="Svuotamento"
+        uncertain={draft.confirmationPending}
+        detail={cesteCount(draft.selected.length)}
+        onResume={() => {
+          setSelected(draft.selected);
+          setKeyed(draft.keyed);
+          saved.dismiss();
+        }}
+        onDiscard={saved.dismiss}
+      />
+    );
+  }
 
   if (yard === undefined) {
     return <p className="text-muted-foreground">Un attimo…</p>;
@@ -162,10 +199,12 @@ export function SvuotamentoScreen() {
   };
 
   const confirm = async () => {
+    if (pending || !connected || !navigator.onLine) return;
     setPending(true);
     setFailed(false);
     try {
       await empty({ cesteIds: chosen, campagnaId });
+      saveMovementDraft("svuotamento", null);
       playConfirmation();
       setSelected([]);
       // What was typed in and has now been emptied leaves with the tiles; what
@@ -185,6 +224,7 @@ export function SvuotamentoScreen() {
       {/* An inset the height of the fixed bar, so that the last row of tiles is
           never underneath it. */}
       <div className="flex flex-col gap-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        {saved.storageFailed && <DraftStorageError />}
         {failed && (
           <p role="alert" className="text-sm text-destructive">
             Non è stato possibile registrare lo Svuotamento. Controlla la
@@ -285,7 +325,7 @@ export function SvuotamentoScreen() {
         </Dialog>
         <Button
           className="h-16 flex-1 text-xl"
-          disabled={pending || chosen.length === 0 || mustAsk}
+          disabled={!connected || pending || chosen.length === 0 || mustAsk}
           onClick={confirm}
         >
           {pending

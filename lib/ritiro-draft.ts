@@ -18,6 +18,7 @@ import { mediaLabel } from "@/lib/media";
  * down; `writeDraft` says why, and `notKept` is what stands in for them.
  */
 export type RitiroDraft = {
+  confirmationPending?: boolean;
   cliente: Cliente;
   ceste: FoundCesta[];
   /**
@@ -53,7 +54,7 @@ const isState = (read: unknown): read is State =>
 const isMediaKind = (read: unknown): read is MediaKind =>
   typeof read === "string" && Object.hasOwn(mediaLabel, read);
 
-const isCliente = (read: unknown): read is Cliente => {
+export const isCliente = (read: unknown): read is Cliente => {
   const cliente = read as Cliente | null;
   return (
     typeof cliente === "object" &&
@@ -66,7 +67,7 @@ const isCliente = (read: unknown): read is Cliente => {
   );
 };
 
-const isCesta = (read: unknown): read is FoundCesta => {
+export const isCesta = (read: unknown): read is FoundCesta => {
   const cesta = read as FoundCesta | null;
   return (
     typeof cesta === "object" &&
@@ -95,9 +96,10 @@ const isDraft = (read: unknown): read is RitiroDraft => {
   return (
     typeof draft === "object" &&
     draft !== null &&
+    (draft.confirmationPending === undefined ||
+      typeof draft.confirmationPending === "boolean") &&
     isCliente(draft.cliente) &&
     Array.isArray(draft.ceste) &&
-    draft.ceste.length > 0 &&
     draft.ceste.every(isCesta) &&
     Array.isArray(draft.notKept) &&
     draft.notKept.every(isMediaKind)
@@ -147,15 +149,15 @@ export const readDraft = (): RitiroDraft | null => {
  * skipped on most Ritiri by the mill's own decision (spec #1, story 19), so
  * losing them costs a tap, where losing the Ceste costs the morning.
  *
- * A device that refuses to keep the draft — storage full, storage off — is not
- * told about and does not stop anything: the Ritiro on screen goes through
- * either way, and all that is lost is the net under it.
+ * The caller reports storage failure and prevents an update from reloading
+ * unsaved work. Recording the Ritiro itself remains available.
  */
 export const writeDraft = (draft: RitiroDraft) => {
   try {
     window.localStorage.setItem(DEVICE_KEY, JSON.stringify(draft));
+    return true;
   } catch {
-    // Nothing to do and nothing to say: see above.
+    return false;
   }
 };
 

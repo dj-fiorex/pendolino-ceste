@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Pendolino Ceste",
     short_name: "Pendolino",
     description: "Le Ceste del frantoio: chi le ha e dove sono.",
@@ -9,7 +10,6 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    orientation: "portrait",
     background_color: "#faf8f3",
     theme_color: "#4a6741",
     icons: [

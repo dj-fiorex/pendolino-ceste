@@ -3,6 +3,14 @@
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  DraftStorageError,
+  InterruptedConfirmation,
+} from "@/components/movement-draft";
+import {
+  useMovementActivity,
+  useMovementConnection,
+} from "@/components/pwa-provider";
 import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
@@ -79,10 +87,12 @@ function ResumeOffer({
       <CardHeader>
         <CardTitle>Un Ritiro lasciato a metà</CardTitle>
         <CardDescription>
-          Nessuna Cesta è ancora uscita: riprendilo, oppure ricomincia da capo.
+          Riprendi il lavoro salvato su questo dispositivo, oppure ricomincia da
+          capo.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        {draft.confirmationPending && <InterruptedConfirmation />}
         {/* Said before the Operatore decides, because it is part of what
             resuming gets them: what they took is not in there, and somebody
             who had the Cliente sign must not confirm believing it is (#25). */}
@@ -127,6 +137,7 @@ function ResumeOffer({
  * Cesta can be on the face nobody can see (#23).
  */
 export function RitiroFlow() {
+  const connected = useMovementConnection();
   const recordRitiro = useMutation(api.movimenti.ritiro);
   const askWhereToPutIt = useMutation(api.media.uploadUrl);
   const { campagnaId, mustAsk } = useCampagnaChoice();
@@ -134,6 +145,7 @@ export function RitiroFlow() {
   const [ceste, setCeste] = useState<FoundCesta[]>([]);
   const [captured, setCaptured] = useState<CapturedMedia>(NOTHING_CAPTURED);
   const [failed, setFailed] = useState(false);
+  const [storageFailed, setStorageFailed] = useState(false);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState<{
     cliente: Cliente;
@@ -165,6 +177,11 @@ export function RitiroFlow() {
    * phone again must be told the same thing the second time.
    */
   const [toRetake, setToRetake] = useState<MediaKind[]>([]);
+  useMovementActivity(
+    done === null && (cliente !== null || ceste.length > 0),
+    pending,
+    !storageFailed,
+  );
 
   // Read once, when this screen opens, and never again: what the device is
   // holding is a question asked at the start of a Ritiro, not a thing this
@@ -201,10 +218,7 @@ export function RitiroFlow() {
     if (offer !== null || done !== null) {
       return;
     }
-    // A Ritiro is the Ceste on it, so a Ritiro with none is nothing to offer
-    // back: a prompt with nothing behind it, in the way of every Ritiro after
-    // it.
-    if (ceste.length === 0) {
+    if (ceste.length === 0 && cliente === null) {
       forgetDraft();
       return;
     }
@@ -218,17 +232,20 @@ export function RitiroFlow() {
     if (cliente === null) {
       return;
     }
-    writeDraft({
-      cliente,
-      ceste,
-      // Everything taken on this Ritiro, whether it is still on the device or
-      // was already lost to an earlier reload: none of it is written down, so
-      // all of it has to be taken again.
-      notKept: mediaKinds.filter(
-        (kind) => captured[kind] !== null || toRetake.includes(kind),
-      ),
-    });
-  }, [offer, done, cliente, ceste, captured, toRetake]);
+    setStorageFailed(
+      !writeDraft({
+        confirmationPending: pending,
+        cliente,
+        ceste,
+        // Everything taken on this Ritiro, whether it is still on the device or
+        // was already lost to an earlier reload: none of it is written down, so
+        // all of it has to be taken again.
+        notKept: mediaKinds.filter(
+          (kind) => captured[kind] !== null || toRetake.includes(kind),
+        ),
+      }),
+    );
+  }, [offer, done, cliente, ceste, captured, toRetake, pending]);
 
   if (done !== null) {
     return (
@@ -319,6 +336,7 @@ export function RitiroFlow() {
    * of all by the optional half of it (ADR-0005, #25).
    */
   const confirm = async () => {
+    if (pending || !connected || !navigator.onLine) return;
     setPending(true);
     setFailed(false);
     const notUploaded: MediaKind[] = [];
@@ -337,6 +355,7 @@ export function RitiroFlow() {
     try {
       const signatureId = await put("signature");
       const photoId = await put("photo");
+      if (!navigator.onLine) throw new Error("Connessione assente");
       await recordRitiro({
         clienteId: cliente._id,
         cesteIds: ceste.map((cesta) => cesta._id),
@@ -408,6 +427,7 @@ export function RitiroFlow() {
 
   return (
     <div className="grid gap-4 pb-4">
+      {storageFailed && <DraftStorageError />}
       <Card>
         <CardHeader>
           <CardTitle>{clienteLabel(cliente)}</CardTitle>
@@ -546,7 +566,7 @@ export function RitiroFlow() {
         />
         <Button
           className="h-14 w-full text-lg"
-          disabled={pending || ceste.length === 0 || mustAsk}
+          disabled={!connected || pending || ceste.length === 0 || mustAsk}
           onClick={confirm}
         >
           {pending

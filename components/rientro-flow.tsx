@@ -3,6 +3,16 @@
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
+import {
+  DraftStorageError,
+  MovementResumeOffer,
+  useMovementDraft,
+} from "@/components/movement-draft";
+import {
+  useMovementActivity,
+  useMovementConnection,
+} from "@/components/pwa-provider";
+import { saveMovementDraft } from "@/lib/movement-draft";
 import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaReader } from "@/components/cesta-reader";
 import { CestaTile } from "@/components/cesta-tile";
@@ -41,6 +51,7 @@ type OnTheTrailer = { _id: Id<"ceste">; numero: number; codice: string };
  * merely absent from it, and they stay Fuori and stay counted against him.
  */
 export function RientroFlow() {
+  const connected = useMovementConnection();
   const recordRientro = useMutation(api.movimenti.rientro);
   const { campagnaId, mustAsk } = useCampagnaChoice();
   // The one Cesta the load was identified by: whose the app says it is before
@@ -61,6 +72,25 @@ export function RientroFlow() {
   );
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const saved = useMovementDraft(
+    "rientro",
+    done !== null || (identifiedBy === null && cliente === null)
+      ? null
+      : {
+          identifiedBy,
+          cliente,
+          searching,
+          ticked,
+          alsoHere,
+          confirmationPending: pending,
+        },
+  );
+  useMovementActivity(
+    done === null && (identifiedBy !== null || cliente !== null),
+    pending,
+    !saved.storageFailed,
+  );
 
   const held = useQuery(
     api.clienti.get,
@@ -98,6 +128,27 @@ export function RientroFlow() {
         ? current.filter((other) => other !== cestaId)
         : [...current, cestaId],
     );
+
+  if (saved.offer === undefined) return <p role="status">Un attimo…</p>;
+  if (saved.offer !== null) {
+    const draft = saved.offer;
+    return (
+      <MovementResumeOffer
+        name="Rientro"
+        uncertain={draft.confirmationPending}
+        detail={`${draft.cliente ? clienteLabel(draft.cliente) : "Carico da identificare"} · ${cesteCount(draft.ticked.length)}`}
+        onResume={() => {
+          setIdentifiedBy(draft.identifiedBy);
+          setCliente(draft.cliente);
+          setSearching(draft.searching);
+          setTicked(draft.ticked);
+          setAlsoHere(draft.alsoHere);
+          saved.dismiss();
+        }}
+        onDiscard={saved.dismiss}
+      />
+    );
+  }
 
   if (done !== null) {
     return (
@@ -144,19 +195,30 @@ export function RientroFlow() {
     }
 
     const fuori = held?.cesteFuori ?? [];
-    const onTheTrailer: OnTheTrailer[] = [...fuori, ...alsoHere];
+    const onTheTrailer: OnTheTrailer[] = [
+      ...fuori,
+      ...alsoHere.filter(
+        (cesta) => !fuori.some((one) => one._id === cesta._id),
+      ),
+    ];
+    // A saved selection is checked against the live load before submission.
+    const visibleTicked = ticked.filter((id) =>
+      onTheTrailer.some((cesta) => cesta._id === id),
+    );
     const oldest = fuori
       .map((cesta) => cesta.since)
       .filter((since) => since !== null)
       .sort((one, other) => one - other)[0];
-    const stayingOut = fuori.filter((cesta) => !ticked.includes(cesta._id));
+    const stayingOut = fuori.filter(
+      (cesta) => !visibleTicked.includes(cesta._id),
+    );
     // The Ceste on the trailer that the app does not have Fuori with the man
     // driving it — never went out, or went out with somebody else. Read against
     // the load as it stands now, so that changing the Cliente mid-Rientro
     // changes who is a surprise and who is not.
     const notWhereTheAppHadThem = alsoHere.filter(
       (cesta) =>
-        ticked.includes(cesta._id) &&
+        visibleTicked.includes(cesta._id) &&
         !fuori.some((his) => his._id === cesta._id),
     );
 
@@ -178,7 +240,7 @@ export function RientroFlow() {
             : [...current, cesta],
         );
       }
-      if (ticked.includes(cesta._id)) {
+      if (visibleTicked.includes(cesta._id)) {
         return `${cesta.codice} è già spuntata.`;
       }
       setTicked((current) =>
@@ -194,15 +256,17 @@ export function RientroFlow() {
     };
 
     const confirm = async () => {
+      if (pending || !connected || !navigator.onLine) return;
       setPending(true);
       setFailed(false);
       try {
         await recordRientro({
           clienteId: cliente._id,
-          cesteIds: ticked,
+          cesteIds: visibleTicked,
           campagnaId,
         });
-        setDone({ cliente, count: ticked.length });
+        saveMovementDraft("rientro", null);
+        setDone({ cliente, count: visibleTicked.length });
       } catch {
         setFailed(true);
       } finally {
@@ -212,6 +276,7 @@ export function RientroFlow() {
 
     return (
       <div className="grid gap-4 pb-4">
+        {saved.storageFailed && <DraftStorageError />}
         <Card>
           <CardHeader>
             <CardTitle>Ceste di {clienteLabel(cliente)}</CardTitle>
@@ -239,9 +304,15 @@ export function RientroFlow() {
 
         <div className="flex items-baseline justify-between text-sm text-muted-foreground">
           <span>Sul rimorchio · tocca per spuntare</span>
-          <span>{cesteCount(ticked.length)}</span>
+          <span>{cesteCount(visibleTicked.length)}</span>
         </div>
 
+        {visibleTicked.length < ticked.length && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Alcune Ceste selezionate non risultano più in questo carico.
+            Controlla l’elenco; puoi aggiungerle di nuovo dal numero.
+          </p>
+        )}
         {onTheTrailer.length === 0 ? (
           <p className="text-muted-foreground">
             Ancora nessuna Cesta sul rimorchio.
@@ -252,7 +323,7 @@ export function RientroFlow() {
               <li key={cesta._id}>
                 <CestaTile
                   codice={cesta.codice}
-                  selected={ticked.includes(cesta._id)}
+                  selected={visibleTicked.includes(cesta._id)}
                   onToggle={() => toggle(cesta._id)}
                 />
               </li>
@@ -299,20 +370,22 @@ export function RientroFlow() {
             label="Numero della Cesta"
             submitLabel="Aggiungi"
             codici={onTheTrailer
-              .filter((cesta) => ticked.includes(cesta._id))
+              .filter((cesta) => visibleTicked.includes(cesta._id))
               .map((cesta) => cesta.codice)}
             onCesta={addCesta}
           />
           <Button
             className="h-14 w-full text-lg"
-            disabled={pending || ticked.length === 0 || mustAsk}
+            disabled={
+              !connected || pending || visibleTicked.length === 0 || mustAsk
+            }
             onClick={confirm}
           >
             {pending
               ? "Un attimo…"
               : mustAsk
                 ? "Scegli prima la Campagna"
-                : `Registra Rientro · ${cesteCount(ticked.length)}`}
+                : `Registra Rientro · ${cesteCount(visibleTicked.length)}`}
           </Button>
         </div>
       </div>
