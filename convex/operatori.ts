@@ -12,6 +12,49 @@ import { writeRegistroRow } from "./registro";
 import { role, tidy } from "./schema";
 
 /**
+ * The Operatore behind this request — and, when it is nobody, which of the
+ * three ways of being nobody this is.
+ *
+ * They are worth telling apart, because only the deployment logs ever read
+ * them and they call for opposite answers: a device whose connection is not
+ * authenticated yet is a screen that should have waited, an account with no
+ * Operatore against it is a person the mill never took on, and a deactivated
+ * one is a person it has since let go. Said as a single "nobody is signed in"
+ * the three are indistinguishable in the logs, which is where somebody is
+ * trying to work out which of them they are looking at.
+ */
+type Behind =
+  | { operatore: Doc<"operatori"> }
+  | { operatore: null; refusal: string };
+
+async function behindTheRequest(ctx: QueryCtx): Promise<Behind> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity === null) {
+    return {
+      operatore: null,
+      refusal: "No session on this device: nobody is signed in.",
+    };
+  }
+  const operatore = await ctx.db
+    .query("operatori")
+    .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
+    .unique();
+  if (operatore === null) {
+    return {
+      operatore: null,
+      refusal: `Signed in as ${identity.subject}, but the mill has no Operatore against that account.`,
+    };
+  }
+  if (!operatore.active) {
+    return {
+      operatore: null,
+      refusal: `The Operatore ${operatore.name} has been deactivated.`,
+    };
+  }
+  return { operatore };
+}
+
+/**
  * The Operatore behind this request, or null when there is none.
  *
  * Everything the app records is attributed to whoever this returns, so a
@@ -21,29 +64,18 @@ import { role, tidy } from "./schema";
 export async function currentOperatore(
   ctx: QueryCtx,
 ): Promise<Doc<"operatori"> | null> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) {
-    return null;
-  }
-  const operatore = await ctx.db
-    .query("operatori")
-    .withIndex("by_authUserId", (q) => q.eq("authUserId", identity.subject))
-    .unique();
-  if (operatore === null || !operatore.active) {
-    return null;
-  }
-  return operatore;
+  return (await behindTheRequest(ctx)).operatore;
 }
 
 /** The same, for the functions that have nothing to say to a stranger. */
 export async function requireOperatore(
   ctx: QueryCtx,
 ): Promise<Doc<"operatori">> {
-  const operatore = await currentOperatore(ctx);
-  if (operatore === null) {
-    throw new Error("No Operatore is signed in on this device.");
+  const behind = await behindTheRequest(ctx);
+  if (behind.operatore === null) {
+    throw new Error(behind.refusal);
   }
-  return operatore;
+  return behind.operatore;
 }
 
 /**

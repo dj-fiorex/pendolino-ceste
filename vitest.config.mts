@@ -9,7 +9,7 @@ export default defineConfig({
     // Convex functions run in a V8 isolate, not in Node: `edge-runtime` is the
     // closest thing Vitest offers.
     environment: "edge-runtime",
-    include: ["convex/**/*.test.ts", "components/**/*.test.ts"],
+    include: ["convex/**/*.test.ts", "components/**/*.test.{ts,tsx}"],
     server: {
       deps: {
         inline: ["convex-test", "@convex-dev/better-auth"],

@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { MenuIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { CampagnaBar } from "@/components/campagna-bar";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -258,9 +258,26 @@ function Chrome({
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { isLoading, isAuthenticated } = useConvexAuth();
 
-  if (pathname.startsWith("/accedi") || pathname.startsWith("/password")) {
+  if (pathname === "/accedi" || pathname.startsWith("/password/")) {
     return <>{children}</>;
+  }
+
+  // Server authentication does not authenticate the browser connection.
+  // Mount the chrome and protected screens only after Convex confirms it.
+  if (isLoading) {
+    return (
+      <main className="p-6">
+        <p role="status" className="text-sm text-muted-foreground">
+          Un attimo…
+        </p>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    redirect("/accedi");
   }
 
   return <Chrome pathname={pathname}>{children}</Chrome>;

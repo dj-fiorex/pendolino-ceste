@@ -711,3 +711,31 @@ describe("the staff", () => {
     ]);
   });
 });
+
+describe("a refusal to somebody who is not an Operatore", () => {
+  test("says which of the three ways of being nobody this is", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+
+    // Nobody at all: the connection carries no session. This is what a screen
+    // that read before its connection was authenticated leaves in the logs.
+    await expect(t.query(api.campagne.list, {})).rejects.toThrow(
+      "No session on this device: nobody is signed in.",
+    );
+
+    // A session the mill has no Operatore against: signed in, unknown here.
+    const stranger = t.withIdentity({ subject: "auth-user-nobody-hired" });
+    await expect(stranger.query(api.campagne.list, {})).rejects.toThrow(
+      "Signed in as auth-user-nobody-hired, but the mill has no Operatore against that account.",
+    );
+
+    // An Operatore the mill has let go, whose device still holds a session.
+    const marco = await operatore(t, "Marco", "auth-user-marco");
+    await gabriele.mutation(api.operatori.deactivate, {
+      operatoreId: (await staffMember(gabriele, "Marco"))._id,
+    });
+    await expect(marco.query(api.campagne.list, {})).rejects.toThrow(
+      "The Operatore Marco has been deactivated.",
+    );
+  });
+});
