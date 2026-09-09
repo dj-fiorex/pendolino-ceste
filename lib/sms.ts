@@ -8,14 +8,16 @@ export const smsKindLabel: Record<SmsKind, string> = {
 };
 
 /**
- * Why a message the mill meant to send never left. Said as a fact about the
- * number rather than as an error: a Cliente with a landline gave the mill a
- * perfectly good telephone, and the app is only saying it cannot text it.
+ * Why a message the mill meant to send never left. Said as a fact rather than
+ * as an error: a Cliente with a landline gave the mill a perfectly good
+ * telephone, and the app is only saying it cannot text it. The last one is a
+ * fact about the mill instead — nobody had said who the message came from.
  */
 const unsendableLabel: Record<SmsUnsendable, string> = {
   no_phone: "non abbiamo il telefono",
   landline: "è un numero fisso",
   unreadable: "il numero non si può leggere",
+  no_sender: "manca il mittente del frantoio",
 };
 
 /**

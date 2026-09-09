@@ -32,7 +32,6 @@ pnpm convex env set TWILIO_ACCOUNT_SID AC...
 pnpm convex env set TWILIO_API_KEY_SID SK...
 pnpm convex env set TWILIO_API_KEY_SECRET ...
 pnpm convex env set TWILIO_AUTH_TOKEN ...
-pnpm convex env set TWILIO_FROM Principe
 pnpm convex env set TWILIO_TEST_MODE false
 ```
 
@@ -66,13 +65,21 @@ its delivery callbacks with the account token and with nothing else, so a
 deployment without it sends every message perfectly well and never learns which
 of them arrived.
 
-`TWILIO_FROM` is what the Cliente sees in place of a sender. It can be a
-number, but the mill uses a name — at most eleven characters, letters, digits
-and spaces with at least one letter — which Italy needs no registration for and
-which costs nothing, there being no telephone number to rent to carry it. The
-trade is that a name is one-way: nobody can reply to it, and Twilio's own STOP
-handling does not apply, so the Cliente who asks not to be written to is marked
-`smsOptOut` in the registry and nowhere else. `TWILIO_TEST_MODE=true` works exactly as
+What the Cliente sees in place of a sender is not an environment variable: it
+is the **Mittente**, which an Admin settles on **Il frantoio** and which lives
+in the database with the mill's name and telephone (ADR-0011). The three
+credentials above stay on the deployment because leaking one costs money; the
+Mittente is public by definition — every Cliente reads it off their telephone —
+and a mill should be able to correct its own name without a deploy.
+
+A Mittente is at most eleven characters, letters, digits and spaces with at
+least one letter, which Italy needs no registration for and which costs
+nothing, there being no telephone number to rent to carry it. The trade is that
+a name is one-way: nobody can reply to it, and Twilio's own STOP handling does
+not apply, so the Cliente who asks not to be written to is marked `smsOptOut`
+in the registry and nowhere else. Until an Admin has settled one, both
+automatic messages refuse to be switched on and a message written by hand is
+refused as it is sent. `TWILIO_TEST_MODE=true` works exactly as
 `RESEND_TEST_MODE` does: the message is written down and built, nothing is
 handed to Twilio, and the row says it was not sent. A deployment with no Twilio
 account counts Ceste exactly as one with it — the Ritiro is registered, the

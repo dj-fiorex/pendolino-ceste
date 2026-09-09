@@ -209,10 +209,24 @@ export type State = Infer<typeof state>;
 export type EtichettaSize = Infer<typeof etichettaSize>;
 
 /**
- * The most a mill's name or telephone can be. They are printed across the foot
- * of a label 70 mm wide: past this they no longer fit on one line.
+ * The most a mill's name or telephone can be. Two masters, and the same answer
+ * suits both: they are printed across the foot of a label 70 mm wide, past
+ * which they no longer fit on one line, and both default templates put the
+ * name *and* the telephone into every Sms, where at forty apiece they already
+ * eat half of a 160-character segment.
  */
 export const MAX_MILL_TEXT = 40;
+
+/**
+ * The most a Mittente can be, which is Twilio's number and not the mill's: an
+ * alphanumeric sender is eleven characters, from `A-Z a-z 0-9` and space, with
+ * at least one letter in it.
+ *
+ * A sender outside that is not a sender the carrier softens — it is a message
+ * that does not arrive, which is the worst way for a Ritiro receipt to fail.
+ * `template.ts` holds the rest of the rule and refuses one.
+ */
+export const MAX_SMS_SENDER = 11;
 
 /**
  * What an Etichetta says besides the Cesta's own Codice: how big it is printed,
@@ -233,8 +247,26 @@ export type EtichettaSettings = Infer<
 >;
 
 /**
- * The settings that decide what an Etichetta looks like, each one named so
- * that a Registro row can say which of them an Admin changed.
+ * The three of those five the Etichette screen still settles. The mill's name
+ * and telephone are the Frantoio's own and are typed there; this screen only
+ * decides whether they are printed, which it decides with the label drawn in
+ * front of it (ADR-0011).
+ */
+export const etichettaChoiceFields = {
+  etichettaSize,
+  millNameOnEtichetta: v.boolean(),
+  millPhoneOnEtichetta: v.boolean(),
+};
+
+export type EtichettaChoice = Infer<
+  ReturnType<typeof v.object<typeof etichettaChoiceFields>>
+>;
+
+/**
+ * The settings a Registro row can say an Admin changed on the Etichette
+ * screen. Five and not three, though only three are written there now: the
+ * name and the telephone moved to Il frantoio, and the rows that recorded them
+ * moving are not rewritten to pretend otherwise (ADR-0004).
  */
 export const etichettaSettingField = v.union(
   v.literal("etichettaSize"),
@@ -245,6 +277,40 @@ export const etichettaSettingField = v.union(
 );
 
 export type EtichettaSettingField = Infer<typeof etichettaSettingField>;
+
+/**
+ * What the mill has settled about itself: the name and the telephone a Cliente
+ * reads on an Etichetta and inside an Sms, and the Mittente an Sms arrives
+ * from (CONTEXT.md, *Frantoio*).
+ *
+ * The Soglia di ritardo belongs to the Frantoio too, but not to this object:
+ * it is a number with its own rule and its own mutation, and the screen saves
+ * it on its own card (ADR-0011).
+ */
+export const frantoioSettingsFields = {
+  millName: v.string(),
+  millPhone: v.string(),
+  smsSender: v.string(),
+};
+
+export type FrantoioSettings = Infer<
+  ReturnType<typeof v.object<typeof frantoioSettingsFields>>
+>;
+
+/**
+ * Each thing the Frantoio screen settles, named so that a Registro row can say
+ * which of them changed. The Soglia is in here and not in its own kind any
+ * more: one screen, one kind, and a reader who wants to know what an Admin did
+ * at that desk reads one sentence (ADR-0006).
+ */
+export const frantoioSettingField = v.union(
+  v.literal("millName"),
+  v.literal("millPhone"),
+  v.literal("smsSender"),
+  v.literal("sogliaRitardo"),
+);
+
+export type FrantoioSettingField = Infer<typeof frantoioSettingField>;
 
 /**
  * How many days a Cesta may be Fuori before she counts In ritardo, until an
@@ -270,7 +336,13 @@ export type SmsKind = Infer<typeof smsKind>;
 
 /**
  * Why a message the mill meant to send could not go: the Cliente gave no
- * telephone, gave a landline, or gave something no carrier will take.
+ * telephone, gave a landline, or gave something no carrier will take — or the
+ * mill has not yet said who its Sms come from.
+ *
+ * That last one is about the mill and not about the Cliente, and it is still
+ * an *unsendable* rather than a *failed*: a message the mill never had a
+ * Mittente for was never sendable, and saying "non riuscito" would blame a
+ * carrier that was never asked.
  *
  * These are the only reasons a row is written for a message that never left.
  * A Ritiro whose Sms was switched off, or whose Cliente asked not to be
@@ -281,6 +353,7 @@ export const smsUnsendable = v.union(
   v.literal("no_phone"),
   v.literal("landline"),
   v.literal("unreadable"),
+  v.literal("no_sender"),
 );
 
 export type SmsUnsendable = Infer<typeof smsUnsendable>;
@@ -348,6 +421,10 @@ export type SmsSettingField = Infer<typeof smsSettingField>;
  */
 export const settingsFields = {
   ...etichettaSettingsFields,
+  // Optional for the reason the Soglia below is: a row written before the mill
+  // had a Mittente of its own carries none, and reads as empty — which is what
+  // holds both Sms switches shut until an Admin settles it (ADR-0004).
+  smsSender: v.optional(v.string()),
   // Optional on the same terms as the Soglia below: a row written before the
   // mill sent any Sms carries none of these, and reads as the app's own words
   // with both switches off until an Admin settles them (ADR-0004).
@@ -693,6 +770,26 @@ export const action = v.union(
     ),
   }),
   v.object({
+    kind: v.literal("frantoio_settings"),
+    // Only what actually changed, each with what it said before and what it
+    // says now. Two mutations write this one kind — the three strings save
+    // together, the Soglia saves on its own card — because the Registro files
+    // by what changed and not by which button was pressed (ADR-0011).
+    //
+    // A number as well as a string, because the Soglia is one: it is the only
+    // thing an Admin settles here that is counted rather than read.
+    changes: v.array(
+      v.object({
+        field: frantoioSettingField,
+        before: v.union(v.string(), v.number()),
+        after: v.union(v.string(), v.number()),
+      }),
+    ),
+  }),
+  v.object({
+    // Retired: the Soglia is recorded under `frantoio_settings` now. Kept
+    // because the rows already written say this, and nothing that happened is
+    // rewritten to agree with what came later (ADR-0004).
     kind: v.literal("soglia_ritardo"),
     // How many days a Cesta could be Fuori before she was called late, and how
     // many she can now. One field, so the row says it outright rather than

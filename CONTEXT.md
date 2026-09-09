@@ -24,6 +24,14 @@ _Avoid_: Soprannome (in code), nickname, nomignolo, secondo nome
 The invoicing software the mill already runs on an always-on PC — OleaPlus, an Access-based product — holding the customer registry they have always billed from. It sits upstream of this app and is never written to.
 _Avoid_: ERP, management system, billing software, accounting system, OleaPlus (in code: the app knows a Gestionale, not a brand)
 
+**Frantoio** (the mill itself):
+The mill as it stands behind what the app prints and sends: the name and the telephone a Cliente reads across the foot of an Etichetta and inside an Sms, the Mittente an Sms arrives from, and the Soglia di ritardo. What the mill has settled about itself, as against what an Operatore settles at the counter or an Admin settles about one Campagna. Distinct from the app, which the mill calls Pendolino.
+_Avoid_: Impostazioni (as the name of the thing or the screen; the stored row is `settings` in code, as it has always been), configurazione, azienda, oleificio, molino
+
+**Mittente** (sender):
+The name a Cliente sees an Sms arrive from, which is the Frantoio's rather than the app's: at most eleven characters, because that is all a carrier will carry in place of a telephone number. A name and not a number, so nothing can be sent back down it. Until the mill has one, it sends nothing at all.
+_Avoid_: Sender (in code: `smsSender`), From, TWILIO_FROM, mittente SMS (in prose, where Mittente alone will do)
+
 **Campagna** (season):
 One harvest and milling season. The unit the mill compares its numbers across ("how many Ceste went round in the 2025 Campagna against the 2026 one"). Known by a name no other Campagna answers to, because naming one is how the counter picks it. Opened, closed and, if need be, reopened by an Admin; at most one is open at a time, and closing it moves no Cesta. Every Movimento belongs to a Campagna: the open one, or, when none is open, the one the Operatore names on the spot, which stays closed.
 _Avoid_: Stagione, season, annata, year
@@ -120,5 +128,5 @@ _Avoid_: Timeout, scadenza, limite
 ### Contact
 
 **Sms**:
-The only thing the app ever says to a Cliente, who never holds an account in it: the receipt a Ritiro or a Rientro sends of itself, or a text an Admin writes by hand. One per action and never one per Cesta — six Ceste leaving together are one Sms — and never one the counter waits for.
+The only thing the app ever says to a Cliente, who never holds an account in it: the receipt a Ritiro or a Rientro sends of itself, or a text an Admin writes by hand. One per action and never one per Cesta — six Ceste leaving together are one Sms — and never one the counter waits for. Arrives from the Frantoio's Mittente, eleven characters at most, which is why nobody can reply to it.
 _Avoid_: Messaggio, notifica, notification, avviso, testo

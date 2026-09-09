@@ -1,3 +1,5 @@
+import { MAX_SMS_SENDER } from "./schema";
+
 /**
  * What an Sms says before it says it about anybody: the words an Admin
  * settles, the places a Cliente's own name and Ceste are written into, and
@@ -33,6 +35,43 @@ export const PLACEHOLDERS = Object.keys(SMS_PLACEHOLDERS) as Placeholder[];
 
 /** What each placeholder stands for, for one Cliente on one occasion. */
 export type SmsValues = Record<Placeholder, string>;
+
+/**
+ * What is wrong with a Mittente, or nothing where it will do.
+ *
+ * Here beside the placeholders and for the same reason: the mutation refuses a
+ * Mittente it cannot send from and the Frantoio screen says so first, which is
+ * one rule in two voices. Nothing here touches the database.
+ *
+ * The rule is Twilio's, not the mill's. An alphanumeric sender is eleven
+ * characters of `A-Z a-z 0-9` and space, and must carry at least one letter. A
+ * Mittente outside it is not softened by the carrier — the message simply
+ * never arrives, and a Ritiro receipt that never arrives is the failure the
+ * mill would notice last.
+ *
+ * Read against a Mittente already trimmed, as the mutation and the form both
+ * hand it over: a space somebody left at the end is a slip the app can put
+ * right on its own, like the name and the telephone beside it.
+ *
+ * Empty is not a fault here. A mill that has not settled its Mittente yet is
+ * an ordinary mill on its first day; it is the Sms switches that stay shut,
+ * and they say so themselves.
+ */
+export const smsSenderProblem = (sender: string): string | null => {
+  if (sender === "") {
+    return null;
+  }
+  if (sender.length > MAX_SMS_SENDER) {
+    return `Il mittente sta in ${MAX_SMS_SENDER} caratteri.`;
+  }
+  if (!/^[A-Za-z0-9 ]+$/.test(sender)) {
+    return "Nel mittente ci vanno solo lettere non accentate, numeri e spazi.";
+  }
+  if (!/[A-Za-z]/.test(sender)) {
+    return "Il mittente deve avere almeno una lettera.";
+  }
+  return null;
+};
 
 /** Every `{{…}}` a template carries, in the order they were written. */
 const placeholdersIn = (template: string): string[] =>

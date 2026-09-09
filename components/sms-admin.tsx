@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { phoneInNational } from "@/convex/phone";
+import type { FrantoioSettings } from "@/convex/schema";
 import {
   PLACEHOLDERS,
   cesteInWords,
@@ -56,7 +57,7 @@ type PreviewCase = "sei" | "una" | "zero";
 
 const previewValues = (
   which: PreviewCase,
-  mill: { millName: string; millPhone: string },
+  mill: FrantoioSettings,
 ): SmsValues => ({
   nome: SAMPLE.nome,
   ceste: cesteInWords(which === "sei" ? 6 : 1),
@@ -84,9 +85,10 @@ function TemplateEditor({
   on: boolean;
   onTemplate: (template: string) => void;
   onSwitch: (on: boolean) => void;
-  mill: { millName: string; millPhone: string };
+  mill: FrantoioSettings;
 }) {
   const [which, setWhich] = useState<PreviewCase>("sei");
+  const noSender = mill.smsSender === "";
   const unknown = unknownPlaceholders(template);
   const preview = renderTemplate(
     tidyForSms(template),
@@ -101,9 +103,28 @@ function TemplateEditor({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor={`${id}-on`}>Mandalo</Label>
-          <Switch id={`${id}-on`} checked={on} onCheckedChange={onSwitch} />
+        <div className="grid gap-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor={`${id}-on`}>Mandalo</Label>
+            <Switch
+              id={`${id}-on`}
+              checked={on}
+              disabled={noSender}
+              onCheckedChange={onSwitch}
+            />
+          </div>
+          {noSender && (
+            <p className="text-sm text-muted-foreground">
+              Prima serve un mittente: si sceglie in{" "}
+              <Link
+                href="/frantoio"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                «Il frantoio»
+              </Link>
+              .
+            </p>
+          )}
         </div>
 
         <div className="grid gap-2">
@@ -137,9 +158,19 @@ function TemplateEditor({
             <option value="una">Con una Cesta sola</option>
             <option value="zero">Quando non gliene restano</option>
           </select>
-          <p className="rounded-lg border bg-secondary p-3 text-base whitespace-pre-wrap text-secondary-foreground">
-            {preview}
-          </p>
+          <div className="rounded-lg border bg-secondary text-secondary-foreground">
+            <p className="border-b px-3 py-2 text-sm text-muted-foreground">
+              Da:{" "}
+              {noSender ? (
+                <span className="italic">mittente non ancora scelto</span>
+              ) : (
+                <span className="font-medium text-secondary-foreground">
+                  {mill.smsSender}
+                </span>
+              )}
+            </p>
+            <p className="p-3 text-base whitespace-pre-wrap">{preview}</p>
+          </div>
           <p className="text-sm text-muted-foreground">
             {characters} caratteri ·{" "}
             {segments === 1 ? "1 SMS" : `${segments} SMS`}
@@ -257,14 +288,15 @@ function SmsList() {
  * Gli SMS: what the two automatic messages say, whether they go out, and what
  * has gone out so far.
  *
- * The one screen in the app that is a settings screen, because these settings
- * govern nothing that already has one — the Soglia lives on the Lista di
- * recupero and the Etichetta on the labels sheet, each beside the thing it
- * decides, and an Sms has no such screen.
+ * The words stay here rather than moving to Il frantoio with the mill's name
+ * and telephone, because they are settled against the preview beside them: a
+ * setting whose effect you can watch while you change it belongs on the screen
+ * that shows it, and words that go out to two hundred people are the last
+ * thing to edit on one screen and check on another (ADR-0011).
  */
 export function SmsAdmin() {
   const settings = useQuery(api.sms.settings, {});
-  const mill = useQuery(api.etichette.settings, {});
+  const mill = useQuery(api.frantoio.settings, {});
   const save = useMutation(api.sms.setSettings);
   // The Admin's own edit, kept as they typed it and started from what the mill
   // is running on. Nothing is written until they say so.

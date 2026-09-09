@@ -1,19 +1,9 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import Link from "next/link";
-import { useState } from "react";
 import { SmsComposer } from "@/components/sms-composer";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { phoneInNational } from "@/convex/phone";
 import {
@@ -26,87 +16,6 @@ import {
 } from "@/lib/ceste";
 import { clienteLabel } from "@/lib/cliente";
 import { cn } from "@/lib/utils";
-
-/**
- * The Soglia di ritardo, as an Admin changes it. One number for the whole
- * mill, and all it decides is which rows above it are coloured: the list is
- * the same list at one day and at a hundred, which is what makes the setting
- * safe to get wrong (#22).
- */
-function SogliaForm({ sogliaRitardo }: { sogliaRitardo: number }) {
-  const setSogliaRitardo = useMutation(api.recupero.setSogliaRitardo);
-  // The box is the Admin's own edit, kept as they typed it; what the mill is
-  // actually running on is read live beside it, so that a Soglia changed on
-  // another device never hides behind a half-typed number here.
-  const [typed, setTyped] = useState(String(sogliaRitardo));
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const days = Number(typed);
-  const isDays = Number.isInteger(days) && days >= 1;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Soglia di ritardo</CardTitle>
-        <CardDescription>
-          Adesso è {daysLabel(sogliaRitardo)}. Dopo quanti giorni Fuori una
-          Cesta è In ritardo: colora le righe qui sopra e basta, non toglie
-          nessuno dall&rsquo;elenco.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid gap-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setError(null);
-            setPending(true);
-            try {
-              await setSogliaRitardo({ days });
-            } catch {
-              setError("Non è stato possibile salvare. Riprova.");
-            } finally {
-              setPending(false);
-            }
-          }}
-        >
-          <div className="grid gap-2">
-            <Label htmlFor="soglia-ritardo">Giorni</Label>
-            <Input
-              id="soglia-ritardo"
-              name="soglia-ritardo"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              className="h-11"
-            />
-          </div>
-          {!isDays && (
-            <p role="alert" className="text-sm text-destructive">
-              Un numero intero di giorni, da 1 in su.
-            </p>
-          )}
-          {error !== null && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button
-            type="submit"
-            className="h-12 text-base"
-            disabled={pending || !isDays || days === sogliaRitardo}
-          >
-            {pending ? "Un attimo…" : "Salva la Soglia"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
 
 /** One Cesta on a row: which she is, and since when he has had her. */
 function CestaFuori({
@@ -245,14 +154,23 @@ export function RecuperoList({ isAdmin }: { isAdmin: boolean }) {
         </ol>
       )}
 
-      {isAdmin ? (
-        <SogliaForm sogliaRitardo={sogliaRitardo} />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          In ritardo dopo {daysLabel(sogliaRitardo)} Fuori. La Soglia la cambia
-          un Admin.
-        </p>
-      )}
+      <p className="text-sm text-muted-foreground">
+        In ritardo dopo {daysLabel(sogliaRitardo)} Fuori.{" "}
+        {isAdmin ? (
+          <>
+            La Soglia si cambia in{" "}
+            <Link
+              href="/frantoio"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              «Il frantoio»
+            </Link>
+            .
+          </>
+        ) : (
+          "La Soglia la cambia un Admin."
+        )}
+      </p>
     </div>
   );
 }

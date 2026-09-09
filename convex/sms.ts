@@ -72,21 +72,36 @@ async function valuesFor(
   };
 }
 
+/** Said in both places the mill is stopped for want of one, and worded once. */
+const NO_MITTENTE =
+  "Il frantoio has no Mittente: settle one before the mill sends anything.";
+
 /**
  * Why a message the mill meant to send cannot go, or nothing where it can.
  * The stored telephone is read rather than trusted: it is E.164 by the time it
  * is stored (ADR-0009), and a landline stored for the Lista di recupero's
  * "Chiama" button is a good number that no Sms will reach.
+ *
+ * Two halves of one bargain, and the Cliente's is asked about first: a Cliente
+ * with no telephone stays unreachable after the mill has fixed its Mittente,
+ * so that is the more useful thing for a row to say. The Mittente comes second
+ * and should almost never be reached — the Sms switches will not turn on
+ * without one — but an Admin can settle a Mittente, turn the switches on and
+ * then clear it again, and a receipt that goes out into that gap is written
+ * down honestly rather than blamed on a carrier nobody asked.
  */
-function whyNot(cliente: Doc<"clienti">): SmsUnsendable | null {
+function whyNot(
+  cliente: Doc<"clienti">,
+  sender: string,
+): SmsUnsendable | null {
   if (cliente.phone === null) {
     return "no_phone";
   }
   const reading = readPhone(cliente.phone);
-  if (isSendable(reading)) {
-    return null;
+  if (!isSendable(reading)) {
+    return reading.kind === "landline" ? "landline" : "unreadable";
   }
-  return reading.kind === "landline" ? "landline" : "unreadable";
+  return sender === "" ? "no_sender" : null;
 }
 
 /**
@@ -114,7 +129,8 @@ async function writeSms(
   },
 ): Promise<Id<"sms">> {
   const at = Date.now();
-  const unsendable = whyNot(sms.cliente);
+  const { smsSender } = await millSettings(ctx);
+  const unsendable = whyNot(sms.cliente, smsSender);
   const smsId = await ctx.db.insert("sms", {
     clienteId: sms.cliente._id,
     kind: sms.kind,
@@ -133,6 +149,10 @@ async function writeSms(
       smsId,
       to: sms.cliente.phone,
       body: sms.body,
+      // Carried rather than read again on the other side: the action cannot
+      // touch the database, and the Mittente this message was written under is
+      // the one it should go out under even if an Admin changes it meanwhile.
+      from: smsSender,
     });
   }
   return smsId;
@@ -194,7 +214,12 @@ export async function sendMovimentoSms(
  * the feature out does not put a real message on a real farmer's telephone.
  */
 export const deliver = internalAction({
-  args: { smsId: v.id("sms"), to: v.string(), body: v.string() },
+  args: {
+    smsId: v.id("sms"),
+    to: v.string(),
+    body: v.string(),
+    from: v.string(),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
@@ -208,7 +233,7 @@ export const deliver = internalAction({
         });
         return null;
       }
-      const sid = await postToTwilio(args.to, args.body);
+      const sid = await postToTwilio(args.to, args.body, args.from);
       await ctx.runMutation(internal.sms.recordSend, {
         smsId: args.smsId,
         outcome: { kind: "sent", twilioSid: sid },
@@ -269,18 +294,16 @@ function twilioAccount(): {
   accountSid: string;
   keySid: string;
   keySecret: string;
-  from: string;
 } {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const keySid = process.env.TWILIO_API_KEY_SID;
   const keySecret = process.env.TWILIO_API_KEY_SECRET;
-  const from = process.env.TWILIO_FROM;
-  if (!accountSid || !keySid || !keySecret || !from) {
+  if (!accountSid || !keySid || !keySecret) {
     throw new Error(
-      "TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET and TWILIO_FROM are not all set on this deployment: no Sms can go out.",
+      "TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET are not all set on this deployment: no Sms can go out.",
     );
   }
-  return { accountSid, keySid, keySecret, from };
+  return { accountSid, keySid, keySecret };
 }
 
 /**
@@ -293,9 +316,21 @@ function statusCallback(): string | null {
   return site === undefined || site === "" ? null : `${site}/twilio/status`;
 }
 
-/** The message itself, as Twilio's own API takes it. The name it gives back. */
-async function postToTwilio(to: string, body: string): Promise<string> {
-  const { accountSid, keySid, keySecret, from } = twilioAccount();
+/**
+ * The message itself, as Twilio's own API takes it. The name it gives back.
+ *
+ * The Mittente arrives as an argument and not out of the environment, because
+ * it is not a secret: the three credentials stay on the deployment because
+ * leaking one costs money, and the Mittente is read off a telephone by every
+ * Cliente the mill writes to. A mill should be able to correct its own name
+ * without a deploy.
+ */
+async function postToTwilio(
+  to: string,
+  body: string,
+  from: string,
+): Promise<string> {
+  const { accountSid, keySid, keySecret } = twilioAccount();
   const form = new URLSearchParams({ To: to, From: from, Body: body });
   const callback = statusCallback();
   if (callback !== null) {
@@ -432,6 +467,11 @@ const smsSettingsOf = (settings: SmsSettings): SmsSettings => ({
  * two hundred farmers reading «Gentile {{cognme}}» cannot be untold
  * (ADR-0005 covers the counter, and this is not it).
  *
+ * A switch will not turn on while the Frantoio has no Mittente, for the same
+ * reason and at the same desk: a mill that has not said who its messages come
+ * from has nothing a carrier will accept, and the useful moment to say so is
+ * the moment somebody reaches for the switch.
+ *
  * The Registro row names only what actually changed, with the words before and
  * the words after (ADR-0006).
  */
@@ -463,7 +503,19 @@ export const setSettings = mutation({
       }
     }
 
-    const before = smsSettingsOf(await millSettings(ctx));
+    const settled = await millSettings(ctx);
+    const before = smsSettingsOf(settled);
+    // Refused on the turning on and not on the being on. A mill that settled a
+    // Mittente, switched a message on and then cleared the Mittente is in a
+    // mess, but it is not a mess that should stop an Admin fixing a typo in
+    // the words: what is refused is arming a message the mill cannot send.
+    const switchedOn =
+      (wanted.smsRitiroOn && !before.smsRitiroOn) ||
+      (wanted.smsRientroOn && !before.smsRientroOn);
+    if (settled.smsSender === "" && switchedOn) {
+      throw new Error(NO_MITTENTE);
+    }
+
     const changes = smsSettingField.members
       .map((member) => member.value as SmsSettingField)
       .filter((field) => before[field] !== wanted[field])
@@ -536,7 +588,11 @@ export const send = mutation({
     if (body === "") {
       throw new Error("An Sms with no words in it is not a message.");
     }
-    const unsendable = whyNot(cliente);
+    const { smsSender } = await millSettings(ctx);
+    if (smsSender === "") {
+      throw new Error(NO_MITTENTE);
+    }
+    const unsendable = whyNot(cliente, smsSender);
     if (unsendable !== null) {
       throw new Error(
         "This Cliente has no telephone an Sms can reach: the message was not sent.",

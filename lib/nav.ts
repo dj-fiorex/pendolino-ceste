@@ -2,6 +2,7 @@ import {
   ArchiveIcon,
   CalendarRangeIcon,
   ClipboardListIcon,
+  FactoryIcon,
   HomeIcon,
   ListChecksIcon,
   MessageSquareTextIcon,
@@ -91,7 +92,7 @@ export const movimenti: NavItem[] = [ritiro, rientro, svuotamento];
 /** The screens that answer where the Ceste are. */
 export const lookups: NavItem[] = [attesaMolitura, recupero, ceste, clienti];
 
-/** An Admin's own: the Registro, le Campagne, chi lavora qui. */
+/** An Admin's own: the Registro, le Campagne, chi lavora qui, il frantoio. */
 export const administration: NavItem[] = [
   {
     href: "/registro",
@@ -119,6 +120,17 @@ export const administration: NavItem[] = [
     label: "Gli Operatori",
     hint: "Chi può entrare nell'app.",
     icon: UserCogIcon,
+    adminOnly: true,
+  },
+  // Last, because it is the screen an Admin fills in once and then forgets,
+  // which is the opposite of the Registro at the top. What belongs on it is a
+  // rule and not a habit: a setting whose effect you can watch while you
+  // change it stays on the screen that shows it (ADR-0011).
+  {
+    href: "/frantoio",
+    label: "Il frantoio",
+    hint: "Come ci chiamiamo, e come ci si trova.",
+    icon: FactoryIcon,
     adminOnly: true,
   },
 ];

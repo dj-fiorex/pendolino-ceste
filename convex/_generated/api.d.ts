@@ -17,6 +17,7 @@ import type * as ceste from "../ceste.js";
 import type * as clienti from "../clienti.js";
 import type * as email from "../email.js";
 import type * as etichette from "../etichette.js";
+import type * as frantoio from "../frantoio.js";
 import type * as gestionale from "../gestionale.js";
 import type * as http from "../http.js";
 import type * as media from "../media.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   clienti: typeof clienti;
   email: typeof email;
   etichette: typeof etichette;
+  frantoio: typeof frantoio;
   gestionale: typeof gestionale;
   http: typeof http;
   media: typeof media;

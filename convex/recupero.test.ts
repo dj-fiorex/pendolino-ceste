@@ -88,7 +88,7 @@ describe("the Soglia di ritardo", () => {
     const t = startApp();
     const gabriele = await admin(t);
 
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 14 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 14 });
 
     expect((await gabriele.query(api.recupero.list, {})).sogliaRitardo).toBe(
       14,
@@ -105,7 +105,13 @@ describe("the Soglia di ritardo", () => {
         correctedBy: [],
         media: { signature: null, photo: null },
         sms: null,
-        action: { kind: "soglia_ritardo", before: 10, after: 14 },
+        // The Soglia is filed with the rest of what the Frantoio settles
+        // (ADR-0011); the older `soglia_ritardo` kind is still read, and no
+        // longer written.
+        action: {
+          kind: "frantoio_settings",
+          changes: [{ field: "sogliaRitardo", before: 10, after: 14 }],
+        },
       },
     ]);
   });
@@ -113,9 +119,9 @@ describe("the Soglia di ritardo", () => {
   test("setting it to what it already says records nothing", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 14 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 14 });
 
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 14 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 14 });
 
     expect(await gabriele.query(api.registro.list, {})).toHaveLength(1);
     expect((await gabriele.query(api.recupero.list, {})).sogliaRitardo).toBe(
@@ -128,13 +134,16 @@ describe("the Soglia di ritardo", () => {
     const gabriele = await admin(t);
     await gabriele.mutation(api.etichette.setSettings, {
       etichettaSize: "a6",
-      millName: "Frantoio Pendolino",
       millNameOnEtichetta: true,
-      millPhone: "0931 000 000",
       millPhoneOnEtichetta: false,
     });
+    await gabriele.mutation(api.frantoio.setSettings, {
+      millName: "Frantoio Pendolino",
+      millPhone: "0931 000 000",
+      smsSender: "Pendolino",
+    });
 
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 21 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 21 });
 
     expect(await gabriele.query(api.etichette.settings, {})).toEqual({
       etichettaSize: "a6",
@@ -155,7 +164,7 @@ describe("the Soglia di ritardo", () => {
     // The two share the one row the whole mill's settings live in. Writing
     // that row for the Soglia must not settle the Etichetta by the way: it
     // still says what the app says until an Admin says otherwise.
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 21 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 21 });
 
     expect(await gabriele.query(api.etichette.settings, {})).toEqual({
       etichettaSize: "100x150",
@@ -172,13 +181,13 @@ describe("the Soglia di ritardo", () => {
     const gabriele = await admin(t);
 
     await expect(
-      gabriele.mutation(api.recupero.setSogliaRitardo, { days: 0 }),
+      gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 0 }),
     ).rejects.toThrow();
     await expect(
-      gabriele.mutation(api.recupero.setSogliaRitardo, { days: -3 }),
+      gabriele.mutation(api.frantoio.setSogliaRitardo, { days: -3 }),
     ).rejects.toThrow();
     await expect(
-      gabriele.mutation(api.recupero.setSogliaRitardo, { days: 7.5 }),
+      gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 7.5 }),
     ).rejects.toThrow();
 
     expect((await gabriele.query(api.recupero.list, {})).sogliaRitardo).toBe(
@@ -190,11 +199,11 @@ describe("the Soglia di ritardo", () => {
   test("is an Admin's to set, and every Operatore's to read", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 14 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 14 });
     const marco = await operatore(t);
 
     await expect(
-      marco.mutation(api.recupero.setSogliaRitardo, { days: 30 }),
+      marco.mutation(api.frantoio.setSogliaRitardo, { days: 30 }),
     ).rejects.toThrow();
 
     expect((await marco.query(api.recupero.list, {})).sogliaRitardo).toBe(14);
@@ -321,9 +330,9 @@ describe("what the Soglia di ritardo does to the Lista di recupero", () => {
     // Everybody is late at one day, nobody is at a thousand. Both readings of
     // the mill are the same list: the Soglia colours rows, it does not choose
     // them (#22).
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 1 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 1 });
     const whenEverybodyIsLate = await marco.query(api.recupero.list, {});
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 1000 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 1000 });
     const whenNobodyIs = await marco.query(api.recupero.list, {});
 
     expect(whenEverybodyIsLate.sogliaRitardo).toBe(1);
@@ -336,7 +345,7 @@ describe("what the Soglia di ritardo does to the Lista di recupero", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
-    await gabriele.mutation(api.recupero.setSogliaRitardo, { days: 30 });
+    await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 30 });
     const marco = await operatore(t);
     const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
 

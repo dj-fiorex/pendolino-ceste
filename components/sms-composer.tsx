@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,6 +102,11 @@ export function SmsComposer({
     api.sms.previewValues,
     open ? { clienteId: cliente._id } : "skip",
   );
+  // Read with the dialog rather than with the screen, like the values above:
+  // both call sites are an Admin's, which is what makes this query theirs to
+  // ask. The mutation refuses a message with no Mittente behind it; this is
+  // only the same thing said before the Admin has written anything.
+  const mill = useQuery(api.frantoio.settings, open ? {} : "skip");
 
   const written = tidyForSms(typed).trim();
   const unknown = unknownPlaceholders(written);
@@ -108,7 +114,8 @@ export function SmsComposer({
     values === undefined
       ? written
       : renderTemplate(written, values as SmsValues);
-  const sendable = written !== "" && unknown.length === 0;
+  const noSender = mill !== undefined && mill.smsSender === "";
+  const sendable = written !== "" && unknown.length === 0 && !noSender;
 
   const close = () => {
     setOpen(false);
@@ -207,6 +214,18 @@ export function SmsComposer({
             <p className="text-sm text-muted-foreground">
               Puoi usare {PLACEHOLDERS.map((name) => `{{${name}}}`).join(", ")}.
             </p>
+            {noSender && (
+              <p role="alert" className="text-sm text-destructive">
+                Senza un mittente non parte niente: scegline uno in{" "}
+                <Link
+                  href="/frantoio"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  «Il frantoio»
+                </Link>
+                .
+              </p>
+            )}
             {unknown.length > 0 && (
               <p role="alert" className="text-sm text-destructive">
                 Non so cosa scrivere al posto di{" "}

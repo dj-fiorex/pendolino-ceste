@@ -3,10 +3,9 @@ import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireAdmin } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import {
-  etichettaSettingField,
+  etichettaChoiceFields,
   etichettaSettingsFields,
-  MAX_MILL_TEXT,
-  type EtichettaSettingField,
+  type EtichettaChoice,
   type EtichettaSettings,
 } from "./schema";
 import { millSettings, saveMillSettings } from "./settings";
@@ -51,31 +50,27 @@ export const settings = query({
  * rather than adds. The screen calls it as it builds a PDF, so that no label
  * is ever printed from settings the Registro has not seen.
  *
+ * Three things and not five. What the name and the telephone *say* is the
+ * Frantoio's, settled on its own screen; what this one settles is whether they
+ * are printed, which is a decision worth taking with the label drawn in front
+ * of you (ADR-0011). A switch left on over a value nobody has written prints
+ * nothing, so the screen disables it and says where to go.
+ *
  * The Registro row names only what actually changed, with before and after
  * (ADR-0006); saving the same settings again changes nothing, and nothing
  * changed is nothing to record.
  */
 export const setSettings = mutation({
-  args: etichettaSettingsFields,
+  args: etichettaChoiceFields,
   returns: v.null(),
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
-    const wanted = {
-      ...args,
-      millName: args.millName.trim(),
-      millPhone: args.millPhone.trim(),
-    };
-    for (const text of [wanted.millName, wanted.millPhone]) {
-      if (text.length > MAX_MILL_TEXT) {
-        throw new Error(
-          `The mill's name and telephone fit ${MAX_MILL_TEXT} characters on an Etichetta.`,
-        );
-      }
-    }
+    const wanted: EtichettaChoice = args;
 
     const before = await currentSettings(ctx);
-    const changes = etichettaSettingField.members
-      .map((member) => member.value as EtichettaSettingField)
+    const changes = (
+      ["etichettaSize", "millNameOnEtichetta", "millPhoneOnEtichetta"] as const
+    )
       .filter((field) => before[field] !== wanted[field])
       .map((field) => ({
         field,

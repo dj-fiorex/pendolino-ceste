@@ -58,14 +58,28 @@ const aFleetOfTen = async (gabriele: Device) =>
 const millWrites = async (
   gabriele: Device,
   words: Partial<{ ritiro: string; rientro: string }> = {},
-) =>
-  await gabriele.mutation(api.sms.setSettings, {
+) => {
+  // A mill with no Mittente cannot turn a switch on, so this is the first
+  // thing any mill that means to write to anybody settles. The name and the
+  // telephone stay empty, as they are before an Admin has been to Il frantoio:
+  // the templates below say nothing about them.
+  await millHasASender(gabriele);
+  return await gabriele.mutation(api.sms.setSettings, {
     smsRitiroTemplate:
       words.ritiro ?? "Ciao {{nome}}, hai preso {{ceste}}: {{numeri}}.",
     smsRitiroOn: true,
     smsRientroTemplate:
       words.rientro ?? "Grazie {{nome}}. Da riportare: {{totale}}.",
     smsRientroOn: true,
+  });
+};
+
+/** The mill says who its Sms come from, and nothing else about itself. */
+const millHasASender = async (gabriele: Device, sender = "Pendolino") =>
+  await gabriele.mutation(api.frantoio.setSettings, {
+    millName: "",
+    millPhone: "",
+    smsSender: sender,
   });
 
 /** The mill's settings as they are before an Admin has touched them. */
@@ -288,6 +302,7 @@ describe("the words the mill settles", () => {
   test("the change is one Registro row, with the words before and after", async () => {
     const t = startApp();
     const gabriele = await admin(t);
+    await millHasASender(gabriele);
 
     await gabriele.mutation(api.sms.setSettings, {
       ...millSaysNothing,
@@ -316,7 +331,10 @@ describe("the words the mill settles", () => {
 
     await millWrites(gabriele);
 
-    expect(await gabriele.query(api.registro.list, {})).toHaveLength(1);
+    const rows = await gabriele.query(api.registro.list, {});
+    expect(rows.filter((row) => row.action.kind === "sms_settings")).toHaveLength(
+      1,
+    );
   });
 
   test("the settings are an Admin's, to read as much as to change", async () => {
@@ -341,6 +359,7 @@ describe("an Admin writing to a Cliente by hand", () => {
       phone: "347 1234567",
     });
     await takeAway(gabriele, clienteId, ["1", "2"]);
+    await millHasASender(gabriele);
 
     await gabriele.mutation(api.sms.send, {
       clienteId,
@@ -397,6 +416,7 @@ describe("an Admin writing to a Cliente by hand", () => {
       phone: "347 1234567",
       smsOptOut: true,
     });
+    await millHasASender(gabriele);
 
     await expect(
       gabriele.mutation(api.sms.send, {
@@ -439,6 +459,159 @@ describe("an Admin writing to a Cliente by hand", () => {
     // The Cliente being created is the only thing that happened today.
     const registro = await gabriele.query(api.registro.list, {});
     expect(registro.map((row) => row.action.kind)).toEqual(["cliente_creato"]);
+  });
+});
+
+describe("the Mittente the mill writes as", () => {
+  test("holds both switches shut until the mill has one", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+
+    await expect(
+      gabriele.mutation(api.sms.setSettings, {
+        smsRitiroTemplate: "Ciao {{nome}}.",
+        smsRitiroOn: true,
+        smsRientroTemplate: "Grazie {{nome}}.",
+        smsRientroOn: false,
+      }),
+    ).rejects.toThrow(/Mittente/);
+
+    // Nothing was written: the mill still says what it said before.
+    expect(await gabriele.query(api.sms.settings, {})).toEqual(millSaysNothing);
+  });
+
+  test("lets the words be settled with the switches left off", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+
+    await gabriele.mutation(api.sms.setSettings, {
+      smsRitiroTemplate: "Ciao {{nome}}.",
+      smsRitiroOn: false,
+      smsRientroTemplate: "Grazie {{nome}}.",
+      smsRientroOn: false,
+    });
+
+    expect(
+      (await gabriele.query(api.sms.settings, {})).smsRitiroTemplate,
+    ).toBe("Ciao {{nome}}.");
+  });
+
+  // The bug the first version of this gate had: it refused the switches being
+  // on rather than their being turned on, so a mill that cleared its Mittente
+  // could not correct a typo in its own words until it switched both off.
+  test("does not hold the words hostage once it has been cleared", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await millWrites(gabriele);
+    await gabriele.mutation(api.frantoio.setSettings, {
+      millName: "",
+      millPhone: "",
+      smsSender: "",
+    });
+
+    await gabriele.mutation(api.sms.setSettings, {
+      smsRitiroTemplate: "Ciao {{nome}}, hai preso {{ceste}}.",
+      smsRitiroOn: true,
+      smsRientroTemplate: "Grazie {{nome}}. Da riportare: {{totale}}.",
+      smsRientroOn: true,
+    });
+
+    expect(
+      (await gabriele.query(api.sms.settings, {})).smsRitiroTemplate,
+    ).toBe("Ciao {{nome}}, hai preso {{ceste}}.");
+  });
+
+  test("still refuses a switch going on while it is empty", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    // Settled, then cleared, with only the Rientro left on.
+    await millWrites(gabriele);
+    await gabriele.mutation(api.sms.setSettings, {
+      smsRitiroTemplate: "Ciao {{nome}}.",
+      smsRitiroOn: false,
+      smsRientroTemplate: "Grazie {{nome}}.",
+      smsRientroOn: true,
+    });
+    await gabriele.mutation(api.frantoio.setSettings, {
+      millName: "",
+      millPhone: "",
+      smsSender: "",
+    });
+
+    await expect(
+      gabriele.mutation(api.sms.setSettings, {
+        smsRitiroTemplate: "Ciao {{nome}}.",
+        smsRitiroOn: true,
+        smsRientroTemplate: "Grazie {{nome}}.",
+        smsRientroOn: true,
+      }),
+    ).rejects.toThrow(/Mittente/);
+  });
+
+  test("refuses a message an Admin writes by hand", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    const clienteId = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      phone: "347 1234567",
+    });
+
+    await expect(
+      gabriele.mutation(api.sms.send, {
+        clienteId,
+        body: "Ha ancora le nostre Ceste.",
+        overrideOptOut: false,
+      }),
+    ).rejects.toThrow(/Mittente/);
+    expect(await gabriele.query(api.sms.byCliente, { clienteId })).toEqual([]);
+  });
+
+  // The gap the switches leave open: settle a Mittente, turn them on, then
+  // clear it. A receipt going out into that gap says what was actually wrong,
+  // rather than blaming a carrier nobody asked (CONTEXT.md, *Sms*).
+  test("makes a receipt unsendable rather than failed once it is cleared", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    await millWrites(gabriele);
+    await gabriele.mutation(api.frantoio.setSettings, {
+      millName: "",
+      millPhone: "",
+      smsSender: "",
+    });
+    const clienteId = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      phone: "347 1234567",
+    });
+
+    await takeAway(gabriele, clienteId, ["1"]);
+
+    expect(
+      (await gabriele.query(api.sms.byCliente, { clienteId }))[0],
+    ).toMatchObject({
+      kind: "ritiro",
+      // Written down all the same, and with nowhere to send it to.
+      to: null,
+      delivery: { kind: "unsendable", reason: "no_sender" },
+    });
+  });
+
+  test("is not what a Cliente's own missing telephone is blamed on", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    await millWrites(gabriele);
+    const clienteId = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+
+    await takeAway(gabriele, clienteId, ["1"]);
+
+    expect(
+      (await gabriele.query(api.sms.byCliente, { clienteId }))[0],
+    ).toMatchObject({
+      delivery: { kind: "unsendable", reason: "no_phone" },
+    });
   });
 });
 
@@ -522,7 +695,6 @@ describe("a deployment in prova", () => {
     vi.stubEnv("TWILIO_API_KEY_SID", undefined);
     vi.stubEnv("TWILIO_API_KEY_SECRET", undefined);
     vi.stubEnv("TWILIO_AUTH_TOKEN", undefined);
-    vi.stubEnv("TWILIO_FROM", undefined);
     vi.stubEnv("TWILIO_TEST_MODE", testMode);
     const t = startApp();
     const gabriele = await admin(t);

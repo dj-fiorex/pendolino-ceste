@@ -38,12 +38,21 @@ const operatore = async (t: TestConvex<typeof schema>) => {
   return t.withIdentity({ subject: "auth|marco" });
 };
 
-const SETTINGS = {
+/** What the Etichette screen itself settles: the size and the two switches. */
+const CHOICES = {
   etichettaSize: "100x150",
-  millName: "Frantoio Pendolino",
   millNameOnEtichetta: true,
-  millPhone: "0931 000 000",
   millPhoneOnEtichetta: true,
+} as const;
+
+/**
+ * What the mill has written about itself in Il frantoio, which the label is
+ * drawn from but this screen does not settle (ADR-0011).
+ */
+const FRANTOIO = {
+  millName: "Frantoio Pendolino",
+  millPhone: "0931 000 000",
+  smsSender: "Pendolino",
 } as const;
 
 describe("the Etichetta settings", () => {
@@ -66,14 +75,16 @@ describe("the Etichetta settings", () => {
     const gabriele = await admin(t);
 
     await gabriele.mutation(api.etichette.setSettings, {
-      ...SETTINGS,
+      ...CHOICES,
       etichettaSize: "70x100",
       millPhoneOnEtichetta: false,
     });
 
     expect(await gabriele.query(api.etichette.settings, {})).toEqual({
-      ...SETTINGS,
       etichettaSize: "70x100",
+      millName: "",
+      millNameOnEtichetta: true,
+      millPhone: "",
       millPhoneOnEtichetta: false,
     });
     expect(await gabriele.query(api.registro.list, {})).toEqual([
@@ -92,8 +103,6 @@ describe("the Etichetta settings", () => {
           kind: "etichette_settings",
           changes: [
             { field: "etichettaSize", before: "100x150", after: "70x100" },
-            { field: "millName", before: "", after: "Frantoio Pendolino" },
-            { field: "millPhone", before: "", after: "0931 000 000" },
             { field: "millPhoneOnEtichetta", before: true, after: false },
           ],
         },
@@ -101,14 +110,35 @@ describe("the Etichetta settings", () => {
     ]);
   });
 
+  test("what the label says about the mill is written in Il frantoio, not here", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+
+    await gabriele.mutation(api.frantoio.setSettings, FRANTOIO);
+
+    // The label is drawn from all five, and this screen still reads them —
+    // it is only the writing of the two that moved.
+    expect(await gabriele.query(api.etichette.settings, {})).toEqual({
+      ...CHOICES,
+      millName: "Frantoio Pendolino",
+      millPhone: "0931 000 000",
+    });
+  });
+
   test("a later change is a Registro row of its own, naming only what changed", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    await gabriele.mutation(api.etichette.setSettings, SETTINGS);
+    // CHOICES is what the app already says, so the first change has to be a
+    // real one for there to be a first row at all.
+    await gabriele.mutation(api.etichette.setSettings, {
+      ...CHOICES,
+      etichettaSize: "70x100",
+    });
 
     await gabriele.mutation(api.etichette.setSettings, {
-      ...SETTINGS,
-      millPhone: "0931 111 111",
+      ...CHOICES,
+      etichettaSize: "70x100",
+      millNameOnEtichetta: false,
     });
 
     const registro = await gabriele.query(api.registro.list, {});
@@ -116,7 +146,7 @@ describe("the Etichetta settings", () => {
     expect(registro[0].action).toEqual({
       kind: "etichette_settings",
       changes: [
-        { field: "millPhone", before: "0931 000 000", after: "0931 111 111" },
+        { field: "millNameOnEtichetta", before: true, after: false },
       ],
     });
   });
@@ -124,50 +154,38 @@ describe("the Etichetta settings", () => {
   test("saving the same settings again records nothing", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    await gabriele.mutation(api.etichette.setSettings, SETTINGS);
-
-    await gabriele.mutation(api.etichette.setSettings, SETTINGS);
     await gabriele.mutation(api.etichette.setSettings, {
-      ...SETTINGS,
-      millName: "  Frantoio Pendolino  ",
+      ...CHOICES,
+      etichettaSize: "a6",
+    });
+
+    await gabriele.mutation(api.etichette.setSettings, {
+      ...CHOICES,
+      etichettaSize: "a6",
     });
 
     expect(await gabriele.query(api.registro.list, {})).toHaveLength(1);
-    expect(await gabriele.query(api.etichette.settings, {})).toEqual(SETTINGS);
-  });
-
-  test("a name longer than an Etichetta is refused", async () => {
-    const t = startApp();
-    const gabriele = await admin(t);
-
-    await expect(
-      gabriele.mutation(api.etichette.setSettings, {
-        ...SETTINGS,
-        millName: "Frantoio Oleario Pendolino dei Fratelli Rossi e Figli",
-      }),
-    ).rejects.toThrow();
-    expect(await gabriele.query(api.etichette.settings, {})).toEqual({
-      ...SETTINGS,
-      millName: "",
-      millPhone: "",
-    });
   });
 
   test("the settings are an Admin's, to read as much as to change", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    await gabriele.mutation(api.etichette.setSettings, SETTINGS);
+    await gabriele.mutation(api.etichette.setSettings, CHOICES);
     const marco = await operatore(t);
 
     await expect(marco.query(api.etichette.settings, {})).rejects.toThrow();
     await expect(t.query(api.etichette.settings, {})).rejects.toThrow();
     await expect(
       marco.mutation(api.etichette.setSettings, {
-        ...SETTINGS,
-        millName: "Frantoio di Marco",
+        ...CHOICES,
+        etichettaSize: "70x100",
       }),
     ).rejects.toThrow();
-    expect(await gabriele.query(api.etichette.settings, {})).toEqual(SETTINGS);
+    expect(await gabriele.query(api.etichette.settings, {})).toEqual({
+      ...CHOICES,
+      millName: "",
+      millPhone: "",
+    });
   });
 });
 
@@ -190,7 +208,7 @@ describe("reprinting a torn Etichetta", () => {
       forma: "quadrata",
       count: 4,
     });
-    await gabriele.mutation(api.etichette.setSettings, SETTINGS);
+    await gabriele.mutation(api.etichette.setSettings, CHOICES);
 
     const reprint = (await gabriele.query(api.ceste.list, {})).filter(
       (cesta) => cesta.numero <= 3,

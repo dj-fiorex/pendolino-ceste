@@ -3,6 +3,7 @@ import type {
   Action,
   ClienteField,
   EtichettaSettingField,
+  FrantoioSettingField,
   EtichettaSize,
   Forma,
   PlainMovimentoKind,
@@ -79,6 +80,13 @@ const smsFieldLabel: Record<SmsSettingField, string> = {
   smsRientroOn: "l'invio al Rientro",
 };
 
+const frantoioFieldLabel: Record<FrantoioSettingField, string> = {
+  millName: "il nome del frantoio",
+  millPhone: "il telefono del frantoio",
+  smsSender: "il mittente degli SMS",
+  sogliaRitardo: "la Soglia di ritardo",
+};
+
 const etichettaFieldLabel: Record<EtichettaSettingField, string> = {
   etichettaSize: "la misura",
   millName: "il nome del frantoio",
@@ -88,7 +96,7 @@ const etichettaFieldLabel: Record<EtichettaSettingField, string> = {
 };
 
 /** What a field said before a correction, and what it says now. */
-type ChangeValue = string | boolean | string[] | null;
+type ChangeValue = string | boolean | string[] | number | null;
 
 type Change<Field extends string> = {
   field: Field;
@@ -111,6 +119,9 @@ const quoted = (value: ChangeValue): string => {
   if (Array.isArray(value)) {
     return value.length === 0 ? "nessuno" : `«${value.join(", ")}»`;
   }
+  if (typeof value === "number") {
+    return `«${value}»`;
+  }
   return value === "" ? "nessuno" : `«${value}»`;
 };
 
@@ -123,16 +134,26 @@ const etichettaValue = (value: ChangeValue) =>
     ? quoted(ETICHETTA_SIZE_LABELS[value])
     : quoted(value);
 
+/**
+ * A Frantoio setting as the screen that sets it shows it. Three of the four
+ * are words and read as words; the Soglia is the one that is counted, and a
+ * row saying "da «10» a «21»" would make a reader work out what of.
+ */
+const frantoioValue = (value: ChangeValue, field: FrantoioSettingField) =>
+  field === "sogliaRitardo" && typeof value === "number"
+    ? daysLabel(value)
+    : quoted(value);
+
 /** What each changed field used to say, and says now, one clause apiece. */
 const changesInSentence = <Field extends string>(
   changes: Change<Field>[],
   label: Record<Field, string>,
-  say: (value: ChangeValue) => string,
+  say: (value: ChangeValue, field: Field) => string,
 ) =>
   changes
     .map(
       (change) =>
-        `${label[change.field]} da ${say(change.before)} a ${say(change.after)}`,
+        `${label[change.field]} da ${say(change.before, change.field)} a ${say(change.after, change.field)}`,
     )
     .join("; ");
 
@@ -224,6 +245,11 @@ const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
       return `${operatore} ha riaperto la Campagna ${action.name}.`;
     case "etichette_settings":
       return `${operatore} ha cambiato le Etichette: ${changesInSentence(action.changes, etichettaFieldLabel, etichettaValue)}.`;
+    case "frantoio_settings":
+      return `${operatore} ha cambiato il frantoio: ${changesInSentence(action.changes, frantoioFieldLabel, frantoioValue)}.`;
+    // Retired in favour of the kind above, and still read: the rows written
+    // before the Soglia moved to Il frantoio say this, and they are not
+    // rewritten to say otherwise (ADR-0004).
     case "soglia_ritardo":
       return `${operatore} ha cambiato la Soglia di ritardo da ${daysLabel(action.before)} a ${daysLabel(action.after)}.`;
     case "sms_inviato": {

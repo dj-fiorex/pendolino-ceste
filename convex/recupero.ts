@@ -6,7 +6,7 @@ import { asCliente, clienteShape } from "./clienti";
 import { fuoriSince } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
-import { millSettings, saveMillSettings } from "./settings";
+import { millSettings } from "./settings";
 
 /**
  * One Cesta on the list: which she is, and since when she has been Fuori.
@@ -119,43 +119,5 @@ export const list = query({
       return one.ceste[0].numero - other.ceste[0].numero;
     });
     return { sogliaRitardo, clienti };
-  },
-});
-
-/**
- * An Admin settles how many days a Cesta may be Fuori before the Lista di
- * recupero calls her In ritardo. One value for the whole mill (CONTEXT.md).
- *
- * It moves no Cesta and takes nobody off the list: all it decides is which
- * rows are highlighted. That is the whole point of the setting being safe to
- * get wrong — a mill that sets it to a hundred days sees the same names in the
- * same order, in plainer colours (#22).
- *
- * The Registro row names what the Soglia said before and what it says now
- * (ADR-0006); setting it to what it already says changes nothing, and nothing
- * changed is nothing to record.
- */
-export const setSogliaRitardo = mutation({
-  args: { days: v.number() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const admin = await requireAdmin(ctx);
-    if (!Number.isInteger(args.days) || args.days < 1) {
-      throw new Error(
-        "The Soglia di ritardo is a whole number of days, one or more.",
-      );
-    }
-
-    const before = (await millSettings(ctx)).sogliaRitardo;
-    if (before === args.days) {
-      return null;
-    }
-
-    await saveMillSettings(ctx, { sogliaRitardo: args.days });
-    await writeRegistroRow(ctx, {
-      operatoreId: admin._id,
-      action: { kind: "soglia_ritardo", before, after: args.days },
-    });
-    return null;
   },
 });

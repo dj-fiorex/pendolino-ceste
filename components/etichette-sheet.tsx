@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Etichetta } from "@/components/etichetta";
 import { api } from "@/convex/_generated/api";
-import { MAX_MILL_TEXT, type EtichettaSize } from "@/convex/schema";
+import type { EtichettaSize } from "@/convex/schema";
 import { ETICHETTA_SIZE_LABELS, type EtichettaSettings } from "@/lib/etichetta";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,64 @@ const wholeFleet = (ceste: EtichettaCesta[]): Selection => ({
   from: String(ceste[0]?.numero ?? ""),
   to: String(ceste[ceste.length - 1]?.numero ?? ""),
 });
+
+/**
+ * One of the two things the mill's own name and telephone amount to on a
+ * label: whether it is printed, and what it would say.
+ *
+ * The value is shown and not edited. It belongs to the Frantoio and is typed
+ * there (ADR-0011); what this screen decides is whether it goes on the label,
+ * which is worth deciding with the label drawn beside you.
+ *
+ * A switch over a value nobody has written is disabled rather than left on
+ * over nothing: `footerLines` drops an empty line silently, so an Admin who
+ * left it on would print a blank foot and never be told why.
+ */
+function MillLine({
+  id,
+  label,
+  switchLabel,
+  value,
+  on,
+  onSwitch,
+}: {
+  id: string;
+  label: string;
+  switchLabel: string;
+  value: string;
+  on: boolean;
+  onSwitch: (on: boolean) => void;
+}) {
+  const written = value.trim() !== "";
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        <Switch
+          id={id}
+          aria-label={switchLabel}
+          checked={written && on}
+          disabled={!written}
+          onCheckedChange={onSwitch}
+        />
+      </div>
+      {written ? (
+        <p className="text-sm text-muted-foreground">{value}</p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Non ancora scritto: si scrive in{" "}
+          <Link
+            href="/frantoio"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            «Il frantoio»
+          </Link>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * The Etichette of a selection of Ceste: what they will look like, the
@@ -86,11 +145,13 @@ export function EtichetteSheet({
       // What is printed is what is recorded: the settings are saved before the
       // PDF is built, and the mutation writes its Registro row when they have
       // changed and nothing when they have not (ADR-0006).
-      await saveSettings(settings);
+      await saveSettings({
+        etichettaSize: settings.etichettaSize,
+        millNameOnEtichetta: settings.millNameOnEtichetta,
+        millPhoneOnEtichetta: settings.millPhoneOnEtichetta,
+      });
     } catch {
-      setError(
-        "Non è stato possibile salvare le impostazioni. Il nome e il telefono devono starci sull'Etichetta: prova più corti.",
-      );
+      setError("Non è stato possibile salvare le impostazioni. Riprova.");
       setBuilding(false);
       return;
     }
@@ -224,51 +285,27 @@ export function EtichetteSheet({
           </div>
         </fieldset>
 
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="millName">Nome del frantoio</Label>
-            <Switch
-              aria-label="Stampa il nome del frantoio"
-              checked={settings.millNameOnEtichetta}
-              onCheckedChange={(on) =>
-                setSettings({ ...settings, millNameOnEtichetta: on })
-              }
-            />
-          </div>
-          <Input
-            id="millName"
-            value={settings.millName}
-            maxLength={MAX_MILL_TEXT}
-            onChange={(event) =>
-              setSettings({ ...settings, millName: event.target.value })
-            }
-            className="h-12 text-base"
-          />
-        </div>
+        <MillLine
+          id="millName"
+          label="Nome del frantoio"
+          switchLabel="Stampa il nome del frantoio"
+          value={settings.millName}
+          on={settings.millNameOnEtichetta}
+          onSwitch={(on) =>
+            setSettings({ ...settings, millNameOnEtichetta: on })
+          }
+        />
 
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="millPhone">Telefono</Label>
-            <Switch
-              aria-label="Stampa il telefono"
-              checked={settings.millPhoneOnEtichetta}
-              onCheckedChange={(on) =>
-                setSettings({ ...settings, millPhoneOnEtichetta: on })
-              }
-            />
-          </div>
-          <Input
-            id="millPhone"
-            type="tel"
-            inputMode="tel"
-            value={settings.millPhone}
-            maxLength={MAX_MILL_TEXT}
-            onChange={(event) =>
-              setSettings({ ...settings, millPhone: event.target.value })
-            }
-            className="h-12 text-base tabular-nums"
-          />
-        </div>
+        <MillLine
+          id="millPhone"
+          label="Telefono"
+          switchLabel="Stampa il telefono"
+          value={settings.millPhone}
+          on={settings.millPhoneOnEtichetta}
+          onSwitch={(on) =>
+            setSettings({ ...settings, millPhoneOnEtichetta: on })
+          }
+        />
 
         <Button
           disabled={building || selected.length === 0}
@@ -287,8 +324,16 @@ export function EtichetteSheet({
         )}
 
         <p className="text-xs text-muted-foreground">
-          Le impostazioni valgono per ogni stampa: si salvano quando scarichi il
-          PDF, e ogni modifica finisce nel Registro.
+          Il formato e i due interruttori valgono per ogni stampa: si salvano
+          quando scarichi il PDF, e ogni modifica finisce nel Registro. Il nome
+          e il telefono si scrivono in{" "}
+          <Link
+            href="/frantoio"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            «Il frantoio»
+          </Link>
+          .
         </p>
       </aside>
     </div>

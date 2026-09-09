@@ -2,6 +2,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import {
   DEFAULT_SOGLIA_RITARDO,
   type EtichettaSettings,
+  type FrantoioSettings,
   type SmsSettings,
   type StoredSettings,
 } from "./schema";
@@ -14,24 +15,34 @@ import { DEFAULT_SMS_RIENTRO, DEFAULT_SMS_RITIRO } from "./template";
  * shape — there, a setting nobody has touched is simply absent.
  */
 export type MillSettings = EtichettaSettings &
+  FrantoioSettings &
   SmsSettings & { sogliaRitardo: number };
 
 /**
- * What an Etichetta says when nobody has decided otherwise: the size the mill
- * assumed while the screens were drawn, and no mill name or telephone, because
- * the app cannot know them. The switches start on, so that typing the name is
- * enough to see it on the label.
+ * What the row says when nobody has decided otherwise: the label size the mill
+ * assumed while the screens were drawn, and no name and no telephone, because
+ * the app cannot know them. The switches start on, so that typing the name on
+ * Il frantoio is enough to see it on the label.
  *
- * These five are what the row cannot be without, so they are what a row is
- * created with.
+ * These five are the columns the row cannot be without, so these are the
+ * values a row is created with. The Mittente is not among them: it arrived after the row did,
+ * and answers empty until an Admin settles it (ADR-0004).
  */
-const DEFAULT_ETICHETTA_SETTINGS: EtichettaSettings = {
+const ROW_DEFAULTS: EtichettaSettings = {
   etichettaSize: "100x150",
   millName: "",
   millNameOnEtichetta: true,
   millPhone: "",
   millPhoneOnEtichetta: true,
 };
+
+/**
+ * The Mittente an Sms arrives from before the mill has said. Empty, and
+ * deliberately not a guess: "Frantoio" landing on two hundred telephones is
+ * worse than nothing landing, because nobody notices it is wrong. Empty is
+ * what holds both switches shut until somebody types the real one.
+ */
+const DEFAULT_SMS_SENDER = "";
 
 /**
  * What the mill's Sms say, and whether they are sent at all, when nobody has
@@ -58,8 +69,9 @@ export async function millSettings(ctx: QueryCtx): Promise<MillSettings> {
   const stored = await ctx.db.query("settings").first();
   if (stored === null) {
     return {
-      ...DEFAULT_ETICHETTA_SETTINGS,
+      ...ROW_DEFAULTS,
       ...DEFAULT_SMS_SETTINGS,
+      smsSender: DEFAULT_SMS_SENDER,
       sogliaRitardo: DEFAULT_SOGLIA_RITARDO,
     };
   }
@@ -69,6 +81,7 @@ export async function millSettings(ctx: QueryCtx): Promise<MillSettings> {
     millNameOnEtichetta: stored.millNameOnEtichetta,
     millPhone: stored.millPhone,
     millPhoneOnEtichetta: stored.millPhoneOnEtichetta,
+    smsSender: stored.smsSender ?? DEFAULT_SMS_SENDER,
     sogliaRitardo: stored.sogliaRitardo ?? DEFAULT_SOGLIA_RITARDO,
     smsRitiroTemplate:
       stored.smsRitiroTemplate ?? DEFAULT_SMS_SETTINGS.smsRitiroTemplate,
@@ -100,7 +113,7 @@ export async function saveMillSettings(
   const stored = await ctx.db.query("settings").first();
   if (stored === null) {
     await ctx.db.insert("settings", {
-      ...DEFAULT_ETICHETTA_SETTINGS,
+      ...ROW_DEFAULTS,
       ...wanted,
     });
     return;
