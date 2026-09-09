@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import {
   Card,
   CardContent,
@@ -29,7 +29,13 @@ import {
  * page above, where an Admin will look for it.
  */
 export function SmsHistory({ clienteId }: { clienteId: Id<"clienti"> }) {
-  const rows = useQuery(api.sms.byCliente, { clienteId });
+  const { isAuthenticated } = useConvexAuth();
+  // Server-rendered Cliente data can arrive before Convex authenticates the
+  // browser connection. Wait for that connection before reading protected SMS.
+  const rows = useQuery(
+    api.sms.byCliente,
+    isAuthenticated ? { clienteId } : "skip",
+  );
 
   if (rows === undefined || rows.length === 0) {
     return null;
