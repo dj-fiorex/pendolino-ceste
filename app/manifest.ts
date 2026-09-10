@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Pendolino",
     description: "Le Ceste del frantoio: chi le ha e dove sono.",
     lang: "it",
+    id: "/",
     start_url: "/",
     scope: "/",
     display: "standalone",

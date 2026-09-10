@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#faf8f3" />
+    <title>Connessione necessaria · Pendolino Ceste</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #faf8f3;
+        --foreground: #1c1f18;
+        --muted: #606456;
+        --primary: #4a6741;
+        --button-text: #fff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #1c1f18;
+          --foreground: #faf8f3;
+          --muted: #c0c4b8;
+          --primary: #b5ce9e;
+          --button-text: #1c1f18;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top))
+          max(24px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom))
+          max(24px, env(safe-area-inset-left));
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          18px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        width: 100%;
+        max-width: 28rem;
+      }
+      .brand {
+        color: var(--muted);
+        font-size: 16px;
+      }
+      h1 {
+        font-size: clamp(1.75rem, 7vw, 2.25rem);
+        line-height: 1.15;
+      }
+      button {
+        margin-top: 12px;
+        min-height: 48px;
+        padding: 12px 24px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--primary);
+        color: var(--button-text);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid var(--foreground);
+        outline-offset: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="brand">Pendolino Ceste</p>
+      <h1>Connessione necessaria</h1>
+      <p>
+        Per usare Pendolino serve una connessione a internet. Controlla il Wi-Fi
+        o la rete mobile e riprova.
+      </p>
+      <button type="button" id="retry">Riprova</button>
+    </main>
+    <script>
+      document.getElementById("retry").addEventListener("click", function () {
+        if (location.pathname === "/offline.html") location.replace("/");
+        else location.reload();
+      });
+    </script>
+  </body>
+</html>

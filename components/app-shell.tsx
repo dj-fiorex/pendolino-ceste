@@ -7,6 +7,7 @@ import { redirect, usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { CampagnaBar } from "@/components/campagna-bar";
 import { SignOutButton } from "@/components/sign-out-button";
+import { InstallApp } from "@/components/install-app";
 import {
   Dialog,
   DialogContent,
@@ -120,6 +121,7 @@ function MoreMenu({
               );
             })}
         </div>
+        <InstallApp />
         <SignOutButton />
       </DialogContent>
     </Dialog>
