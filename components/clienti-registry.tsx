@@ -20,15 +20,16 @@ export function ClientiRegistry() {
           <h1 className="font-display text-3xl font-bold tracking-tight">
             I Clienti
           </h1>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12 text-base"
-            disabled={creating}
-            onClick={() => setCreating(true)}
-          >
-            Nuovo Cliente
-          </Button>
+          {creating ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 text-base"
+              onClick={() => setCreating(true)}
+            >
+              Nuovo Cliente
+            </Button>
+          )}
         </div>
         <p className="text-muted-foreground">
           Cerca per nome o per soprannome. Chi non c&apos;è si scrive al
