@@ -739,3 +739,23 @@ describe("a refusal to somebody who is not an Operatore", () => {
     );
   });
 });
+
+test("auth trusts configured previews and localhost, but rejects other sites", async () => {
+  const preview = "https://pendolino-preview.example";
+  vi.stubEnv("AUTH_TRUSTED_ORIGINS", ` ${preview}, `);
+  try {
+    const t = startApp();
+    const trusted = await t.run(async (ctx) => {
+      const { createAuth } = await import("./auth");
+      const auth = await createAuth(ctx).$context;
+      return [
+        preview,
+        "http://localhost:3000",
+        "https://unrelated.example",
+      ].map((origin) => auth.isTrustedOrigin(origin));
+    });
+    expect(trusted).toEqual([true, true, false]);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

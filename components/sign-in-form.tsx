@@ -23,7 +23,13 @@ export function SignInForm() {
     });
     if (attempt.error) {
       setPending(false);
-      setError("Email o password non corretti.");
+      setError(
+        attempt.error.code === "INVALID_EMAIL_OR_PASSWORD"
+          ? "Email o password non corretti."
+          : attempt.error.code === "INVALID_ORIGIN"
+            ? "Questo indirizzo del sito non è abilitato all'accesso. Contatta un Admin."
+            : "Accesso non riuscito. Riprova tra poco.",
+      );
       return;
     }
     router.replace("/");

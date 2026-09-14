@@ -37,6 +37,10 @@ const canSignIn = makeFunctionReference<
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
     baseURL: process.env.SITE_URL,
+    // Additional frontend origins sharing this backend, such as a Vercel preview.
+    trustedOrigins: process.env.AUTH_TRUSTED_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,
