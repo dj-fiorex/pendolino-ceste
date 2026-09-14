@@ -19,23 +19,35 @@ import { clienteLabel, type Cliente } from "@/lib/cliente";
 export function ClientePicker({
   onPick,
   pickLabel,
+  creating: controlledCreating,
+  onCreatingChange,
+  showCreateAction = true,
 }: {
   onPick: (cliente: Cliente) => void;
   /** What choosing a Cliente does next, for whoever reads the screen. */
   pickLabel: string;
+  /** Lets a screen place its own create action without changing the flow. */
+  creating?: boolean;
+  onCreatingChange?: (creating: boolean) => void;
+  showCreateAction?: boolean;
 }) {
   const [term, setTerm] = useState("");
-  const [writing, setWriting] = useState(false);
+  const [localCreating, setLocalCreating] = useState(false);
   const createCliente = useMutation(api.clienti.create);
   const found = useQuery(api.clienti.search, { term });
+  const creating = controlledCreating ?? localCreating;
+  const setCreating = (next: boolean) => {
+    setLocalCreating(next);
+    onCreatingChange?.(next);
+  };
 
-  if (writing) {
+  if (creating) {
     return (
       <ClienteForm
         initial={{ name: term, alias: [], phone: "", smsOptOut: false }}
         submitLabel="Crea il Cliente"
         onPickNamesake={onPick}
-        onCancel={() => setWriting(false)}
+        onCancel={() => setCreating(false)}
         onSubmit={async (fields) => {
           // A Cliente entered at the counter receives the mill's SMS: nobody
           // has asked not to yet, and the switch that says so is on their own
@@ -108,13 +120,15 @@ export function ClientePicker({
         </p>
       )}
 
-      <Button
-        variant="outline"
-        className="h-12 text-base"
-        onClick={() => setWriting(true)}
-      >
-        Nuovo Cliente
-      </Button>
+      {showCreateAction ? (
+        <Button
+          variant="outline"
+          className="h-12 text-base"
+          onClick={() => setCreating(true)}
+        >
+          Nuovo Cliente
+        </Button>
+      ) : null}
     </div>
   );
 }

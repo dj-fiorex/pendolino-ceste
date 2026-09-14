@@ -14,15 +14,6 @@ export default async function Clienti() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-4 md:p-6 lg:max-w-4xl">
-      <div className="space-y-2">
-        <h1 className="font-display text-3xl font-bold tracking-tight">
-          I Clienti
-        </h1>
-        <p className="text-muted-foreground">
-          Cerca per nome o per soprannome. Chi non c&apos;è si scrive al
-          momento.
-        </p>
-      </div>
       <ClientiRegistry />
     </main>
   );
