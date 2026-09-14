@@ -264,7 +264,9 @@ export function SvuotamentoScreen() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 flex items-center gap-3 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      {/* Above the mobile tabs: min-h-14, their border and the safe area.
+          At lg the tabs give way to the 17rem sidebar. */}
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-20 flex items-center gap-3 border-t bg-background/95 p-3 backdrop-blur lg:bottom-0 lg:left-[17rem] lg:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline" className="h-16 px-5 text-lg">
