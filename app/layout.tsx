@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Source_Sans_3 } from "next/font/google";
 import type { ReactNode } from "react";
-import { AppShell } from "@/components/app-shell";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
 import { PwaProvider } from "@/components/pwa-provider";
 import { getToken } from "@/lib/auth-server";
@@ -56,7 +55,7 @@ export default async function RootLayout({
       >
         <PwaProvider>
           <ConvexClientProvider initialToken={initialToken}>
-            <AppShell>{children}</AppShell>
+            {children}
           </ConvexClientProvider>
         </PwaProvider>
       </body>

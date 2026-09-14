@@ -1,13 +1,6 @@
 import { redirect } from "next/navigation";
 import { HomeDashboard, type HomeData } from "@/components/home-dashboard";
-import { SignOutButton } from "@/components/sign-out-button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AccountDisabled } from "@/components/account-disabled";
 import { api } from "@/convex/_generated/api";
 import { fetchAuthQuery, signedInOperatore } from "@/lib/auth-server";
 import { inRitardo } from "@/lib/ceste";
@@ -28,21 +21,7 @@ export default async function Home() {
   }
 
   if (operatore === null) {
-    return (
-      <main className="mx-auto flex w-full max-w-md flex-col justify-center gap-8 p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Questo account non è abilitato</CardTitle>
-            <CardDescription>
-              Chiedi a un Admin del frantoio di riattivarti, poi rientra.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SignOutButton />
-          </CardContent>
-        </Card>
-      </main>
-    );
+    return <AccountDisabled />;
   }
 
   const [ceste, disponibili, recupero] = await Promise.all([

@@ -22,12 +22,11 @@ import {
  * whatever a device still remembers — so this is what the screen shows and
  * what it sends, not the last word on either.
  */
-function useCampagna(): {
+function useCampagna(campagne: Campagna[] | undefined): {
   campagne: Campagna[] | undefined;
   open: Campagna | null;
   named: Campagna | null;
 } {
-  const campagne = useQuery(api.campagne.list, {});
   const namedId = useSyncExternalStore(
     subscribeToNamedCampagna,
     namedCampagna,
@@ -68,7 +67,8 @@ export function useCampagnaChoice(): {
   campagnaId: Id<"campagne"> | undefined;
   mustAsk: boolean;
 } {
-  const { campagne, open, named } = useCampagna();
+  const campagne = useQuery(api.campagne.list, {});
+  const { open, named } = useCampagna(campagne);
   return {
     campagnaId: (open ?? named)?._id,
     mustAsk:
@@ -107,8 +107,12 @@ function CampagnaChoice({
  * because opening a Campagna is an Admin's and the queue is not (ADR-0005).
  * Picking a closed Campagna does not reopen it.
  */
-export function CampagnaBar() {
-  const { campagne, open, named } = useCampagna();
+export function CampagnaBar({
+  campagne,
+}: {
+  campagne: Campagna[] | undefined;
+}) {
+  const { open, named } = useCampagna(campagne);
   const [choosing, setChoosing] = useState(false);
 
   if (campagne === undefined) {

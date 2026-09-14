@@ -1,10 +1,12 @@
 "use client";
 
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, type Preloaded } from "convex/react";
+import { usePreloadedAuthQuery } from "@convex-dev/better-auth/nextjs/client";
+import { AccountDisabled } from "@/components/account-disabled";
 import { MenuIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect, usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CampagnaBar } from "@/components/campagna-bar";
 import { SignOutButton } from "@/components/sign-out-button";
 import { InstallApp } from "@/components/install-app";
@@ -137,22 +139,46 @@ function MoreMenu({
  * registers belongs to one whichever screen registers it, and the way back to
  * the home is the chrome's now — no screen carries its own "Indietro".
  */
+type ShellProps = {
+  children: ReactNode;
+  preloadedOperatore: Preloaded<typeof api.operatori.current>;
+  preloadedCampagne: Preloaded<typeof api.campagne.list> | null;
+};
+
+// A reauthenticated connection can still be waiting for its first query result.
+// Undefined means pending; null remains a real result, including deactivation.
+function useLastDefined<T>(value: T | undefined) {
+  const [last, setLast] = useState(value);
+  useEffect(() => {
+    if (value !== undefined) setLast(value);
+  }, [value]);
+  return value === undefined ? last : value;
+}
+
+function PreloadedCampagnaBar({
+  query,
+}: {
+  query: Preloaded<typeof api.campagne.list>;
+}) {
+  const campagne = useLastDefined(usePreloadedAuthQuery(query));
+  return <CampagnaBar campagne={campagne ?? undefined} />;
+}
+
 function Chrome({
   children,
   pathname,
-}: {
-  children: ReactNode;
-  pathname: string;
-}) {
-  const operatore = useQuery(api.operatori.current, {});
+  preloadedOperatore,
+  preloadedCampagne,
+}: ShellProps & { pathname: string }) {
+  const operatore = useLastDefined(usePreloadedAuthQuery(preloadedOperatore));
   const [more, setMore] = useState(false);
   const isAdmin = operatore?.role === "admin";
 
   // An account an Admin has deactivated is signed in and has nowhere to go:
   // it gets the card that says so, and no chrome round it that would offer
   // screens it will only be turned away from.
-  if (operatore === null) {
-    return <>{children}</>;
+  if (operatore == null) {
+    return <AccountDisabled />;
   }
 
   return (
@@ -206,9 +232,9 @@ function Chrome({
           )}
         </header>
 
-        {operatore && (
+        {preloadedCampagne && (
           <div className="px-4 pt-4 lg:px-8 lg:pt-6">
-            <CampagnaBar />
+            <PreloadedCampagnaBar query={preloadedCampagne} />
           </div>
         )}
 
@@ -253,34 +279,14 @@ function Chrome({
   );
 }
 
-/**
- * Where the shell hangs. Signing in and setting a password are shown bare:
- * there is nothing to navigate to until somebody is signed in, and the chrome
- * reads the Operatore.
- */
-export function AppShell({ children }: { children: ReactNode }) {
+/** Server-authorized content stays mounted while the browser authenticates. */
+export function AppShell(props: ShellProps) {
   const pathname = usePathname();
   const { isLoading, isAuthenticated } = useConvexAuth();
 
-  if (pathname === "/accedi" || pathname.startsWith("/password/")) {
-    return <>{children}</>;
-  }
-
-  // Server authentication does not authenticate the browser connection.
-  // Mount the chrome and protected screens only after Convex confirms it.
-  if (isLoading) {
-    return (
-      <main className="p-6">
-        <p role="status" className="text-sm text-muted-foreground">
-          Un attimo…
-        </p>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (!isLoading && !isAuthenticated) {
     redirect("/accedi");
   }
 
-  return <Chrome pathname={pathname}>{children}</Chrome>;
+  return <Chrome pathname={pathname} {...props} />;
 }
