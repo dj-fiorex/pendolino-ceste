@@ -1,22 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { HashIcon } from "lucide-react";
 import { useState } from "react";
 import { useCampagnaChoice } from "@/components/campagna-bar";
 import { CestaTile } from "@/components/cesta-tile";
-import { NumeroKeypad } from "@/components/numero-keypad";
+import { NumeroKeypadDialog } from "@/components/numero-keypad-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -267,24 +258,10 @@ export function SvuotamentoScreen() {
       {/* Above the mobile tabs: min-h-14, their border and the safe area.
           At lg the tabs give way to the 17rem sidebar. */}
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-20 flex items-center gap-3 border-t bg-background/95 p-3 backdrop-blur lg:bottom-0 lg:left-[17rem] lg:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="h-16 px-5 text-lg">
-              <HashIcon className="size-5" />
-              Numero
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Aggiungi per numero</DialogTitle>
-              <DialogDescription>
-                Anche una Cesta che non risulta in attesa di molitura: si svuota
-                lo stesso.
-              </DialogDescription>
-            </DialogHeader>
-            <NumeroKeypad onCesta={addByNumero} />
-          </DialogContent>
-        </Dialog>
+        <NumeroKeypadDialog
+          description="Anche una Cesta che non risulta in attesa di molitura: si svuota lo stesso."
+          onCesta={addByNumero}
+        />
         <Button
           className="h-16 flex-1 text-xl"
           disabled={pending || chosen.length === 0 || mustAsk}

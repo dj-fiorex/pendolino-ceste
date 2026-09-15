@@ -34,8 +34,10 @@ const MAX_DIGITS = 4;
  */
 export function NumeroKeypad({
   onCesta,
+  submitLabel = "Aggiungi",
 }: {
   onCesta: (cesta: FoundCesta) => string | null;
+  submitLabel?: string;
 }) {
   const convex = useConvex();
   const [typed, setTyped] = useState("");
@@ -112,7 +114,7 @@ export function NumeroKeypad({
         </Button>
         <Button
           type="button"
-          aria-label="Aggiungi"
+          aria-label={submitLabel}
           className="h-16"
           disabled={typed === ""}
           onClick={add}
