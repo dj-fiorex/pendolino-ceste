@@ -144,6 +144,7 @@ describe("a Ritiro at the counter", () => {
       // the same: the counter is not blocked by the calendar either (#19).
       campagna: null,
       producedRettifica: false,
+      discrepanze: [],
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
@@ -675,6 +676,7 @@ describe("a Rientro at the counter", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      discrepanze: [],
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
@@ -971,6 +973,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
       cliente: null,
       campagna: null,
       producedRettifica: false,
+      discrepanze: [],
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
@@ -1230,6 +1233,7 @@ describe("a Rettifica", () => {
       // The row an Admin's own correction leaves is a row that produced a
       // Rettifica, like the counter's discrepanze (#21).
       producedRettifica: true,
+      discrepanze: [],
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },

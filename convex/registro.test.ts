@@ -180,6 +180,7 @@ describe("the Registro of a day", () => {
       cliente: { name: "Giuseppe Amato", alias: [] },
       campagna: null,
       producedRettifica: false,
+      discrepanze: [],
       corrects: null,
       correctedBy: [],
       media: { signature: null, photo: null },
@@ -323,6 +324,82 @@ describe("narrowing the Registro", () => {
         await gabriele.query(api.registro.list, { day, clienteId: salvatore }),
       ),
     ).toEqual(["cliente_creato"]);
+  });
+
+  test("by Cliente includes a grouped discrepancy that names them", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t, "Marco", "auth|marco");
+    const abissi = await marco.mutation(api.clienti.create, {
+      name: "Abissi Vincenzo",
+    });
+    const carmelo = await marco.mutation(api.clienti.create, {
+      name: "Carmelo Fiorello",
+    });
+    const cestaId = await typeNumero(marco, "2");
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: abissi,
+      cesteIds: [cestaId],
+    });
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: carmelo,
+      cesteIds: [cestaId],
+    });
+
+    const rows = await gabriele.query(api.registro.list, {
+      day: today(),
+      clienteId: abissi,
+    });
+    const grouped = rows.find(
+      (row) =>
+        row.action.kind === "ritiro" &&
+        row.cliente?.name === "Carmelo Fiorello",
+    );
+
+    expect(grouped?.discrepanze).toEqual([
+      {
+        numero: 2,
+        believedState: "fuori",
+        becomes: "fuori",
+        cliente: { name: "Abissi Vincenzo", alias: [] },
+      },
+    ]);
+  });
+
+  test("Solo rettifiche includes manual and automatic Rettifiche", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t, "Marco", "auth|marco");
+    const giuseppe = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const salvatore = await marco.mutation(api.clienti.create, {
+      name: "Salvatore Russo",
+    });
+    const cestaId = await typeNumero(marco, "2");
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: giuseppe,
+      cesteIds: [cestaId],
+    });
+    await marco.mutation(api.movimenti.ritiro, {
+      clienteId: salvatore,
+      cesteIds: [cestaId],
+    });
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId: await typeNumero(gabriele, "7"),
+      cause: "rotta",
+    });
+
+    expect(
+      kindsOf(
+        await gabriele.query(api.registro.list, {
+          day: today(),
+          producedRettifica: true,
+        }),
+      ),
+    ).toEqual(["rettifica", "ritiro"]);
   });
 
   test("by Operatore leaves only what they did", async () => {

@@ -489,10 +489,8 @@ export const properName = (text: string) =>
  * both are searched, and both are searched under the same comparison rule the
  * rest of the registry uses (ADR-0010).
  */
-export const searchableNames = (cliente: {
-  name: string;
-  alias: string[];
-}) => [cliente.name, ...cliente.alias].map(comparableName).join(" ");
+export const searchableNames = (cliente: { name: string; alias: string[] }) =>
+  [cliente.name, ...cliente.alias].map(comparableName).join(" ");
 
 /**
  * The two fields the `clienti` indexes are built on, derived from the Cliente
@@ -1101,6 +1099,9 @@ export default defineSchema({
     ),
   )
     .index("by_cliente", ["clienteId"])
+    // The Movimenti grouped under one human-readable Registro action. Read
+    // when that row has to explain the automatic Rettifiche it produced.
+    .index("by_registro", ["registroId"])
     // One Cesta's own history, newest last.
     .index("by_cesta", ["cestaId"])
     // The newest Movimento of one kind against her, read as a single row: the

@@ -1,15 +1,23 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { MediaKept } from "@/components/media-kept";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { dayBounds } from "@/convex/schema";
 import { clienteLabel } from "@/lib/cliente";
-import { registroSentence, saysItsCampagna, timeOf } from "@/lib/registro";
+import {
+  discrepancySentence,
+  registroSentence,
+  saysItsCampagna,
+  timeOf,
+} from "@/lib/registro";
 import { smsDeliveryLabel, smsWentWrong } from "@/lib/sms";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +88,7 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
   const [day, setDay] = useState(initialDay);
   const [clienteId, setClienteId] = useState<Id<"clienti"> | null>(null);
   const [operatoreId, setOperatoreId] = useState<Id<"operatori"> | null>(null);
+  const [onlyRettifiche, setOnlyRettifiche] = useState(false);
 
   // A cleared date box is nobody's day: the screen asks for one rather than
   // reading every Campagna the mill has ever had.
@@ -96,6 +105,7 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
           day: bounds,
           clienteId: clienteId ?? undefined,
           operatoreId: operatoreId ?? undefined,
+          producedRettifica: onlyRettifiche ? true : undefined,
         },
   );
 
@@ -145,6 +155,20 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
           chosen={operatoreId}
           onChoose={setOperatoreId}
         />
+
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <div className="grid gap-1">
+            <Label htmlFor="registro-rettifiche">Solo rettifiche</Label>
+            <p className="text-sm text-muted-foreground">
+              Manuali e automatiche
+            </p>
+          </div>
+          <Switch
+            id="registro-rettifiche"
+            checked={onlyRettifiche}
+            onCheckedChange={setOnlyRettifiche}
+          />
+        </div>
       </div>
 
       {bounds === null ? (
@@ -177,6 +201,21 @@ export function RegistroList({ initialDay }: { initialDay: string }) {
                     </span>
                   )}
                 </p>
+                {row.discrepanze.length > 0 && (
+                  <Alert variant="warning" className="mt-3">
+                    <TriangleAlert aria-hidden="true" />
+                    <AlertTitle>Rettifiche automatiche</AlertTitle>
+                    <AlertDescription>
+                      <ul className="grid gap-1">
+                        {row.discrepanze.map((discrepancy) => (
+                          <li key={discrepancy.numero}>
+                            {discrepancySentence(discrepancy)}
+                          </li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {/* What the Cliente left at the counter, on the one line that
                     is the whole Ritiro rather than one of its six Ceste
                     (ADR-0006, #25). */}

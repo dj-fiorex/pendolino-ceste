@@ -9,6 +9,7 @@ import type {
   PlainMovimentoKind,
   SmsDelivery,
   SmsSettingField,
+  State,
 } from "@/convex/schema";
 import { cesteCount, dayOf, daysLabel, stateInSentence } from "@/lib/ceste";
 import { clienteInSentence, type ClienteName } from "@/lib/cliente";
@@ -26,6 +27,13 @@ export type RegistroRow = {
   campagna: string | null;
   /** Whether the action left a Rettifica behind it (#21). */
   producedRettifica: boolean;
+  /** The automatic Rettifiche grouped under this counter action. */
+  discrepanze: {
+    numero: number;
+    believedState: State;
+    becomes: State;
+    cliente: ClienteName | null;
+  }[];
   /** The action this row corrects, where this row is a correction (#28). */
   corrects: {
     _id: Id<"registro">;
@@ -60,6 +68,17 @@ export const timeOf = (at: number) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+/** One automatic Rettifica, as the warning under its Registro row reads. */
+export const discrepancySentence = (
+  discrepancy: RegistroRow["discrepanze"][number],
+) => {
+  const cliente =
+    discrepancy.cliente === null
+      ? null
+      : clienteInSentence(discrepancy.cliente);
+  return `La Cesta ${discrepancy.numero} risultava ${stateInSentence(discrepancy.believedState, cliente)}.`;
+};
 
 const formaInSentence: Record<Forma, { one: string; many: string }> = {
   quadrata: { one: "quadrata", many: "quadrate" },

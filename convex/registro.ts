@@ -10,6 +10,7 @@ import {
   mediaLinks,
   plainMovimentoKind,
   smsDelivery,
+  state,
   type Action,
   type PlainMovimentoKind,
 } from "./schema";
@@ -160,14 +161,35 @@ async function rowsIndexedBy(
   { day, clienteId, operatoreId }: Filters,
 ): Promise<Doc<"registro">[]> {
   if (clienteId !== undefined) {
-    const rows = await ctx.db
+    const directRows = await ctx.db
       .query("registro")
       .withIndex("by_cliente", (q) => within(q.eq("clienteId", clienteId), day))
       .order("desc")
       .collect();
-    return operatoreId === undefined
-      ? rows
-      : rows.filter((row) => row.operatoreId === operatoreId);
+    const discrepancyMovements = await ctx.db
+      .query("movimenti")
+      .withIndex("by_cliente", (q) => within(q.eq("clienteId", clienteId), day))
+      .order("desc")
+      .collect();
+    const relatedRows = await Promise.all(
+      discrepancyMovements.flatMap((movimento) =>
+        movimento.kind === "rettifica" &&
+        movimento.rettifica.cause === "discrepanza"
+          ? [ctx.db.get(movimento.registroId)]
+          : [],
+      ),
+    );
+    const rows = new Map(
+      [
+        ...directRows,
+        ...relatedRows.flatMap((row) => (row === null ? [] : [row])),
+      ].map((row) => [row._id, row]),
+    );
+    return [...rows.values()]
+      .filter(
+        (row) => operatoreId === undefined || row.operatoreId === operatoreId,
+      )
+      .sort((one, other) => other._creationTime - one._creationTime);
   }
 
   if (operatoreId !== undefined) {
@@ -314,6 +336,49 @@ async function clienteOf(
   return cliente;
 }
 
+/** The automatic corrections grouped under one counter action. */
+async function discrepanciesOf(ctx: QueryCtx, row: Doc<"registro">) {
+  if (!leftARettifica(row)) {
+    return [];
+  }
+  const movements = await ctx.db
+    .query("movimenti")
+    .withIndex("by_registro", (q) => q.eq("registroId", row._id))
+    .collect();
+  const discrepancies = movements.filter(
+    (movimento) =>
+      movimento.kind === "rettifica" &&
+      movimento.rettifica.cause === "discrepanza",
+  );
+  return await Promise.all(
+    discrepancies.map(async (movimento) => {
+      if (movimento.kind !== "rettifica") {
+        throw new Error("A discrepancy is always a Rettifica.");
+      }
+      const cesta = await ctx.db.get(movimento.cestaId);
+      if (cesta === null) {
+        throw new Error("A Rettifica names a Cesta that is gone.");
+      }
+      const cliente =
+        movimento.clienteId === undefined
+          ? null
+          : await ctx.db.get(movimento.clienteId);
+      if (movimento.clienteId !== undefined && cliente === null) {
+        throw new Error("A Rettifica names a Cliente that is gone.");
+      }
+      return {
+        numero: cesta.numero,
+        believedState: movimento.rettifica.believedState,
+        becomes: movimento.rettifica.becomes,
+        cliente:
+          cliente === null
+            ? null
+            : { name: cliente.name, alias: cliente.alias },
+      };
+    }),
+  );
+}
+
 /**
  * The Registro, newest first: who did what, when, and to which Cliente, as the
  * structured fields the screen turns into Italian sentences. Read by an Admin
@@ -341,6 +406,19 @@ export const list = query({
       // Whether the action left a Rettifica behind it, so that the screen can
       // mark the row and offer the day's discrepanze on their own (#21, #27).
       producedRettifica: v.boolean(),
+      // The automatic Rettifiche grouped under this counter action. Manual
+      // Rettifiche are already the action itself and leave this empty.
+      discrepanze: v.array(
+        v.object({
+          numero: v.number(),
+          believedState: state,
+          becomes: state,
+          cliente: v.union(
+            v.null(),
+            v.object({ name: v.string(), alias: v.array(v.string()) }),
+          ),
+        }),
+      ),
       // The action this row corrects, and the Rettifiche that correct it: the
       // two ends of a misregistration put right, so that the Registro reads
       // the pair from whichever of them the Admin happens to be looking at
@@ -392,6 +470,7 @@ export const list = query({
               : { name: cliente.name, alias: cliente.alias },
           campagna: await campagnaNameOf(ctx, row),
           producedRettifica: leftARettifica(row),
+          discrepanze: await discrepanciesOf(ctx, row),
           corrects: await correctsOf(ctx, row),
           correctedBy: await correctedByOf(ctx, row),
           media: await linksToMedia(ctx, row.action),
@@ -435,6 +514,23 @@ export const filterOptions = query({
       const cliente = await clienteOf(ctx, row);
       if (cliente !== null) {
         clienti.set(cliente._id, cliente);
+      }
+      for (const movimento of await ctx.db
+        .query("movimenti")
+        .withIndex("by_registro", (q) => q.eq("registroId", row._id))
+        .collect()) {
+        if (
+          movimento.kind !== "rettifica" ||
+          movimento.rettifica.cause !== "discrepanza" ||
+          movimento.clienteId === undefined
+        ) {
+          continue;
+        }
+        const previous = await ctx.db.get(movimento.clienteId);
+        if (previous === null) {
+          throw new Error("A Rettifica names a Cliente that is gone.");
+        }
+        clienti.set(previous._id, previous);
       }
     }
 

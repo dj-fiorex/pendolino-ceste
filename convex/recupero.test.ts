@@ -101,6 +101,7 @@ describe("the Soglia di ritardo", () => {
         cliente: null,
         campagna: null,
         producedRettifica: false,
+        discrepanze: [],
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },

@@ -95,6 +95,7 @@ describe("the Etichetta settings", () => {
         cliente: null,
         campagna: null,
         producedRettifica: false,
+        discrepanze: [],
         corrects: null,
         correctedBy: [],
         media: { signature: null, photo: null },
@@ -145,9 +146,7 @@ describe("the Etichetta settings", () => {
     expect(registro).toHaveLength(2);
     expect(registro[0].action).toEqual({
       kind: "etichette_settings",
-      changes: [
-        { field: "millNameOnEtichetta", before: true, after: false },
-      ],
+      changes: [{ field: "millNameOnEtichetta", before: true, after: false }],
     });
   });
 

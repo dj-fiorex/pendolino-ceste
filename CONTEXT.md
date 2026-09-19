@@ -17,7 +17,7 @@ Whoever takes empty Ceste away from the mill and brings them back loaded with ol
 _Avoid_: Utente, user, client
 
 **Alias**:
-A further name a Cliente is known by at the counter, used to tell namesakes apart. A Cliente may have several. Labelled *Soprannomi* on screen, because that is the counter's word; `alias` in code.
+A further name a Cliente is known by at the counter, used to tell namesakes apart. A Cliente may have several. Labelled _Soprannomi_ on screen, because that is the counter's word; `alias` in code.
 _Avoid_: Soprannome (in code), nickname, nomignolo, secondo nome
 
 **Gestionale** (management software):
@@ -104,13 +104,13 @@ The Cesta is tipped out at the mill and its paper tape comes off. Attesa molitur
 _Avoid_: Scarico, unload, release, cesta vuota
 
 **Rettifica** (adjustment):
-A correction to a Cesta's whereabouts that no Ritiro or Rientro explains. Carries one of five reasons, because they are different facts: *persa* (lost to a Cliente, the Cesta becomes Dismessa), *rotta* (broken at the mill, Dismessa), *ritrovata* (turned up again; the Admin says whether it is Disponibile or Fuori with a Cliente), *errore* (the last Movimento was registered wrongly, and the Admin says where the Cesta really is) and *discrepanza* (a scanned Cesta was not in the state the app expected; written by the app itself, under the Operatore at the counter, as the Movimento goes through). The first four are recorded by an Admin only. A note may accompany any of them.
+A correction to a Cesta's whereabouts that no Ritiro or Rientro explains. Carries one of five reasons, because they are different facts: _persa_ (lost to a Cliente, the Cesta becomes Dismessa), _rotta_ (broken at the mill, Dismessa), _ritrovata_ (turned up again; the Admin says whether it is Disponibile or Fuori with a Cliente), _errore_ (the last Movimento was registered wrongly, and the Admin says where the Cesta really is) and _discrepanza_ (a scanned Cesta was not in the state the app expected; written by the app itself, under the Operatore at the counter, as the Movimento goes through). The first four are recorded by an Admin only. A note may accompany any of them.
 _Avoid_: Fix, correction, writeoff, annullamento, cancellazione
 
 ### Supervision
 
 **Registro** (activity record):
-The record of every action taken in the app — who did it, when, and what it changed. A Ritiro of six Ceste is one entry, and so are the Rettifiche the app wrote while recording it. Read by Admin only.
+The record of every action taken in the app — who did it, when, and what it changed. A Ritiro of six Ceste is one entry; any automatic Rettifiche written while recording it are Movimenti grouped and named inside that same entry, while a Rettifica recorded by an Admin is its own entry. Read by Admin only.
 _Avoid_: Log, audit log, audit trail, storico, cronologia, diario, attività
 
 **Lista di recupero** (recovery list):
