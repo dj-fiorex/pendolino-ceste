@@ -130,6 +130,24 @@ const within = <Range extends CreationTimeRange>(
  */
 const leftARettifica = (row: Doc<"registro">) => row.producedRettifica ?? false;
 
+type Discrepancy = Extract<Doc<"movimenti">, { kind: "rettifica" }>;
+
+/** Whether a Movimento is an automatic correction written at the counter. */
+const isDiscrepancy = (movimento: Doc<"movimenti">): movimento is Discrepancy =>
+  movimento.kind === "rettifica" && movimento.rettifica.cause === "discrepanza";
+
+/** The automatic corrections grouped under one human-readable action. */
+const discrepancyMovementsOf = async (
+  ctx: QueryCtx,
+  registroId: Id<"registro">,
+) =>
+  (
+    await ctx.db
+      .query("movimenti")
+      .withIndex("by_registro", (q) => q.eq("registroId", registroId))
+      .collect()
+  ).filter(isDiscrepancy);
+
 /**
  * The rows a set of filters leaves, newest first.
  *
@@ -173,10 +191,7 @@ async function rowsIndexedBy(
       .collect();
     const relatedRows = await Promise.all(
       discrepancyMovements.flatMap((movimento) =>
-        movimento.kind === "rettifica" &&
-        movimento.rettifica.cause === "discrepanza"
-          ? [ctx.db.get(movimento.registroId)]
-          : [],
+        isDiscrepancy(movimento) ? [ctx.db.get(movimento.registroId)] : [],
       ),
     );
     const rows = new Map(
@@ -341,20 +356,9 @@ async function discrepanciesOf(ctx: QueryCtx, row: Doc<"registro">) {
   if (!leftARettifica(row)) {
     return [];
   }
-  const movements = await ctx.db
-    .query("movimenti")
-    .withIndex("by_registro", (q) => q.eq("registroId", row._id))
-    .collect();
-  const discrepancies = movements.filter(
-    (movimento) =>
-      movimento.kind === "rettifica" &&
-      movimento.rettifica.cause === "discrepanza",
-  );
-  return await Promise.all(
+  const discrepancies = await discrepancyMovementsOf(ctx, row._id);
+  const details = await Promise.all(
     discrepancies.map(async (movimento) => {
-      if (movimento.kind !== "rettifica") {
-        throw new Error("A discrepancy is always a Rettifica.");
-      }
       const cesta = await ctx.db.get(movimento.cestaId);
       if (cesta === null) {
         throw new Error("A Rettifica names a Cesta that is gone.");
@@ -377,6 +381,7 @@ async function discrepanciesOf(ctx: QueryCtx, row: Doc<"registro">) {
       };
     }),
   );
+  return details.sort((one, other) => one.numero - other.numero);
 }
 
 /**
@@ -515,22 +520,17 @@ export const filterOptions = query({
       if (cliente !== null) {
         clienti.set(cliente._id, cliente);
       }
-      for (const movimento of await ctx.db
-        .query("movimenti")
-        .withIndex("by_registro", (q) => q.eq("registroId", row._id))
-        .collect()) {
-        if (
-          movimento.kind !== "rettifica" ||
-          movimento.rettifica.cause !== "discrepanza" ||
-          movimento.clienteId === undefined
-        ) {
-          continue;
+      if (leftARettifica(row)) {
+        for (const movimento of await discrepancyMovementsOf(ctx, row._id)) {
+          if (movimento.clienteId === undefined) {
+            continue;
+          }
+          const previous = await ctx.db.get(movimento.clienteId);
+          if (previous === null) {
+            throw new Error("A Rettifica names a Cliente that is gone.");
+          }
+          clienti.set(previous._id, previous);
         }
-        const previous = await ctx.db.get(movimento.clienteId);
-        if (previous === null) {
-          throw new Error("A Rettifica names a Cliente that is gone.");
-        }
-        clienti.set(previous._id, previous);
       }
     }
 
