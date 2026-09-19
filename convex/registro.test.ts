@@ -521,7 +521,10 @@ describe("who the Registro is for", () => {
     const gabriele = await admin(t);
     const marco = await operatore(t, "Marco", "auth|marco");
 
-    await marco.query(api.clienti.search, { term: "" });
+    await marco.query(api.clienti.search, {
+      term: "",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
     await marco.query(api.ceste.list, {});
     await marco.query(api.ceste.disponibiliByPortata, {});
     await gabriele.query(api.registro.list, { day: today() });

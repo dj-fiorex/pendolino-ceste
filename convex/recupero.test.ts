@@ -378,7 +378,14 @@ describe("a Cliente the mill has written off", () => {
     // — but the Ceste are still his and still counted against him (ADR-0004).
     expect(list.clienti[0].active).toBe(false);
     expect(list.clienti[0].ceste.map((cesta) => cesta.numero)).toEqual([1, 2]);
-    expect(await marco.query(api.clienti.search, { term: "anna" })).toEqual([]);
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "anna",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([]);
 
     // Only a Rientro or a Rettifica takes him off it.
     await marco.mutation(api.movimenti.rientro, { clienteId: anna, cesteIds });

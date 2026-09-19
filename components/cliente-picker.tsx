@@ -1,14 +1,18 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { useMutation, usePaginatedQuery } from "convex/react";
+import { useEffect, useState } from "react";
 import { ClienteForm } from "@/components/cliente-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { storedPhone } from "@/convex/phone";
-import { MAX_SEARCH_RESULTS } from "@/convex/schema";
+import {
+  comparableName,
+  MAX_SEARCH_CANDIDATES,
+  MAX_SEARCH_RESULTS,
+} from "@/convex/schema";
 import { clienteLabel, type Cliente } from "@/lib/cliente";
 
 /**
@@ -34,7 +38,6 @@ export function ClientePicker({
   const [term, setTerm] = useState("");
   const [localCreating, setLocalCreating] = useState(false);
   const createCliente = useMutation(api.clienti.create);
-  const found = useQuery(api.clienti.search, { term });
   const creating = controlledCreating ?? localCreating;
   const setCreating = (next: boolean) => {
     setLocalCreating(next);
@@ -86,13 +89,87 @@ export function ClientePicker({
         />
       </div>
 
-      {found === undefined ? (
-        <p className="text-sm text-muted-foreground">Un attimo…</p>
-      ) : found.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Nessun Cliente con questo nome.
-        </p>
-      ) : (
+      <ClienteSearchResults
+        key={comparableName(term)}
+        term={comparableName(term)}
+        onPick={onPick}
+        pickLabel={pickLabel}
+      />
+
+      {showCreateAction ? (
+        <Button
+          variant="outline"
+          className="h-12 text-base"
+          onClick={() => setCreating(true)}
+        >
+          Nuovo Cliente
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+// Ten pages target 200 candidates before asking the Operatore to continue.
+// Convex may resize/split reactive pages; each backend request also has a cap.
+const AUTO_SEARCH_PAGES = 10;
+
+/** A new search term remounts this component, discarding its pages and budget. */
+function ClienteSearchResults({
+  term,
+  onPick,
+  pickLabel,
+}: {
+  term: string;
+  onPick: (cliente: Cliente) => void;
+  pickLabel: string;
+}) {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.clienti.search,
+    { term },
+    { initialNumItems: MAX_SEARCH_RESULTS },
+  );
+  const [requestedPages, setRequestedPages] = useState(1);
+  const [pageBudget, setPageBudget] = useState(AUTO_SEARCH_PAGES);
+  const unique = [
+    ...new Map(
+      results
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => [cliente._id, cliente]),
+    ).values(),
+  ];
+  const found = unique
+    .slice(0, MAX_SEARCH_RESULTS)
+    .sort((one, other) =>
+      comparableName(one.name).localeCompare(comparableName(other.name)),
+    );
+  const needsMore = found.length < MAX_SEARCH_RESULTS;
+  // Native search can report isDone after only its first 1024 candidates.
+  // Null placeholders retain the rejected-candidate count without their data.
+  const searchLimitReached =
+    term !== "" && results.length >= MAX_SEARCH_CANDIDATES && needsMore;
+  const canContinue =
+    status === "CanLoadMore" && needsMore && !searchLimitReached;
+  const continueAutomatically = canContinue && requestedPages < pageBudget;
+
+  useEffect(() => {
+    if (continueAutomatically) {
+      loadMore(MAX_SEARCH_RESULTS);
+      setRequestedPages(requestedPages + 1);
+    }
+  }, [continueAutomatically, loadMore, requestedPages]);
+
+  const searching =
+    status === "LoadingFirstPage" ||
+    status === "LoadingMore" ||
+    continueAutomatically;
+  const paused = canContinue && !continueAutomatically;
+  const moreResults =
+    !needsMore &&
+    (status !== "Exhausted" || unique.length > MAX_SEARCH_RESULTS);
+
+  return (
+    <div className="grid gap-4" aria-busy={searching}>
+      {found.length > 0 && (
         <ul className="grid gap-2">
           {found.map((cliente) => (
             <li key={cliente._id}>
@@ -113,22 +190,34 @@ export function ClientePicker({
           ))}
         </ul>
       )}
-
-      {found !== undefined && found.length === MAX_SEARCH_RESULTS && (
-        <p className="text-sm text-muted-foreground">
-          Ce ne sono altri: scrivi qualche lettera in più.
-        </p>
-      )}
-
-      {showCreateAction ? (
+      <div role="status" className="text-sm text-muted-foreground">
+        {searching ? (
+          <p>Cerco i Clienti…</p>
+        ) : searchLimitReached ? (
+          <p>
+            Ricerca troppo ampia. Scrivi un nome o un soprannome più preciso.
+          </p>
+        ) : paused ? (
+          <p>
+            Ricerca non completata. Continua a cercare o scrivi qualche lettera
+            in più.
+          </p>
+        ) : found.length === 0 ? (
+          <p>Nessun Cliente con questo nome.</p>
+        ) : moreResults ? (
+          <p>Mostro i primi 20 risultati: scrivi qualche lettera in più.</p>
+        ) : null}
+      </div>
+      {paused && !searchLimitReached && (
         <Button
+          type="button"
           variant="outline"
-          className="h-12 text-base"
-          onClick={() => setCreating(true)}
+          className="h-12"
+          onClick={() => setPageBudget(pageBudget + AUTO_SEARCH_PAGES)}
         >
-          Nuovo Cliente
+          Continua a cercare
         </Button>
-      ) : null}
+      )}
     </div>
   );
 }

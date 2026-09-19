@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
@@ -13,8 +17,22 @@ import {
   namesakeClash,
   portata,
   properName,
+  searchableNames,
   tidy,
 } from "./schema";
+
+/** Match word boundaries, including apostrophes and hyphens, like the index. */
+const searchWords = (text: string) =>
+  text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+
+function matchesEveryWord(cliente: Doc<"clienti">, wanted: string[]): boolean {
+  const words = searchWords(searchableNames(cliente));
+  return wanted.every((term, index) =>
+    words.some((word) =>
+      index === wanted.length - 1 ? word.startsWith(term) : word === term,
+    ),
+  );
+}
 
 /** A Cliente as every screen shows them: the name, the Alias, the telephone. */
 export const clienteShape = {
@@ -77,15 +95,7 @@ async function namesakesOf(
     .collect();
 }
 
-/**
- * The order the counter reads a list of Clienti in — by name, and by who was
- * entered first where two share one.
- *
- * The search index hands its results back by relevance, which is not an order
- * anybody at a counter can predict: the same twenty Clienti reshuffle as a
- * letter is typed. They are sorted here instead, so that a search reads like
- * the registry it is a slice of.
- */
+/** Namesakes read by name, then by who was entered first. */
 const byName = (one: Doc<"clienti">, other: Doc<"clienti">) =>
   comparableName(one.name).localeCompare(comparableName(other.name)) ||
   one._creationTime - other._creationTime;
@@ -134,24 +144,45 @@ async function refuseANamesake(
 }
 
 /**
- * The Clienti whose name or Alias begins with what the Operatore has typed. An
- * empty term is the head of the registry, so that the same box browses and
- * searches.
- *
- * Both halves read twenty rows off an index and no more (ADR-0010). The
- * registry is three thousand names, this query re-runs on every keystroke, and
- * what it used to do was read all three thousand each time.
- *
- * A deactivated Cliente is not offered here. They appear on the Lista di
- * recupero until their Ceste come back, and nowhere else (ADR-0004) — which is
- * why the search index filters on `active` rather than this handler.
+ * One page of indexed candidates, exposing only Clienti matching every word.
+ * The final word may be a prefix. A short or empty page is not the end unless
+ * `isDone` says so: the picker continues from the candidate cursor, preserving
+ * matches beyond the first twenty OR hits. Rejected candidates become null,
+ * so the picker can count the native 1024-candidate ceiling without receiving
+ * their details. Empty input browses the registry.
+ * Inactive Clienti are excluded by the index before pagination (ADR-0004).
  */
 export const search = query({
-  args: { term: v.string() },
-  returns: v.array(v.object(clienteShape)),
+  args: { term: v.string(), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(v.union(v.null(), v.object(clienteShape))),
   handler: async (ctx, args) => {
     await requireOperatore(ctx);
     const wanted = comparableName(args.term);
+    const words = searchWords(wanted);
+    if (wanted !== "" && words.length === 0) {
+      return { page: [], isDone: true, continueCursor: "" };
+    }
+    if (
+      !Number.isInteger(args.paginationOpts.numItems) ||
+      args.paginationOpts.numItems < 1 ||
+      args.paginationOpts.numItems > MAX_SEARCH_RESULTS
+    ) {
+      throw new Error("Request between 1 and 20 search candidates per page.");
+    }
+    // Preserve native cursor/split metadata. Reactive pages can grow beyond
+    // numItems, so also cap their scan. Ordinary browse pages can be split;
+    // search uses its native candidate ceiling and cursor behavior.
+    const paginationOpts = {
+      ...args.paginationOpts,
+      maximumRowsRead: Math.min(
+        args.paginationOpts.maximumRowsRead ?? 100,
+        100,
+      ),
+      maximumBytesRead: Math.min(
+        args.paginationOpts.maximumBytesRead ?? 262144,
+        262144,
+      ),
+    };
     const found =
       wanted === ""
         ? // Nothing typed yet. A search index has no answer to an empty
@@ -159,14 +190,23 @@ export const search = query({
           await ctx.db
             .query("clienti")
             .withIndex("by_active_and_name", (q) => q.eq("active", true))
-            .take(MAX_SEARCH_RESULTS)
+            .paginate(paginationOpts)
         : await ctx.db
             .query("clienti")
             .withSearchIndex("search_names", (q) =>
-              q.search("searchableNames", wanted).eq("active", true),
+              // Convex accepts at most sixteen search terms. A subset is a
+              // candidate superset; the predicate below still checks them all.
+              q
+                .search("searchableNames", words.slice(0, 16).join(" "))
+                .eq("active", true),
             )
-            .take(MAX_SEARCH_RESULTS);
-    return found.sort(byName).map(asCliente);
+            .paginate(paginationOpts);
+    return {
+      ...found,
+      page: found.page.map((cliente) =>
+        matchesEveryWord(cliente, words) ? asCliente(cliente) : null,
+      ),
+    };
   },
 });
 
@@ -184,12 +224,10 @@ export const namesakes = query({
     if (tidy(args.name) === "") {
       return [];
     }
-    return (await namesakesOf(ctx, args.name))
-      .sort(byName)
-      .map((cliente) => ({
-        ...asCliente(cliente),
-        active: cliente.active,
-      }));
+    return (await namesakesOf(ctx, args.name)).sort(byName).map((cliente) => ({
+      ...asCliente(cliente),
+      active: cliente.active,
+    }));
   },
 });
 

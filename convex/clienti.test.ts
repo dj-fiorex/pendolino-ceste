@@ -45,7 +45,14 @@ describe("the Cliente at the counter", () => {
 
     await marco.mutation(api.clienti.create, { name: "Giuseppe Amato" });
 
-    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Giuseppe Amato",
@@ -67,9 +74,14 @@ describe("the name in the registry's own casing", () => {
     await marco.mutation(api.clienti.create, { name: "D'AMATO ANNA" });
 
     expect(
-      (await marco.query(api.clienti.search, { term: "" })).map(
-        (cliente) => cliente.name,
-      ),
+      (
+        await marco.query(api.clienti.search, {
+          term: "",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
     ).toEqual(["D'Amato Anna", "De Luca Giuseppe", "Mario Rossi"]);
   });
 
@@ -82,7 +94,14 @@ describe("the name in the registry's own casing", () => {
       alias: ["u' pilota"],
     });
 
-    expect(await marco.query(api.clienti.search, { term: "pilota" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "pilota",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Amato Giuseppe",
@@ -129,6 +148,110 @@ describe("the name in the registry's own casing", () => {
 });
 
 describe("finding a Cliente in a registry of thousands", () => {
+  test("words can span a name and Alias, with punctuation treated as word boundaries", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    await marco.mutation(api.clienti.create, {
+      name: "D'Amato Anna",
+      alias: ["u' pilota"],
+    });
+    await marco.mutation(api.clienti.create, { name: "D'Amato Mario" });
+    for (const term of ["D'AMATO   pilo", "anna-pilota", "amato pilota "]) {
+      const found = await marco.query(api.clienti.search, {
+        term,
+        paginationOpts: { numItems: 20, cursor: null },
+      });
+      expect(
+        found.page
+          .filter((cliente) => cliente !== null)
+          .map((cliente) => cliente.name),
+      ).toEqual(["D'Amato Anna"]);
+    }
+    const partialCompletedWord = await marco.query(api.clienti.search, {
+      term: "amat pilo",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(
+      partialCompletedWord.page.filter((cliente) => cliente !== null),
+    ).toEqual([]);
+  });
+
+  test("punctuation alone matches nobody, while whitespace browses active Clienti", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    await marco.mutation(api.clienti.create, { name: "Anna Rossi" });
+    const punctuation = await marco.query(api.clienti.search, {
+      term: "--- ' !!!",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(punctuation.page.filter((cliente) => cliente !== null)).toEqual([]);
+    expect(punctuation.isDone).toBe(true);
+    const browse = await marco.query(api.clienti.search, {
+      term: "  ",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(
+      browse.page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
+    ).toEqual(["Anna Rossi"]);
+  });
+
+  test("a page without matches can be continued to find a later match", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    for (let index = 0; index < 25; index++) {
+      await marco.mutation(api.clienti.create, {
+        name: `Oleificio Rossi ${index}`,
+      });
+    }
+    await marco.mutation(api.clienti.create, { name: "Oleificio Cellulare" });
+
+    const first = await marco.query(api.clienti.search, {
+      term: "oleificio cellulare",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(first.page).toHaveLength(20);
+    expect(first.page.every((cliente) => cliente === null)).toBe(true);
+    expect(first.isDone).toBe(false);
+
+    const next = await marco.query(api.clienti.search, {
+      term: "oleificio cellulare",
+      paginationOpts: { numItems: 20, cursor: first.continueCursor },
+    });
+    expect(
+      next.page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
+    ).toEqual(["Oleificio Cellulare"]);
+    expect(next.isDone).toBe(true);
+  });
+
+  test("every word must match, with a prefix allowed for the final word", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    await marco.mutation(api.clienti.create, { name: "Oleificio Cellulare" });
+    await marco.mutation(api.clienti.create, { name: "Oleificio Rossi" });
+    await marco.mutation(api.clienti.create, { name: "Mario Cellulare" });
+
+    for (const term of [
+      "oleificio cellulare",
+      "oleificio cell",
+      "cellulare oleificio",
+    ]) {
+      expect(
+        (
+          await marco.query(api.clienti.search, {
+            term,
+            paginationOpts: { numItems: 20, cursor: null },
+          })
+        ).page
+          .filter((cliente) => cliente !== null)
+          .map((cliente) => cliente.name),
+      ).toEqual(["Oleificio Cellulare"]);
+    }
+  });
+
   test("a few letters of a surname are enough, and so are a few of a Soprannome", async () => {
     const t = startApp();
     const marco = await operatore(t);
@@ -139,18 +262,28 @@ describe("finding a Cliente in a registry of thousands", () => {
     });
 
     expect(
-      (await marco.query(api.clienti.search, { term: "cipo" })).map(
-        (cliente) => cliente.name,
-      ),
+      (
+        await marco.query(api.clienti.search, {
+          term: "cipo",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
     ).toEqual(["Cipolla Giuseppe"]);
     expect(
-      (await marco.query(api.clienti.search, { term: "pilo" })).map(
-        (cliente) => cliente.name,
-      ),
+      (
+        await marco.query(api.clienti.search, {
+          term: "pilo",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
     ).toEqual(["Amato Salvatore"]);
   });
 
-  test("reads back in name order, whoever was written down first", async () => {
+  test("browses in name order, whoever was written down first", async () => {
     const t = startApp();
     const marco = await operatore(t);
     for (const name of ["Rossi Mario", "Rossi Anna", "Rossi Nicola"]) {
@@ -158,9 +291,14 @@ describe("finding a Cliente in a registry of thousands", () => {
     }
 
     expect(
-      (await marco.query(api.clienti.search, { term: "rossi" })).map(
-        (cliente) => cliente.name,
-      ),
+      (
+        await marco.query(api.clienti.search, {
+          term: "",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
     ).toEqual(["Rossi Anna", "Rossi Mario", "Rossi Nicola"]);
   });
 
@@ -173,14 +311,15 @@ describe("finding a Cliente in a registry of thousands", () => {
       });
     }
 
-    // Twenty of them, and in order — but which twenty is the search index's to
-    // decide, not the alphabet's (ADR-0010). Typing another letter is how the
-    // counter narrows it, which is what the picker's "keep typing" line says.
-    const found = await marco.query(api.clienti.search, { term: "rossi" });
-    const names = found.map((cliente) => cliente.name);
-
+    // Candidate selection stays in index order. The picker sorts only after
+    // selecting twenty matches across pages (ADR-0010).
+    const found = (
+      await marco.query(api.clienti.search, {
+        term: "rossi",
+        paginationOpts: { numItems: 20, cursor: null },
+      })
+    ).page.filter((cliente) => cliente !== null);
     expect(found).toHaveLength(MAX_SEARCH_RESULTS);
-    expect(names).toEqual([...names].sort());
   });
 });
 
@@ -194,7 +333,14 @@ describe("two Clienti with the same name", () => {
       marco.mutation(api.clienti.create, { name: "giuseppe  amato" }),
     ).rejects.toThrow();
 
-    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Giuseppe Amato",
@@ -216,7 +362,14 @@ describe("two Clienti with the same name", () => {
       phone: "333 111 2222",
     });
 
-    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Giuseppe Amato",
@@ -250,7 +403,12 @@ describe("two Clienti with the same name", () => {
     ).rejects.toThrow();
 
     expect(
-      await marco.query(api.clienti.search, { term: "amato" }),
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
     ).toHaveLength(1);
   });
 
@@ -268,9 +426,14 @@ describe("two Clienti with the same name", () => {
     // They are gone from the search, and still on the Lista di recupero with
     // whatever Ceste they hold: a second Giuseppe Amato with nothing to tell
     // them apart is the confusion the rule exists to prevent (ADR-0004).
-    expect(await gabriele.query(api.clienti.search, { term: "amato" })).toEqual(
-      [],
-    );
+    expect(
+      (
+        await gabriele.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([]);
     await expect(
       gabriele.mutation(api.clienti.create, { name: "Giuseppe Amato" }),
     ).rejects.toThrow();
@@ -293,7 +456,12 @@ describe("two Clienti with the same name", () => {
     });
 
     expect(
-      await gabriele.query(api.clienti.search, { term: "amato" }),
+      (
+        await gabriele.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
     ).toHaveLength(1);
   });
 
@@ -311,7 +479,12 @@ describe("two Clienti with the same name", () => {
     });
 
     expect(
-      await marco.query(api.clienti.search, { term: "turi" }),
+      (
+        await marco.query(api.clienti.search, {
+          term: "turi",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
     ).toHaveLength(2);
   });
 });
@@ -362,7 +535,14 @@ describe("correcting a Cliente", () => {
       smsOptOut: false,
     });
 
-    expect(await marco.query(api.clienti.search, { term: "pilota" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "pilota",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: clienteId,
         name: "Giuseppe Amato",
@@ -453,7 +633,14 @@ describe("correcting a Cliente", () => {
       }),
     ).rejects.toThrow();
 
-    expect(await marco.query(api.clienti.search, { term: "russo" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "russo",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: clienteId,
         name: "Salvatore Russo",
@@ -506,9 +693,14 @@ describe("the telephone", () => {
       }),
     ).rejects.toThrow();
 
-    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual(
-      [],
-    );
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([]);
   });
 
   test("having none is not a mistake: the counter is never blocked", async () => {
@@ -566,9 +758,14 @@ describe("deactivating a Cliente", () => {
       confirmed: false,
     });
 
-    expect(await marco.query(api.clienti.search, { term: "amato" })).toEqual(
-      [],
-    );
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "amato",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([]);
     expect(await marco.query(api.clienti.get, { clienteId })).toMatchObject({
       name: "Giuseppe Amato",
       active: false,

@@ -508,6 +508,9 @@ export const indexedNames = (cliente: { name: string; alias: string[] }) => ({
 /** How many Clienti a search hands back, on screen as in the query. */
 export const MAX_SEARCH_RESULTS = 20;
 
+/** Convex's search candidate pool is capped even when traversed with cursors. */
+export const MAX_SEARCH_CANDIDATES = 1024;
+
 /** Why an Alias fails to tell a Cliente apart from their namesakes. */
 export type NamesakeClash = "no_alias" | "shared_alias";
 

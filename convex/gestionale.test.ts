@@ -42,9 +42,14 @@ describe("the Gestionale's registry, imported", () => {
     });
 
     expect(
-      (await marco.query(api.clienti.search, { term: "" })).map(
-        (cliente) => cliente.name,
-      ),
+      (
+        await marco.query(api.clienti.search, {
+          term: "",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page
+        .filter((cliente) => cliente !== null)
+        .map((cliente) => cliente.name),
     ).toEqual(["Cipolla Giuseppe", "D'Amato Anna"]);
   });
 
@@ -56,7 +61,14 @@ describe("the Gestionale's registry, imported", () => {
       rows: [row("1", "CIPOLLA GIUSEPPE", "333 111 2222")],
     });
 
-    expect(await marco.query(api.clienti.search, { term: "cipo" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "cipo",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Cipolla Giuseppe",
@@ -77,7 +89,9 @@ describe("the Gestionale's registry, imported", () => {
       row("2", "cipolla  giuseppe"),
     ];
 
-    const first = await t.mutation(internal.gestionale.importRegistry, { rows });
+    const first = await t.mutation(internal.gestionale.importRegistry, {
+      rows,
+    });
     const second = await t.mutation(internal.gestionale.importRegistry, {
       rows,
     });
@@ -87,7 +101,14 @@ describe("the Gestionale's registry, imported", () => {
       "already_present",
       "namesake",
     ]);
-    expect(await marco.query(api.clienti.search, { term: "cipolla" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "cipolla",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       {
         _id: expect.any(String),
         name: "Cipolla Giuseppe",
@@ -114,7 +135,14 @@ describe("the Gestionale's registry, imported", () => {
         phoneUnreadable: true,
       },
     ]);
-    expect(await marco.query(api.clienti.search, { term: "cipolla" })).toEqual([
+    expect(
+      (
+        await marco.query(api.clienti.search, {
+          term: "cipolla",
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page.filter((cliente) => cliente !== null),
+    ).toEqual([
       expect.objectContaining({ name: "Cipolla Giuseppe", phone: null }),
     ]);
   });
