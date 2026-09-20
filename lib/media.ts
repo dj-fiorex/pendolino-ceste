@@ -37,7 +37,7 @@ export const mediaKinds = Object.keys(mediaLabel) as MediaKind[];
  * these, so the list is put together in one place and the sentences differ
  * only where they mean different things.
  */
-export const mediaListed = (kinds: MediaKind[]) =>
+export const mediaListed = (kinds: readonly MediaKind[]) =>
   kinds.map((kind) => mediaInSentence[kind]).join(" e ");
 
 /**
@@ -49,7 +49,7 @@ export const mediaListed = (kinds: MediaKind[]) =>
  * the buttons for as long as it stands — a warning that has scrolled away is a
  * warning nobody sees at the moment they confirm.
  */
-export const toRetakeLine = (kinds: MediaKind[]) =>
+export const toRetakeLine = (kinds: readonly MediaKind[]) =>
   `Il telefono non conserva ${mediaListed(kinds)}: ${
     kinds.length === 1 ? "se serve, rifalla" : "se servono, rifalle"
   }.`;
@@ -134,18 +134,6 @@ export async function photoFrom(file: Blob): Promise<Blob> {
 }
 
 /**
- * How long the counter waits for a file to go up before giving up on it.
- *
- * The Ceste are already on the trailer by the time anybody taps Conferma, so
- * the one thing this upload must never do is hold the queue: a mill yard in
- * November has the signal it has, and an Operatore standing in front of a
- * spinner is the app blocking the counter (ADR-0005). Long enough that a
- * photograph goes up over a bad connection, short enough that a dead one is
- * over before the next Cliente is at the counter.
- */
-const UPLOAD_PATIENCE = 12_000;
-
-/**
  * Puts a file where the app said to put it, and hands back where it landed:
  * the id the Ritiro carries (#25).
  *
@@ -154,9 +142,9 @@ const UPLOAD_PATIENCE = 12_000;
  * function of this app, which is why several hundred kilobytes crossing it
  * costs the counter nothing.
  *
- * It gives up rather than waiting for ever, and whoever called it turns that
- * into a Ritiro registered without the file and a line saying so. Losing a
- * photograph is a footnote; losing the morning is not.
+ * Wait for the request's result without an application timeout. A slow upload
+ * can still succeed. The Ritiro module handles a reported failure by recording
+ * without that file and naming it in the result.
  */
 export async function upload(
   uploadUrl: string,
@@ -166,7 +154,6 @@ export async function upload(
     method: "POST",
     headers: { "Content-Type": file.type },
     body: file,
-    signal: AbortSignal.timeout(UPLOAD_PATIENCE),
   });
   if (!sent.ok) {
     throw new Error(`The upload came back ${sent.status}.`);

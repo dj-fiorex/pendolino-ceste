@@ -164,13 +164,13 @@ export const writeDraft = (draft: RitiroDraft) => {
  *
  * Called when it has been confirmed and is now the mill's record rather than a
  * device's note, and when the Operatore has been offered it back and said no
- * (#24). Both clear it for good: the draft is a Ritiro nobody has decided
- * about yet, and after either of those somebody has.
+ * (#24). Removal is best effort. If storage refuses it, an old draft can be
+ * offered again after reload; this does not undo a successful recording.
  */
 export const forgetDraft = () => {
   try {
     window.localStorage.removeItem(DEVICE_KEY);
   } catch {
-    // As above: a device that will not forget it will be written over.
+    // Recording stays successful even if the device cannot remove its draft.
   }
 };

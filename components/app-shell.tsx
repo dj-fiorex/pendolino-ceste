@@ -8,6 +8,7 @@ import Link from "next/link";
 import { redirect, usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { CampagnaBar } from "@/components/campagna-bar";
+import { RitiroProvider } from "@/components/ritiro-provider";
 import { SignOutButton } from "@/components/sign-out-button";
 import { InstallApp } from "@/components/install-app";
 import {
@@ -241,7 +242,7 @@ function Chrome({
         {/* Room under the last row for the tab bar and the phone's own bar.
             The screen inside carries its own <main>, as every screen does. */}
         <div className="flex-1 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-8">
-          {children}
+          <RitiroProvider key={operatore.email}>{children}</RitiroProvider>
         </div>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">

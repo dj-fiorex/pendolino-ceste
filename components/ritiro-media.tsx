@@ -12,16 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { mediaLabel, photoFrom } from "@/lib/media";
-
-/**
- * What the Operatore has taken on this Ritiro besides the Ceste: the Cliente's
- * signature and the photograph of his load, each as it stands on the device
- * before the Ritiro is confirmed and either of them goes anywhere.
- */
-export type CapturedMedia = { signature: Blob | null; photo: Blob | null };
-
-/** What every Ritiro starts with, and what most of them are confirmed with. */
-export const NOTHING_CAPTURED: CapturedMedia = { signature: null, photo: null };
+import type { MediaKind } from "@/convex/schema";
+import type { CapturedMedia } from "@/lib/ritiro";
 
 /** A file on the device as an `<img>` can show it, and tidied up after. */
 function usePreview(file: Blob | null) {
@@ -102,9 +94,13 @@ function Taken({
 export function RitiroMedia({
   captured,
   onCapture,
+  onRemove,
+  disabled,
 }: {
   captured: CapturedMedia;
-  onCapture: (captured: CapturedMedia) => void;
+  onCapture: (kind: MediaKind, file: Blob | Promise<Blob>) => Promise<void>;
+  onRemove: (kind: MediaKind) => void;
+  disabled: boolean;
 }) {
   const [signing, setSigning] = useState(false);
   // The signature as it stands on the open pad. It becomes the Ritiro's only
@@ -140,7 +136,9 @@ export function RitiroMedia({
     }
     setTrouble(null);
     try {
-      onCapture({ ...captured, photo: await photoFrom(taken) });
+      // Hand preparation to the module before it finishes, while this Cliente
+      // still owns the capture. Never send back a stale copy of both files.
+      await onCapture("photo", photoFrom(taken));
     } catch {
       setTrouble("Non sono riuscito a preparare la foto. Riprova.");
     }
@@ -164,7 +162,7 @@ export function RitiroMedia({
             label={mediaLabel.signature}
             preview={signature}
             onRetake={openThePad}
-            onRemove={() => onCapture({ ...captured, signature: null })}
+            onRemove={() => onRemove("signature")}
           />
         )}
 
@@ -183,7 +181,7 @@ export function RitiroMedia({
             label={mediaLabel.photo}
             preview={photo}
             onRetake={() => camera.current?.click()}
-            onRemove={() => onCapture({ ...captured, photo: null })}
+            onRemove={() => onRemove("photo")}
           />
         )}
       </div>
@@ -208,7 +206,7 @@ export function RitiroMedia({
         </p>
       )}
 
-      <Dialog open={signing} onOpenChange={setSigning}>
+      <Dialog open={signing && !disabled} onOpenChange={setSigning}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Firma del Cliente</DialogTitle>
@@ -221,9 +219,9 @@ export function RitiroMedia({
           <Button
             type="button"
             className="h-12 text-base"
-            disabled={drawn === null}
+            disabled={disabled || drawn === null}
             onClick={() => {
-              onCapture({ ...captured, signature: drawn });
+              if (drawn !== null) void onCapture("signature", drawn);
               setSigning(false);
             }}
           >

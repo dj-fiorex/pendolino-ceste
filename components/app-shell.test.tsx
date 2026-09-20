@@ -23,6 +23,7 @@ const session = vi.hoisted(() => ({
 // during reconfirmation and defer subscriptions until Convex authenticates.
 vi.mock("convex/react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("convex/react")>()),
+  useMutation: () => vi.fn(),
   useConvexAuth: () => session,
   useQuery: (...args: unknown[]) => session.query(...args),
 }));
