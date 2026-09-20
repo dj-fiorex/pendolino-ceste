@@ -149,21 +149,15 @@ export async function fuoriSince(
   return since.length === 0 ? null : Math.max(...since);
 }
 
-/**
- * The two movements at the counter, each as what it is called and where it
- * leaves the Ceste it moved. Everything else about them is one gesture — the
- * Cliente in front of the Operatore, then their Ceste one at a time — which is
- * why one function records both.
- *
- * The Svuotamento is not one of these: nobody is at the counter for it and it
- * carries no Cliente.
- */
-const atTheCounter = {
+/** The name and target state of each Movimento recorded in the yard. */
+const movement = {
   ritiro: { name: "Ritiro", becomes: "fuori" },
   rientro: { name: "Rientro", becomes: "attesa_molitura" },
-} as const satisfies Record<string, { name: string; becomes: State }>;
-
-type CounterMovimento = keyof typeof atTheCounter;
+  svuotamento: { name: "Svuotamento", becomes: "disponibile" },
+} as const satisfies Record<
+  PlainMovimentoKind,
+  { name: string; becomes: State }
+>;
 
 /**
  * The Campagna the device recording a Movimento names: the choice the app
@@ -219,47 +213,36 @@ const counterArgs = {
 };
 
 /**
- * A movement at the counter: the Ceste the Operatore has added, one at a time,
- * all move together under the Cliente in front of them. One Movimento per
- * Cesta, all of them under the one Registro row that says what the Operatore
- * did (ADR-0006).
- *
- * Nothing here refuses a Cesta for the state she is in — Fuori with somebody
- * else, still in Attesa molitura, or never taken out at all. The Cesta is in
- * the yard and the Cliente is loading her: the app records what happens rather
- * than authorising it, and a Cesta on the wrong trailer is exactly the fact the
- * mill has never been able to see (ADR-0005). Each of those Ceste moves with a
- * Rettifica of *discrepanza* beside her, carrying the belief the movement went
- * through on, and the Operatore is told before they confirm rather than after.
- *
- * The Cliente moved to is always the one actually present, which is what makes
- * a Rientro of somebody else's Cesta come to rest under the name the paper tape
- * will carry (#17).
+ * Record one action and its Movimenti in the calling mutation's transaction.
+ * Deduplicate and read all Ceste before writing the grouped Registro row, then
+ * record each discrepancy before changing state and recording the Movimento.
+ * Dismessa stays untouched. Counter movements assign the present Cliente;
+ * Svuotamento removes the Cliente and sends no Sms (ADR-0004, 0005, 0006).
  */
-async function recordAtTheCounter(
+async function recordMovimento(
   ctx: MutationCtx,
-  kind: CounterMovimento,
   args: {
-    clienteId: Id<"clienti">;
     cesteIds: Id<"ceste">[];
     campagnaId?: Id<"campagne">;
-    /**
-     * What a Ritiro carries beside its Ceste, where the Operatore took
-     * anything: the Cliente's signature and the photograph of his load, both
-     * already in file storage (#25). A Rientro takes neither — nobody signs
-     * for bringing Ceste back.
-     */
-    signatureId?: Id<"_storage">;
-    photoId?: Id<"_storage">;
-  },
+  } & (
+    | {
+        kind: "ritiro";
+        clienteId: Id<"clienti">;
+        signatureId?: Id<"_storage">;
+        photoId?: Id<"_storage">;
+      }
+    | { kind: "rientro"; clienteId: Id<"clienti"> }
+    | { kind: "svuotamento" }
+  ),
 ): Promise<null> {
-  const { name, becomes } = atTheCounter[kind];
+  const { kind } = args;
+  const { name, becomes } = movement[kind];
   const operatore = await requireOperatore(ctx);
-  // Settled once for the whole movement, so that the Registro row and every
-  // Movimento under it name the same season (ADR-0006).
+  // Resolve the Campagna once for the Registro row and all its Movimenti.
   const campagnaId = await campagnaFor(ctx, args.campagnaId);
-  const cliente = await ctx.db.get(args.clienteId);
-  if (cliente === null) {
+  const cliente =
+    args.kind === "svuotamento" ? null : await ctx.db.get(args.clienteId);
+  if (args.kind !== "svuotamento" && cliente === null) {
     throw new Error("This Cliente is not in the registry.");
   }
 
@@ -280,20 +263,20 @@ async function recordAtTheCounter(
   // is written first, because every Movimento under it carries its id.
   const surprises = new Set(
     inFleet
-      .filter((cesta) => !asExpected(kind, cesta, cliente._id))
+      .filter((cesta) => !asExpected(kind, cesta, cliente?._id))
       .map((cesta) => cesta._id),
   );
 
   const numeri = inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b);
   const registroId = await writeRegistroRow(ctx, {
     operatoreId: operatore._id,
-    clienteId: cliente._id,
+    clienteId: cliente?._id,
     campagnaId,
     producedRettifica: surprises.size > 0,
     // The signature and the photograph go on the row and nowhere else: one
     // Cliente signed once, whether he loaded one Cesta or six (ADR-0006, #25).
     action:
-      kind === "ritiro"
+      args.kind === "ritiro"
         ? {
             kind,
             numeri,
@@ -304,18 +287,11 @@ async function recordAtTheCounter(
   });
 
   for (const cesta of inFleet) {
-    // Where the movement leaves her: with the Cliente at the counter, unless an
-    // Admin has written her off, in which case it moves nothing. She is
-    // Dismessa, standing in the yard, and only an Admin's *ritrovata* brings
-    // her back into the fleet (#20).
+    // Only an Admin's ritrovata can return a Dismessa to the fleet.
     const leavesHer = inTheFleet(cesta) ? becomes : cesta.state;
     if (surprises.has(cesta._id)) {
-      // She was not where the app had her, and she is moving all the same.
-      // Written before the Movimento and under the same Registro row, as the
-      // Svuotamento's is (ADR-0006), and naming the Cliente the app believed
-      // was holding her, so that the correction turns up in that Cliente's own
-      // history — which is where the mill would go looking for why a Cesta
-      // stopped being counted against them.
+      // Keep the prior Cliente on the Rettifica so the discrepancy remains
+      // visible in that Cliente's history after the Cesta changes hands.
       await ctx.db.insert("movimenti", {
         kind: "rettifica",
         cestaId: cesta._id,
@@ -333,13 +309,13 @@ async function recordAtTheCounter(
     if (inTheFleet(cesta)) {
       await ctx.db.patch(cesta._id, {
         state: leavesHer,
-        clienteId: cliente._id,
+        clienteId: cliente?._id,
       });
     }
     await ctx.db.insert("movimenti", {
       kind,
       cestaId: cesta._id,
-      clienteId: cliente._id,
+      clienteId: cliente?._id,
       operatoreId: operatore._id,
       campagnaId,
       registroId,
@@ -351,14 +327,16 @@ async function recordAtTheCounter(
   // hands the message to the scheduler and nothing else: whatever a carrier
   // makes of it happens outside this transaction and never at the counter
   // (ADR-0005).
-  await sendMovimentoSms(ctx, {
-    kind,
-    cliente,
-    numeri,
-    registroId,
-    operatoreId: operatore._id,
-    campagnaId,
-  });
+  if (kind !== "svuotamento" && cliente !== null) {
+    await sendMovimentoSms(ctx, {
+      kind,
+      cliente,
+      numeri,
+      registroId,
+      operatoreId: operatore._id,
+      campagnaId,
+    });
+  }
   return null;
 }
 
@@ -372,7 +350,7 @@ export const ritiro = mutation({
   // nothing — which is most mornings, and is what optional means here (#25).
   args: { ...counterArgs, ...mediaFields },
   returns: v.null(),
-  handler: (ctx, args) => recordAtTheCounter(ctx, "ritiro", args),
+  handler: (ctx, args) => recordMovimento(ctx, { ...args, kind: "ritiro" }),
 });
 
 /**
@@ -388,7 +366,7 @@ export const ritiro = mutation({
 export const rientro = mutation({
   args: counterArgs,
   returns: v.null(),
-  handler: (ctx, args) => recordAtTheCounter(ctx, "rientro", args),
+  handler: (ctx, args) => recordMovimento(ctx, { ...args, kind: "rientro" }),
 });
 
 /**
@@ -410,82 +388,8 @@ export const rientro = mutation({
 export const svuotamento = mutation({
   args: { cesteIds: v.array(v.id("ceste")), ...campagnaArg },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const operatore = await requireOperatore(ctx);
-    const campagnaId = await campagnaFor(ctx, args.campagnaId);
-
-    // The same Cesta twice — tapped on her tile and then typed on the keypad —
-    // is one Cesta emptied once.
-    const cesteIds = [...new Set(args.cesteIds)];
-    if (cesteIds.length === 0) {
-      throw new Error("A Svuotamento takes at least one Cesta.");
-    }
-    const ceste = await Promise.all(cesteIds.map((id) => ctx.db.get(id)));
-    if (ceste.some((cesta) => cesta === null)) {
-      throw new Error("A Cesta in this Svuotamento is not in the fleet.");
-    }
-    const inFleet = ceste.flatMap((cesta) => (cesta === null ? [] : [cesta]));
-
-    // The ones the app did not have waiting to be milled, settled before any
-    // of them moves, for the same reason as at the counter.
-    const surprises = new Set(
-      inFleet
-        .filter((cesta) => !asExpected("svuotamento", cesta))
-        .map((cesta) => cesta._id),
-    );
-
-    const registroId = await writeRegistroRow(ctx, {
-      operatoreId: operatore._id,
-      campagnaId,
-      producedRettifica: surprises.size > 0,
-      action: {
-        kind: "svuotamento",
-        numeri: inFleet.map((cesta) => cesta.numero).sort((a, b) => a - b),
-      },
-    });
-
-    for (const cesta of inFleet) {
-      // Where the Svuotamento leaves her: empty and at the mill, unless an
-      // Admin has written her off, in which case emptying her moves nothing.
-      // She is Dismessa, standing empty in the yard, and the Rettifica below is
-      // all that says she turned up at all — putting her back into the fleet is
-      // an Admin's *ritrovata* and nobody else's (#20).
-      const becomes = inTheFleet(cesta) ? "disponibile" : "dismessa";
-      // Written before she moves, and under the same Registro row as the
-      // Svuotamento that moved her: the correction and the movement are one
-      // action a person took (ADR-0006).
-      if (surprises.has(cesta._id)) {
-        await ctx.db.insert("movimenti", {
-          kind: "rettifica",
-          cestaId: cesta._id,
-          clienteId: cesta.clienteId,
-          operatoreId: operatore._id,
-          campagnaId,
-          registroId,
-          rettifica: {
-            cause: "discrepanza",
-            believedState: cesta.state,
-            becomes,
-          },
-        });
-      }
-      // Empty, at the mill, in nobody's hands: the Cliente goes with the tape.
-      if (inTheFleet(cesta)) {
-        await ctx.db.patch(cesta._id, {
-          state: becomes,
-          clienteId: undefined,
-        });
-      }
-      await ctx.db.insert("movimenti", {
-        kind: "svuotamento",
-        cestaId: cesta._id,
-        operatoreId: operatore._id,
-        campagnaId,
-        registroId,
-      });
-    }
-    return null;
-  },
+  handler: (ctx, args) =>
+    recordMovimento(ctx, { ...args, kind: "svuotamento" }),
 });
 
 /**
