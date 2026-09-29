@@ -1,4 +1,4 @@
-# Pendolino Ceste 
+# Pendolino Ceste
 
 Tracks the olive Ceste of an oil mill: which ones are out with which Cliente,
 which are available, and every movement in and out of the mill.
