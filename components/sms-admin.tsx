@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +19,7 @@ import { phoneInNational } from "@/convex/phone";
 import type { FrantoioSettings } from "@/convex/schema";
 import {
   PLACEHOLDERS,
+  SMS_PLACEHOLDERS,
   cesteInWords,
   renderTemplate,
   segmentsOf,
@@ -45,24 +46,72 @@ const selectClass =
  * The Cliente the preview is written about: made up, and the same one every
  * time, so that an Admin comparing two drafts is comparing the words.
  */
-const SAMPLE = { nome: "Giuseppe Amato", numeri: "17, 22, 34" };
+const SAMPLE_NOME = "Giuseppe Amato";
 
 /**
- * The two cases an Admin would otherwise never think to check: a Cliente who
- * moved one Cesta, and a Rientro that leaves him with none. Both come out
- * grammatical because the number travels with its noun, and the preview is
- * where that is proved rather than promised.
+ * One occasion the preview can be read on: what the counter would have seen,
+ * as the Admin picks it from a list, and the three numbers it produces.
+ *
+ * The three are settled together and told apart on purpose. `{{ceste}}` is
+ * the Ceste of this movement and `{{totale}}` the ones left Fuori afterwards,
+ * and a preview where the two came out equal is how a mill came to write the
+ * one where it meant the other: the words read fine right up to the first
+ * Cliente who already held some. So every occasion but the trivial one keeps
+ * them different, and `{{numeri}}` always lists as many as `{{ceste}}` says.
  */
-type PreviewCase = "sei" | "una" | "zero";
+type PreviewScenario = {
+  label: string;
+  numeri: number[];
+  /** Ceste Fuori with this Cliente once the movement is recorded. */
+  fuoriAfter: number;
+};
+
+/**
+ * The occasions worth reading a Ritiro on: the plain one, the one that tells
+ * the two counts apart, and the one that tests the grammar at one.
+ */
+const RITIRO_SCENARIOS: PreviewScenario[] = [
+  {
+    label: "Ritira 3 Ceste e non ne aveva",
+    numeri: [17, 22, 34],
+    fuoriAfter: 3,
+  },
+  {
+    label: "Ritira 4 Ceste, ne aveva già 2",
+    numeri: [17, 22, 34, 41],
+    fuoriAfter: 6,
+  },
+  { label: "Ritira una Cesta sola", numeri: [17], fuoriAfter: 1 },
+];
+
+/**
+ * The occasions worth reading a Rientro on: a partial return, the last Cesta
+ * coming back, and a full load that leaves him with none — the case an Admin
+ * would otherwise never think to check, where "da riportare" has to read
+ * "nessuna cesta" and not something ungrammatical.
+ */
+const RIENTRO_SCENARIOS: PreviewScenario[] = [
+  {
+    label: "Riporta 2 Ceste, gliene restano 3",
+    numeri: [17, 22],
+    fuoriAfter: 3,
+  },
+  { label: "Riporta l'ultima che aveva", numeri: [17], fuoriAfter: 0 },
+  {
+    label: "Riporta tutte e 3 quelle che aveva",
+    numeri: [17, 22, 34],
+    fuoriAfter: 0,
+  },
+];
 
 const previewValues = (
-  which: PreviewCase,
+  scenario: PreviewScenario,
   mill: FrantoioSettings,
 ): SmsValues => ({
-  nome: SAMPLE.nome,
-  ceste: cesteInWords(which === "sei" ? 6 : 1),
-  totale: cesteInWords(which === "zero" ? 0 : which === "sei" ? 6 : 1),
-  numeri: which === "sei" ? SAMPLE.numeri : "17",
+  nome: SAMPLE_NOME,
+  ceste: cesteInWords(scenario.numeri.length),
+  totale: cesteInWords(scenario.fuoriAfter),
+  numeri: scenario.numeri.join(", "),
   frantoio: mill.millName,
   telefono: mill.millPhone,
 });
@@ -77,6 +126,7 @@ function TemplateEditor({
   onTemplate,
   onSwitch,
   mill,
+  scenarios,
 }: {
   id: string;
   title: string;
@@ -86,13 +136,14 @@ function TemplateEditor({
   onTemplate: (template: string) => void;
   onSwitch: (on: boolean) => void;
   mill: FrantoioSettings;
+  scenarios: PreviewScenario[];
 }) {
-  const [which, setWhich] = useState<PreviewCase>("sei");
+  const [which, setWhich] = useState(0);
   const noSender = mill.smsSender === "";
   const unknown = unknownPlaceholders(template);
   const preview = renderTemplate(
     tidyForSms(template),
-    previewValues(which, mill),
+    previewValues(scenarios[which] ?? scenarios[0], mill),
   );
   const { characters, segments, unicode } = segmentsOf(preview);
 
@@ -135,9 +186,14 @@ function TemplateEditor({
             value={template}
             onChange={(event) => onTemplate(event.target.value)}
           />
-          <p className="text-sm text-muted-foreground">
-            Puoi usare {PLACEHOLDERS.map((name) => `{{${name}}}`).join(", ")}.
-          </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+            {PLACEHOLDERS.map((name) => (
+              <Fragment key={name}>
+                <dt className="font-mono">{`{{${name}}}`}</dt>
+                <dd>{SMS_PLACEHOLDERS[name]}</dd>
+              </Fragment>
+            ))}
+          </dl>
           {unknown.length > 0 && (
             <p role="alert" className="text-sm text-destructive">
               Non so cosa scrivere al posto di{" "}
@@ -152,11 +208,13 @@ function TemplateEditor({
             id={`${id}-prova`}
             className={selectClass}
             value={which}
-            onChange={(event) => setWhich(event.target.value as PreviewCase)}
+            onChange={(event) => setWhich(Number(event.target.value))}
           >
-            <option value="sei">Con sei Ceste</option>
-            <option value="una">Con una Cesta sola</option>
-            <option value="zero">Quando non gliene restano</option>
+            {scenarios.map((scenario, index) => (
+              <option key={scenario.label} value={index}>
+                {scenario.label}
+              </option>
+            ))}
           </select>
           <div className="rounded-lg border bg-secondary text-secondary-foreground">
             <p className="border-b px-3 py-2 text-sm text-muted-foreground">
@@ -340,6 +398,7 @@ export function SmsAdmin() {
         onTemplate={(smsRitiroTemplate) => change({ smsRitiroTemplate })}
         onSwitch={(smsRitiroOn) => change({ smsRitiroOn })}
         mill={mill}
+        scenarios={RITIRO_SCENARIOS}
       />
 
       <TemplateEditor
@@ -351,6 +410,7 @@ export function SmsAdmin() {
         onTemplate={(smsRientroTemplate) => change({ smsRientroTemplate })}
         onSwitch={(smsRientroOn) => change({ smsRientroOn })}
         mill={mill}
+        scenarios={RIENTRO_SCENARIOS}
       />
 
       <div className="grid gap-2">
