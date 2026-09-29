@@ -31,9 +31,10 @@ import { clienteLabel, type Cliente } from "@/lib/cliente";
 type OnTheTrailer = { _id: Id<"ceste">; numero: number; codice: string };
 
 /**
- * The Rientro: nobody is searched for. The Operatore reads the numero off any
- * one Cesta of the load and the app says whose it is; then the Ceste that
- * Cliente is holding come up as tiles and the ones on the trailer are ticked.
+ * The Rientro: the Operatore reads the numero off any one Cesta of the load
+ * and the app says whose it is; then the Ceste that Cliente is holding come up
+ * as tiles and the ones on the trailer are ticked. With no Cesta to hand, the
+ * Cliente is searched for first and the tiles come up unticked (#34).
  *
  * Variant B of the prototype the mill chose (#31): ticking what came back,
  * rather than filling an empty list, is what makes a partial return visible —
@@ -352,22 +353,39 @@ export function RientroFlow() {
     );
   }
 
-  // Nobody to read off the Cesta, so the Cliente is searched for as at a Ritiro
-  // (#16). What the app believed instead is #21's to record.
-  if (identifiedBy !== null) {
+  // Nobody to read off the Cesta, or no Cesta read at all, so the Cliente is
+  // searched for as at a Ritiro (#16, #34). What the app believed instead is
+  // #21's to record. "Nuovo Cliente" stays: whoever is at the counter with
+  // Ceste the app had elsewhere still returns them (ADR-0005).
+  if (identifiedBy !== null || searching) {
     return (
       <div className="grid gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="font-display tabular-nums">
-              {identifiedBy.codice}
-            </CardTitle>
+            {identifiedBy !== null && (
+              <CardTitle className="font-display tabular-nums">
+                {identifiedBy.codice}
+              </CardTitle>
+            )}
             <CardDescription>
-              {identifiedBy.cliente === null
-                ? "L'app non sa di chi sia questa Cesta. Cerca chi la sta riportando."
-                : "Cerca chi sta riportando le Ceste."}
+              {identifiedBy === null
+                ? "Cerca chi sta riportando le Ceste, poi spunta quelle sul rimorchio."
+                : identifiedBy.cliente === null
+                  ? "L'app non sa di chi sia questa Cesta. Cerca chi la sta riportando."
+                  : "Cerca chi sta riportando le Ceste."}
             </CardDescription>
           </CardHeader>
+          {identifiedBy === null && (
+            <CardContent>
+              <Button
+                variant="outline"
+                className="h-11 w-full text-base"
+                onClick={() => setSearching(false)}
+              >
+                Leggi una Cesta invece
+              </Button>
+            </CardContent>
+          )}
         </Card>
         <ClientePicker pickLabel="Rientro" onPick={openLoadFor} />
       </div>
@@ -393,6 +411,16 @@ export function RientroFlow() {
       <p className="text-muted-foreground">
         Basta una Cesta qualsiasi del carico: l&apos;app dice di chi è, e il
         resto si spunta dopo.
+      </p>
+      <Button
+        variant="outline"
+        className="h-12 w-full text-base"
+        onClick={() => setSearching(true)}
+      >
+        Cerca il Cliente
+      </Button>
+      <p className="text-muted-foreground">
+        Se non hai una Cesta sotto mano, parti da chi la sta riportando.
       </p>
     </div>
   );
