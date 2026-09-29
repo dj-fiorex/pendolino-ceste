@@ -8,12 +8,13 @@ import { ClientePicker } from "./cliente-picker";
 const database = vi.hoisted(() => ({
   pages: {} as Record<string, (Cliente | null)[][]>,
   loading: null as "LoadingFirstPage" | "LoadingMore" | null,
+  create: vi.fn(),
 }));
 
 // The Convex subscription is the external boundary. Each page here already
 // contains the backend's matches; DOM assertions exercise picker behavior.
 vi.mock("convex/react", () => ({
-  useMutation: () => vi.fn(),
+  useMutation: () => database.create,
   useQuery: () => [],
   usePaginatedQuery: (_query: unknown, { term }: { term: string }) => {
     const [count, setCount] = useState(1);
@@ -44,6 +45,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   database.pages = {};
   database.loading = null;
+  database.create.mockReset();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -57,6 +59,10 @@ afterEach(async () => {
 async function typeSearch(value: string) {
   const input = container.querySelector("input");
   if (!input) throw new Error("Search input missing");
+  await typeInput(input, value);
+}
+
+async function typeInput(input: HTMLInputElement, value: string) {
   await act(async () => {
     Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
@@ -65,6 +71,43 @@ async function typeSearch(value: string) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+
+test("selects the saved Cliente returned by creation unchanged", async () => {
+  const saved: Cliente = {
+    ...oleificio,
+    name: "Mario Rossi",
+    alias: ["u' pilota"],
+    phone: "+393331234567",
+  };
+  database.create.mockResolvedValue(saved);
+  const onPick = vi.fn();
+  await act(async () =>
+    root.render(<ClientePicker creating onPick={onPick} pickLabel="Ritiro" />),
+  );
+  for (const [id, value] of [
+    ["cliente-name", "  mARIO   ROSSI  "],
+    ["cliente-alias", "  u'   pilota  "],
+    ["cliente-phone", "333 123 4567"],
+  ]) {
+    const input = container.querySelector<HTMLInputElement>(`#${id}`);
+    if (!input) throw new Error(`Input ${id} missing`);
+    await typeInput(input, value);
+  }
+
+  await act(async () => {
+    container
+      .querySelector("form")!
+      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+
+  expect(database.create).toHaveBeenCalledWith({
+    name: "  mARIO   ROSSI  ",
+    alias: ["u'   pilota"],
+    phone: "333 123 4567",
+  });
+  expect(onPick).toHaveBeenCalledTimes(1);
+  expect(onPick.mock.calls[0][0]).toBe(saved);
+});
 
 test("continues through empty pages and lets the Operatore pick the later match", async () => {
   database.pages["oleificio cellulare"] = [[], [], [oleificio]];

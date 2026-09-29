@@ -160,7 +160,7 @@ describe("a Movimento and the Campagna it belongs to", () => {
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
     await gabriele.mutation(api.campagne.open, { name: "2025" });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -195,7 +195,7 @@ describe("a Movimento and the Campagna it belongs to", () => {
       campagnaId,
       confirmed: false,
     });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -225,7 +225,7 @@ describe("a Movimento and the Campagna it belongs to", () => {
       confirmed: false,
     });
     await gabriele.mutation(api.campagne.open, { name: "2026" });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -247,7 +247,7 @@ describe("a Movimento and the Campagna it belongs to", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -271,7 +271,7 @@ describe("closing a Campagna", () => {
     const campagnaId = await gabriele.mutation(api.campagne.open, {
       name: "2025",
     });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
@@ -316,7 +316,7 @@ describe("closing a Campagna", () => {
     const campagnaId = await gabriele.mutation(api.campagne.open, {
       name: "2025",
     });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await marco.mutation(api.movimenti.ritiro, {
@@ -433,7 +433,7 @@ describe("renaming a Campagna", () => {
     const campagnaId = await gabriele.mutation(api.campagne.open, {
       name: "2025",
     });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await marco.mutation(api.movimenti.ritiro, {
@@ -528,7 +528,7 @@ describe("the Registro and the Campagne", () => {
     const campagnaId = await gabriele.mutation(api.campagne.open, {
       name: "2025",
     });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await marco.mutation(api.movimenti.ritiro, {
@@ -554,7 +554,7 @@ describe("the Registro and the Campagne", () => {
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
     await gabriele.mutation(api.campagne.open, { name: "2025" });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await marco.mutation(api.movimenti.ritiro, {

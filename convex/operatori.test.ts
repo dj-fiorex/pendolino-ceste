@@ -591,7 +591,7 @@ describe("deactivating an Operatore", () => {
       count: 3,
     });
     const marco = await operatore(t, "Marco", "auth|marco");
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: [],
     });

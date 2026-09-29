@@ -102,7 +102,7 @@ describe("a Ritiro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -161,7 +161,7 @@ describe("a Ritiro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -227,7 +227,7 @@ describe("a Ritiro at the counter", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(gabriele, "3");
@@ -249,7 +249,7 @@ describe("a Ritiro at the counter", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(gabriele, "1");
@@ -294,7 +294,7 @@ describe("the signature and the photo of a Ritiro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [first] = await takeAway(marco, clienteId, ["1", "2"]);
@@ -312,7 +312,7 @@ describe("the signature and the photo of a Ritiro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(marco, "1");
@@ -335,7 +335,7 @@ describe("the signature and the photo of a Ritiro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -371,10 +371,10 @@ describe("the signature and the photo of a Ritiro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const turiddu = await marco.mutation(api.clienti.create, {
+    const { _id: turiddu } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Turiddu",
     });
     // The app has her Fuori with Giuseppe, and Turiddu is loading her: she
@@ -414,7 +414,7 @@ describe("the signature and the photo of a Ritiro", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -490,7 +490,7 @@ describe("a Cesta read by camera or by eye", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
@@ -552,7 +552,7 @@ describe("a Cesta read by camera or by eye", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -615,7 +615,7 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
       phone: "349 1234567",
@@ -650,7 +650,7 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cesteIds = await takeAway(marco, clienteId, ["1", "2", "3", "4"]);
@@ -698,7 +698,7 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cesteIds = await takeAway(marco, clienteId, [
@@ -737,10 +737,10 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     const [cestaId] = await takeAway(marco, giuseppe, ["3"]);
@@ -777,7 +777,7 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(marco, "7");
@@ -805,10 +805,10 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
 
@@ -841,7 +841,7 @@ describe("a Rientro at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -866,7 +866,7 @@ describe("a Rientro at the counter", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(gabriele, "1");
@@ -894,7 +894,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -928,10 +928,10 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     const his = await bringBack(marco, giuseppe, ["1", "2", "3"]);
@@ -992,7 +992,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(marco, clienteId, ["3"]);
@@ -1087,11 +1087,11 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
 
@@ -1137,7 +1137,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await bringBack(marco, clienteId, ["3"]);
@@ -1161,7 +1161,7 @@ describe("a Svuotamento where the Ceste are tipped out", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await bringBack(gabriele, clienteId, ["1"]);
@@ -1181,7 +1181,7 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(gabriele, clienteId, ["3"]);
@@ -1252,10 +1252,10 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const giuseppe = await gabriele.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await gabriele.mutation(api.clienti.create, {
+    const { _id: salvatore } = await gabriele.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     // She went out with Giuseppe, was given up for lost, and turned up in
@@ -1300,7 +1300,7 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [persa] = await takeAway(gabriele, clienteId, ["3"]);
@@ -1345,7 +1345,7 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await bringBack(gabriele, clienteId, ["2"]);
@@ -1398,7 +1398,7 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await bringBack(gabriele, clienteId, ["4"]);
@@ -1442,7 +1442,7 @@ describe("a Rettifica", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(marco, clienteId, ["6"]);
@@ -1483,7 +1483,7 @@ describe("a Rettifica", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cestaId = await typeNumero(marco, "8");
@@ -1528,7 +1528,7 @@ describe("a Rettifica", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(gabriele, clienteId, ["1"]);
@@ -1608,10 +1608,10 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     // Gabriele hands her to Giuseppe in the morning; Marco is at the counter
@@ -1671,10 +1671,10 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     // Her tape says Giuseppe and nobody has tipped her out yet.
@@ -1715,7 +1715,7 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     // Nobody registered her Ritiro, and here she is, full, on the weighbridge.
@@ -1761,10 +1761,10 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     const [cestaId] = await takeAway(gabriele, giuseppe, ["2"]);
@@ -1806,7 +1806,7 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     // Three in the yard as the app has them, one still Fuori because nobody
@@ -1868,10 +1868,10 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     // One of the six is out with Giuseppe and one is standing full in the yard.
@@ -1926,10 +1926,10 @@ describe("the counter is never blocked", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
 
@@ -2014,7 +2014,7 @@ describe("a Rettifica for an Errore di registrazione", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     // He took two and the app says three: the third was scanned off the stack
@@ -2086,11 +2086,11 @@ describe("a Rettifica for an Errore di registrazione", () => {
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
     // Two Giuseppe Amato, told apart at the counter by their Soprannomi.
-    const turi = await marco.mutation(api.clienti.create, {
+    const { _id: turi } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
-    const ciccio = await marco.mutation(api.clienti.create, {
+    const { _id: ciccio } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Ciccio"],
     });
@@ -2128,7 +2128,7 @@ describe("a Rettifica for an Errore di registrazione", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     // She came back full with his name on her tape, and then the tile beside
@@ -2174,7 +2174,7 @@ describe("a Rettifica for an Errore di registrazione", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const giuseppe = await gabriele.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(gabriele, giuseppe, ["8"]);
@@ -2235,10 +2235,10 @@ describe("a Rettifica for an Errore di registrazione", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     const [cestaId] = await takeAway(marco, giuseppe, ["1"]);
@@ -2307,7 +2307,7 @@ describe("a Rettifica for an Errore di registrazione", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t);
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const [cestaId] = await takeAway(marco, giuseppe, ["9"]);

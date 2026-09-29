@@ -242,7 +242,7 @@ export const create = mutation({
     alias: v.optional(v.array(v.string())),
     phone: v.optional(v.string()),
   },
-  returns: v.id("clienti"),
+  returns: v.object(clienteShape),
   handler: async (ctx, args) => {
     const operatore = await requireOperatore(ctx);
     // The name in the registry's own casing, the Alias in the counter's. A
@@ -270,7 +270,11 @@ export const create = mutation({
       action: { kind: "cliente_creato", name },
     });
 
-    return clienteId;
+    const cliente = await ctx.db.get("clienti", clienteId);
+    if (cliente === null) {
+      throw new Error("The newly created Cliente could not be read.");
+    }
+    return asCliente(cliente);
   },
 });
 

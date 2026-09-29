@@ -218,7 +218,7 @@ describe("the Lista di recupero", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
       phone: "0931 000 000",
@@ -259,7 +259,7 @@ describe("the Lista di recupero", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cesteIds = await takeAway(marco, clienteId, ["1", "2"]);
@@ -278,9 +278,15 @@ describe("the Lista di recupero", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
-    const bruno = await marco.mutation(api.clienti.create, { name: "Bruno" });
-    const carla = await marco.mutation(api.clienti.create, { name: "Carla" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
+    const { _id: bruno } = await marco.mutation(api.clienti.create, {
+      name: "Bruno",
+    });
+    const { _id: carla } = await marco.mutation(api.clienti.create, {
+      name: "Carla",
+    });
 
     // Anna took hers first and Carla last, so Anna heads the list — and the
     // numeri run the other way, so no read of them could produce this order.
@@ -300,8 +306,12 @@ describe("the Lista di recupero", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
-    const bruno = await marco.mutation(api.clienti.create, { name: "Bruno" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
+    const { _id: bruno } = await marco.mutation(api.clienti.create, {
+      name: "Bruno",
+    });
 
     await takeAway(marco, anna, ["1"]);
     await takeAway(marco, bruno, ["2"]);
@@ -323,8 +333,12 @@ describe("what the Soglia di ritardo does to the Lista di recupero", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
-    const bruno = await marco.mutation(api.clienti.create, { name: "Bruno" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
+    const { _id: bruno } = await marco.mutation(api.clienti.create, {
+      name: "Bruno",
+    });
     await takeAway(marco, anna, ["1", "2"]);
     await takeAway(marco, bruno, ["3"]);
 
@@ -348,7 +362,9 @@ describe("what the Soglia di ritardo does to the Lista di recupero", () => {
     await aFleetOfTwelve(gabriele);
     await gabriele.mutation(api.frantoio.setSogliaRitardo, { days: 30 });
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
 
     await takeAway(marco, anna, ["1"]);
 
@@ -364,7 +380,9 @@ describe("a Cliente the mill has written off", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
     const cesteIds = await takeAway(marco, anna, ["1", "2"]);
 
     await gabriele.mutation(api.clienti.deactivate, {
@@ -402,7 +420,9 @@ describe("the warning at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
 
     await takeAway(marco, anna, ["1", "2"]);
     await takeAway(marco, anna, ["7"]);
@@ -424,7 +444,9 @@ describe("the warning at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
     await takeAway(marco, anna, ["1", "2", "3"]);
 
     await takeAway(marco, anna, ["4", "5", "6", "7", "8", "9"]);
@@ -443,8 +465,12 @@ describe("the warning at the counter", () => {
     const gabriele = await admin(t);
     await aFleetOfTwelve(gabriele);
     const marco = await operatore(t);
-    const anna = await marco.mutation(api.clienti.create, { name: "Anna" });
-    const bruno = await marco.mutation(api.clienti.create, { name: "Bruno" });
+    const { _id: anna } = await marco.mutation(api.clienti.create, {
+      name: "Anna",
+    });
+    const { _id: bruno } = await marco.mutation(api.clienti.create, {
+      name: "Bruno",
+    });
     const [cestaId] = await takeAway(marco, anna, ["1"]);
     const tookHerOut = (await marco.query(api.clienti.get, { clienteId: anna }))
       ?.cesteFuori[0].since;

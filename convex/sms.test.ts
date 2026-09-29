@@ -118,7 +118,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -145,7 +145,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -160,7 +160,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -178,7 +178,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -202,7 +202,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -223,7 +223,7 @@ describe("the Sms a Ritiro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "0931 000000",
     });
@@ -248,7 +248,7 @@ describe("the Sms a Rientro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -268,7 +268,7 @@ describe("the Sms a Rientro sends of itself", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -354,7 +354,7 @@ describe("an Admin writing to a Cliente by hand", () => {
     const t = startApp();
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -387,7 +387,7 @@ describe("an Admin writing to a Cliente by hand", () => {
     const t = startApp();
     const gabriele = await admin(t);
     const marco = await operatore(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -405,7 +405,7 @@ describe("an Admin writing to a Cliente by hand", () => {
   test("a Cliente who asked not to be written to needs saying so twice", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -443,7 +443,7 @@ describe("an Admin writing to a Cliente by hand", () => {
   test("a Cliente with no telephone is refused, and nothing is written", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -551,7 +551,7 @@ describe("the Mittente the mill writes as", () => {
   test("refuses a message an Admin writes by hand", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -579,7 +579,7 @@ describe("the Mittente the mill writes as", () => {
       millPhone: "",
       smsSender: "",
     });
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -601,7 +601,7 @@ describe("the Mittente the mill writes as", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -621,7 +621,7 @@ describe("the Registro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -656,11 +656,11 @@ describe("what the season has cost", () => {
     await millWrites(gabriele);
     // One with a telephone and one without: the second costs the mill nothing
     // and is not counted as though it had.
-    const giuseppe = await gabriele.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
-    const salvatore = await gabriele.mutation(api.clienti.create, {
+    const { _id: salvatore } = await gabriele.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     await takeAway(gabriele, giuseppe, ["1"]);
@@ -700,7 +700,7 @@ describe("a deployment in prova", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     await millWrites(gabriele);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });

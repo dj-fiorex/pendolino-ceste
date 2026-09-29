@@ -94,7 +94,7 @@ describe("the Registro of a day", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
@@ -130,7 +130,7 @@ describe("the Registro of a day", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -159,7 +159,7 @@ describe("the Registro of a day", () => {
     const t = startApp();
     const gabriele = await admin(t);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "333 111 2222",
     });
@@ -222,7 +222,7 @@ describe("a correction and the action it corrects", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cesteIds = [
@@ -288,10 +288,10 @@ describe("narrowing the Registro", () => {
     const marco = await operatore(t, "Marco", "auth|marco");
     const rosa = await operatore(t, "Rosa", "auth|rosa");
 
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await rosa.mutation(api.clienti.create, {
+    const { _id: salvatore } = await rosa.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     await marco.mutation(api.movimenti.ritiro, {
@@ -331,10 +331,10 @@ describe("narrowing the Registro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const abissi = await marco.mutation(api.clienti.create, {
+    const { _id: abissi } = await marco.mutation(api.clienti.create, {
       name: "Abissi Vincenzo",
     });
-    const carmelo = await marco.mutation(api.clienti.create, {
+    const { _id: carmelo } = await marco.mutation(api.clienti.create, {
       name: "Carmelo Fiorello",
     });
     const cestaId = await typeNumero(marco, "2");
@@ -372,10 +372,10 @@ describe("narrowing the Registro", () => {
     const gabriele = await admin(t);
     await aFleetOfTen(gabriele);
     const marco = await operatore(t, "Marco", "auth|marco");
-    const giuseppe = await marco.mutation(api.clienti.create, {
+    const { _id: giuseppe } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
-    const salvatore = await marco.mutation(api.clienti.create, {
+    const { _id: salvatore } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
     const cestaId = await typeNumero(marco, "2");
@@ -537,7 +537,7 @@ describe("who the Registro is for", () => {
         count: 4,
       }),
     ).rejects.toThrow();
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await expect(

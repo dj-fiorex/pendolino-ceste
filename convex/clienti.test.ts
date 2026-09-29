@@ -43,7 +43,16 @@ describe("the Cliente at the counter", () => {
     const t = startApp();
     const marco = await operatore(t);
 
-    await marco.mutation(api.clienti.create, { name: "Giuseppe Amato" });
+    const created = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    expect(created).toEqual({
+      _id: expect.any(String),
+      name: "Giuseppe Amato",
+      alias: [],
+      phone: null,
+      smsOptOut: false,
+    });
 
     expect(
       (
@@ -52,15 +61,28 @@ describe("the Cliente at the counter", () => {
           paginationOpts: { numItems: 20, cursor: null },
         })
       ).page.filter((cliente) => cliente !== null),
-    ).toEqual([
-      {
-        _id: expect.any(String),
-        name: "Giuseppe Amato",
-        alias: [],
-        phone: null,
-        smsOptOut: false,
-      },
-    ]);
+    ).toEqual([created]);
+  });
+
+  test("creation returns the saved Cliente with normalized fields", async () => {
+    const t = startApp();
+    const marco = await operatore(t);
+    const created = await marco.mutation(api.clienti.create, {
+      name: "  mARIO   ROSSI  ",
+      alias: ["  u'   pilota  ", " "],
+      phone: "333 123 4567",
+    });
+
+    expect(created).toEqual({
+      _id: expect.any(String),
+      name: "Mario Rossi",
+      alias: ["u' pilota"],
+      phone: "+393331234567",
+      smsOptOut: false,
+    });
+    expect(
+      await marco.query(api.clienti.get, { clienteId: created._id }),
+    ).toEqual({ ...created, active: true, cesteFuori: [] });
   });
 });
 
@@ -129,7 +151,7 @@ describe("the name in the registry's own casing", () => {
   test("a correction is capitalised too", async () => {
     const t = startApp();
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giusepe Amato",
     });
 
@@ -415,7 +437,7 @@ describe("two Clienti with the same name", () => {
   test("a deactivated namesake still needs telling apart, though nobody can pick them", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     await gabriele.mutation(api.clienti.deactivate, {
@@ -523,7 +545,7 @@ describe("correcting a Cliente", () => {
   test("any Operatore fixes the name, the Alias and the telephone", async () => {
     const t = startApp();
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giusepe Amato",
     });
 
@@ -557,7 +579,7 @@ describe("correcting a Cliente", () => {
     const t = startApp();
     const gabriele = await admin(t);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "333 111 2222",
     });
@@ -599,7 +621,7 @@ describe("correcting a Cliente", () => {
   test("saving a Cliente unchanged records nothing", async () => {
     const t = startApp();
     const gabriele = await admin(t);
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       alias: ["Turi"],
     });
@@ -619,7 +641,7 @@ describe("correcting a Cliente", () => {
     const t = startApp();
     const marco = await operatore(t);
     await marco.mutation(api.clienti.create, { name: "Giuseppe Amato" });
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Salvatore Russo",
     });
 
@@ -667,7 +689,7 @@ describe("the telephone", () => {
       // Whoever winters abroad and still brings olives in October.
       ["+49 151 12345678", "+4915112345678"],
     ]) {
-      const clienteId = await marco.mutation(api.clienti.create, {
+      const { _id: clienteId } = await marco.mutation(api.clienti.create, {
         name: `Cliente ${typed}`,
         phone: typed,
       });
@@ -707,7 +729,7 @@ describe("the telephone", () => {
     const t = startApp();
     const marco = await operatore(t);
 
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "   ",
     });
@@ -720,7 +742,7 @@ describe("the telephone", () => {
   test("a correction is refused the same way, and changes nothing", async () => {
     const t = startApp();
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
       phone: "347 1234567",
     });
@@ -746,7 +768,7 @@ describe("deactivating a Cliente", () => {
     const t = startApp();
     const gabriele = await admin(t);
     const marco = await operatore(t);
-    const clienteId = await marco.mutation(api.clienti.create, {
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
 
@@ -780,7 +802,7 @@ describe("deactivating a Cliente", () => {
       forma: "rettangolare",
       count: 3,
     });
-    const clienteId = await gabriele.mutation(api.clienti.create, {
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
       name: "Giuseppe Amato",
     });
     const cesta = await gabriele.query(api.ceste.byNumero, { numero: "2" });

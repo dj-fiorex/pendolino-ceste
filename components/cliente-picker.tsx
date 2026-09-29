@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
-import { storedPhone } from "@/convex/phone";
 import {
   comparableName,
   MAX_SEARCH_CANDIDATES,
@@ -55,19 +54,12 @@ export function ClientePicker({
           // A Cliente entered at the counter receives the mill's SMS: nobody
           // has asked not to yet, and the switch that says so is on their own
           // page rather than on this form.
-          const clienteId = await createCliente({
+          const cliente = await createCliente({
             name: fields.name,
             alias: fields.alias,
             phone: fields.phone,
           });
-          onPick({
-            _id: clienteId,
-            name: fields.name.trim(),
-            alias: fields.alias,
-            // As the registry now keeps it, not as it was typed (ADR-0009).
-            phone: storedPhone(fields.phone),
-            smsOptOut: false,
-          });
+          onPick(cliente);
         }}
       />
     );
