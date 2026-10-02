@@ -18,6 +18,8 @@ import {
 import { Warning } from "@/components/warning";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { expectedBefore } from "@/convex/schema";
+import { movimentoLabel } from "@/lib/movimento";
 import {
   cesteCount,
   dayOf,
@@ -27,11 +29,13 @@ import {
 } from "@/lib/ceste";
 import { clienteLabel, type Cliente } from "@/lib/cliente";
 
-/** A Cesta on the trailer, whether or not the app believed she was his. */
-type OnTheTrailer = { _id: Id<"ceste">; numero: number; codice: string };
+/** A Cesta shown for this movement, whether suggested or explicitly added. */
+type ListedCesta = { _id: Id<"ceste">; numero: number; codice: string };
 
 /**
- * The Rientro: the Operatore reads the numero off any one Cesta of the load
+ * Rientro and Conferimento in frantoio share selection and confirmation.
+ * A Conferimento starts with the Cliente and an empty list of Ceste.
+ * In Rientro, the Operatore reads the numero off any one Cesta of the load
  * and the app says whose it is; then the Ceste that Cliente is holding come up
  * as tiles and the ones on the trailer are ticked. With no Cesta to hand, the
  * Cliente is searched for first and the tiles come up unticked (#34).
@@ -41,8 +45,18 @@ type OnTheTrailer = { _id: Id<"ceste">; numero: number; codice: string };
  * the two that stayed on the farm are named on the screen instead of being
  * merely absent from it, and they stay Fuori and stay counted against him.
  */
-export function RientroFlow() {
-  const recordRientro = useMutation(api.movimenti.rientro);
+export function IncomingCesteFlow({
+  kind,
+}: {
+  kind: "rientro" | "conferimento_in_frantoio";
+}) {
+  const isConferimento = kind === "conferimento_in_frantoio";
+  const label = movimentoLabel[kind];
+  const record = useMutation(
+    isConferimento
+      ? api.movimenti.conferimentoInFrantoio
+      : api.movimenti.rientro,
+  );
   const { campagnaId, mustAsk } = useCampagnaChoice();
   // The one Cesta the load was identified by: whose the app says it is before
   // the Cliente is settled, and the Cesta the tiles are opened with after.
@@ -52,10 +66,8 @@ export function RientroFlow() {
   // app had nobody to name, or the Operatore said it is somebody else.
   const [searching, setSearching] = useState(false);
   const [ticked, setTicked] = useState<Id<"ceste">[]>([]);
-  // Ceste typed on the trailer that the app does not believe are his. They
-  // come back with him anyway (ADR-0005), so they belong on the screen — and
-  // they are kept whole, because the warning has to say where the app did have
-  // them and with whom (#21).
+  // Explicitly added Ceste: all of a Conferimento, or those a Rientro did not
+  // find among this Cliente's Fuori. Keep their state and Cliente for warnings.
   const [alsoHere, setAlsoHere] = useState<FoundCesta[]>([]);
   const [done, setDone] = useState<{ cliente: Cliente; count: number } | null>(
     null,
@@ -65,7 +77,7 @@ export function RientroFlow() {
 
   const held = useQuery(
     api.clienti.get,
-    cliente === null ? "skip" : { clienteId: cliente._id },
+    cliente === null || isConferimento ? "skip" : { clienteId: cliente._id },
   );
 
   const startOver = () => {
@@ -104,7 +116,7 @@ export function RientroFlow() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Rientro registrato</CardTitle>
+          <CardTitle>{label} registrato</CardTitle>
           <CardDescription>
             {cesteCount(done.count)} da {clienteLabel(done.cliente)}, in attesa
             di molitura.
@@ -112,7 +124,7 @@ export function RientroFlow() {
         </CardHeader>
         <CardContent className="grid gap-3">
           <Button className="h-12 text-base" onClick={startOver}>
-            Nuovo Rientro
+            Nuovo {label}
           </Button>
           <Button variant="outline" asChild className="h-12 text-base">
             <Link href="/attesa-molitura">Vedi l&apos;Attesa molitura</Link>
@@ -127,10 +139,10 @@ export function RientroFlow() {
 
   // The load is open and its Cliente is being changed: what is already ticked
   // stays ticked, since it is the name that was wrong and not the trailer.
-  if (cliente !== null && searching) {
+  if ((cliente !== null && searching) || (isConferimento && cliente === null)) {
     return (
       <ClientePicker
-        pickLabel="Rientro"
+        pickLabel={label}
         onPick={(picked) => {
           setCliente(picked);
           setSearching(false);
@@ -140,12 +152,12 @@ export function RientroFlow() {
   }
 
   if (cliente !== null) {
-    if (held === undefined) {
+    if (!isConferimento && held === undefined) {
       return <p className="text-muted-foreground">Un attimo…</p>;
     }
 
-    const fuori = held?.cesteFuori ?? [];
-    const onTheTrailer: OnTheTrailer[] = [...fuori, ...alsoHere];
+    const fuori = isConferimento ? [] : (held?.cesteFuori ?? []);
+    const listed: ListedCesta[] = [...fuori, ...alsoHere];
     const oldest = fuori
       .map((cesta) => cesta.since)
       .filter((since) => since !== null)
@@ -158,7 +170,9 @@ export function RientroFlow() {
     const notWhereTheAppHadThem = alsoHere.filter(
       (cesta) =>
         ticked.includes(cesta._id) &&
-        !fuori.some((his) => his._id === cesta._id),
+        (isConferimento
+          ? cesta.state !== expectedBefore[kind]
+          : !fuori.some((his) => his._id === cesta._id)),
     );
 
     /**
@@ -189,16 +203,21 @@ export function RientroFlow() {
       // size of surprise whether it had her at the mill or with somebody else:
       // either way it was wrong about whose she was, and she comes back all
       // the same (ADR-0005).
-      return his
+      const expected = isConferimento
+        ? cesta.state === expectedBefore[kind]
+        : his;
+      return expected
         ? null
-        : `${warningLine(cesta)}: rientra lo stesso, con una Rettifica.`;
+        : isConferimento
+          ? `${warningLine(cesta)}: il Conferimento in frantoio viene registrato con una Rettifica.`
+          : `${warningLine(cesta)}: rientra lo stesso, con una Rettifica.`;
     };
 
     const confirm = async () => {
       setPending(true);
       setFailed(false);
       try {
-        await recordRientro({
+        await record({
           clienteId: cliente._id,
           cesteIds: ticked,
           campagnaId,
@@ -217,9 +236,11 @@ export function RientroFlow() {
           <CardHeader>
             <CardTitle>Ceste di {clienteLabel(cliente)}</CardTitle>
             <CardDescription>
-              {fuori.length === 0
-                ? "Non risulta avere Ceste Fuori."
-                : `${cesteCount(fuori.length)} Fuori${oldest === undefined ? "" : ` dal ${dayOf(oldest)} · ${daysSince(oldest)}`}.`}
+              {isConferimento
+                ? "Aggiungi le Ceste riempite qui in frantoio."
+                : fuori.length === 0
+                  ? "Non risulta avere Ceste Fuori."
+                  : `${cesteCount(fuori.length)} Fuori${oldest === undefined ? "" : ` dal ${dayOf(oldest)} · ${daysSince(oldest)}`}.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
@@ -231,6 +252,7 @@ export function RientroFlow() {
             <Button
               variant="outline"
               className="h-11 w-full text-base"
+              disabled={pending}
               onClick={() => setSearching(true)}
             >
               Cambia Cliente
@@ -239,21 +261,27 @@ export function RientroFlow() {
         </Card>
 
         <div className="flex items-baseline justify-between text-sm text-muted-foreground">
-          <span>Sul rimorchio · tocca per spuntare</span>
+          <span>
+            {isConferimento ? "Riempite in frantoio" : "Sul rimorchio"} · tocca
+            per spuntare
+          </span>
           <span>{cesteCount(ticked.length)}</span>
         </div>
 
-        {onTheTrailer.length === 0 ? (
+        {listed.length === 0 ? (
           <p className="text-muted-foreground">
-            Ancora nessuna Cesta sul rimorchio.
+            {isConferimento
+              ? "Ancora nessuna Cesta aggiunta."
+              : "Ancora nessuna Cesta sul rimorchio."}
           </p>
         ) : (
           <ul className="flex flex-wrap gap-2">
-            {onTheTrailer.map((cesta) => (
+            {listed.map((cesta) => (
               <li key={cesta._id}>
                 <CestaTile
                   codice={cesta.codice}
                   selected={ticked.includes(cesta._id)}
+                  disabled={pending}
                   onToggle={() => toggle(cesta._id)}
                 />
               </li>
@@ -280,9 +308,11 @@ export function RientroFlow() {
         {notWhereTheAppHadThem.length > 0 && (
           <Warning>
             <span className="font-semibold">
-              {notWhereTheAppHadThem.length === 1
-                ? "Rientra lo stesso, con una Rettifica:"
-                : "Rientrano lo stesso, con una Rettifica per ognuna:"}
+              {isConferimento
+                ? "Si registra con una Rettifica per ogni Cesta non Disponibile:"
+                : notWhereTheAppHadThem.length === 1
+                  ? "Rientra lo stesso, con una Rettifica:"
+                  : "Rientrano lo stesso, con una Rettifica per ognuna:"}
             </span>{" "}
             {notWhereTheAppHadThem.map(warningLine).join(" · ")}.
           </Warning>
@@ -290,7 +320,7 @@ export function RientroFlow() {
 
         {failed && (
           <p role="alert" className="text-sm text-destructive">
-            Non è stato possibile registrare il Rientro. Controlla la
+            Non è stato possibile registrare il {label}. Controlla la
             connessione e riprova.
           </p>
         )}
@@ -299,13 +329,15 @@ export function RientroFlow() {
           <CestaReader
             label="Numero della Cesta"
             submitLabel="Aggiungi"
-            codici={onTheTrailer
+            codici={listed
               .filter((cesta) => ticked.includes(cesta._id))
               .map((cesta) => cesta.codice)}
-            onCesta={addCesta}
+            onCesta={(cesta) =>
+              pending ? "Registrazione in corso." : addCesta(cesta)
+            }
           />
           <Button
-            className="h-14 w-full text-lg"
+            className="min-h-14 w-full whitespace-normal text-lg"
             disabled={pending || ticked.length === 0 || mustAsk}
             onClick={confirm}
           >
@@ -313,7 +345,7 @@ export function RientroFlow() {
               ? "Un attimo…"
               : mustAsk
                 ? "Scegli prima la Campagna"
-                : `Registra Rientro · ${cesteCount(ticked.length)}`}
+                : `Registra ${label} · ${cesteCount(ticked.length)}`}
           </Button>
         </div>
       </div>

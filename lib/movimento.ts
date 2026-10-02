@@ -9,6 +9,7 @@ import { stateLabel } from "@/lib/ceste";
 export const movimentoLabel: Record<MovimentoKind, string> = {
   ritiro: "Ritiro",
   rientro: "Rientro",
+  conferimento_in_frantoio: "Conferimento in frantoio",
   svuotamento: "Svuotamento",
   rettifica: "Rettifica",
 };
@@ -34,6 +35,7 @@ export const rettificaCauseLabel: Record<RettificaCause, string> = {
 export const movimentoInSentence: Record<MovimentoKind, string> = {
   ritiro: "il Ritiro",
   rientro: "il Rientro",
+  conferimento_in_frantoio: "il Conferimento in frantoio",
   svuotamento: "lo Svuotamento",
   rettifica: "la Rettifica",
 };

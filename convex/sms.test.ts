@@ -112,6 +112,43 @@ const takeAway = async (
 };
 
 describe("the Sms a Ritiro sends of itself", () => {
+  test("Conferimento in frantoio sends nothing even with both automatic receipts enabled", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+      phone: "347 1234567",
+    });
+    const cesteIds = [await typeNumero(marco, "1")];
+    await millWrites(gabriele);
+    await marco.mutation(api.movimenti.conferimentoInFrantoio, {
+      clienteId,
+      cesteIds,
+    });
+    // A second registration is a discrepancy but still must not send an Sms.
+    await marco.mutation(api.movimenti.conferimentoInFrantoio, {
+      clienteId,
+      cesteIds,
+    });
+    expect(await marco.query(api.sms.byCliente, { clienteId })).toEqual([]);
+    expect(
+      (await gabriele.query(api.registro.list, {}))
+        .filter((row) => row.action.kind === "conferimento_in_frantoio")
+        .map((row) => row.sms),
+    ).toEqual([null, null]);
+
+    await marco.mutation(api.movimenti.svuotamento, { cesteIds });
+    await marco.mutation(api.movimenti.ritiro, { clienteId, cesteIds });
+    await marco.mutation(api.movimenti.rientro, { clienteId, cesteIds });
+    expect(
+      (await marco.query(api.sms.byCliente, { clienteId })).map(
+        (sms) => sms.kind,
+      ),
+    ).toEqual(["rientro", "ritiro"]);
+  });
+
   test("six Ceste leaving together are one message, not six", async () => {
     const t = startApp();
     const gabriele = await admin(t);
@@ -332,9 +369,9 @@ describe("the words the mill settles", () => {
     await millWrites(gabriele);
 
     const rows = await gabriele.query(api.registro.list, {});
-    expect(rows.filter((row) => row.action.kind === "sms_settings")).toHaveLength(
-      1,
-    );
+    expect(
+      rows.filter((row) => row.action.kind === "sms_settings"),
+    ).toHaveLength(1);
   });
 
   test("the settings are an Admin's, to read as much as to change", async () => {
@@ -491,9 +528,9 @@ describe("the Mittente the mill writes as", () => {
       smsRientroOn: false,
     });
 
-    expect(
-      (await gabriele.query(api.sms.settings, {})).smsRitiroTemplate,
-    ).toBe("Ciao {{nome}}.");
+    expect((await gabriele.query(api.sms.settings, {})).smsRitiroTemplate).toBe(
+      "Ciao {{nome}}.",
+    );
   });
 
   // The bug the first version of this gate had: it refused the switches being
@@ -516,9 +553,9 @@ describe("the Mittente the mill writes as", () => {
       smsRientroOn: true,
     });
 
-    expect(
-      (await gabriele.query(api.sms.settings, {})).smsRitiroTemplate,
-    ).toBe("Ciao {{nome}}, hai preso {{ceste}}.");
+    expect((await gabriele.query(api.sms.settings, {})).smsRitiroTemplate).toBe(
+      "Ciao {{nome}}, hai preso {{ceste}}.",
+    );
   });
 
   test("still refuses a switch going on while it is empty", async () => {

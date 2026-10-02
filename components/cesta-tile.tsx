@@ -17,10 +17,12 @@ export function CestaTile({
   codice,
   selected,
   onToggle,
+  disabled = false,
 }: {
   codice: string;
   selected: boolean;
   onToggle: () => void;
+  disabled?: boolean;
 }) {
   const { prefix, numero } = codiceParts(codice);
   return (
@@ -29,8 +31,9 @@ export function CestaTile({
       aria-pressed={selected}
       aria-label={`Cesta ${codice}`}
       onClick={onToggle}
+      disabled={disabled}
       className={cn(
-        "relative flex size-24 flex-col items-center justify-center gap-1 rounded-xl border transition-colors",
+        "relative flex size-24 flex-col items-center justify-center gap-1 rounded-xl border transition-colors disabled:opacity-50",
         selected
           ? "border-primary bg-primary text-primary-foreground"
           : "bg-card hover:bg-accent",

@@ -9,11 +9,11 @@ _Terms are the mill staff's own Italian words and are not translated in code. Th
 ### Core
 
 **Cesta** (basket):
-A reusable container owned by the mill, in which a Cliente harvests and brings back olives. Tracked individually, identified by a `numero` unique across the whole fleet and worn on an Etichetta. Has a Portata and a Forma; the counter counts and hands out Ceste by Portata alone, and the Forma changes nothing there.
+A reusable container owned by the mill, in which a Cliente harvests and brings back olives or deposits olives brought to the mill by other means. Tracked individually, identified by a `numero` unique across the whole fleet and worn on an Etichetta. Has a Portata and a Forma; the counter counts and hands out Ceste by Portata alone, and the Forma changes nothing there.
 _Avoid_: Bin, bins, cassetta, crate
 
 **Cliente** (customer):
-Whoever takes empty Ceste away from the mill and brings them back loaded with olives for milling. Identified by name, by any Alias, and, where given, phone number. Two Clienti never share the same name and Alias: a namesake is told apart by an Alias or is the same person. May or may not correspond to a record in the Gestionale; when it does, the two are tied by that record's `gestionaleId`.
+Whoever brings olives to the mill for milling, either in Ceste previously taken away or by other means for a Conferimento in frantoio. Identified by name, by any Alias, and, where given, phone number. Two Clienti never share the same name and Alias: a namesake is told apart by an Alias or is the same person. May or may not correspond to a record in the Gestionale; when it does, the two are tied by that record's `gestionaleId`.
 _Avoid_: Utente, user, client
 
 **Alias**:
@@ -68,7 +68,7 @@ In a Cliente's hands. The only state in which a Cesta can be lost or stolen, and
 _Avoid_: Prestata, on loan, borrowed
 
 **Attesa molitura** (awaiting milling):
-Back at the mill, still full, not yet emptied. About half the Ceste sit here for a day or two; the other half are emptied straight away. Recognisable in the yard by the paper tape the mill sticks on at Rientro with the Cliente's name on it.
+At the mill, full of a Cliente's olives, not yet emptied, following either a Rientro or a Conferimento in frantoio. About half the Ceste sit here for a day or two; the other half are emptied straight away. Recognisable in the yard by the paper tape bearing the Cliente's name.
 _Avoid_: Rientrata piena, pending, queued
 
 **Dismessa** (retired):
@@ -78,7 +78,7 @@ _Avoid_: Deleted, cancelled, inactive
 ### Roles
 
 **Operatore** (operator):
-Mill staff who register the Movimenti of a Campagna: Ritiri and Rientri at the counter, Svuotamenti where the Ceste are tipped out. Holds an account in the app, which a Cliente never does; whatever is recorded from a signed-in device is attributed to that account.
+Mill staff who register the Movimenti of a Campagna: Ritiri, Rientri and Conferimenti in frantoio at the counter, Svuotamenti where the Ceste are tipped out. Holds an account in the app, which a Cliente never does; whatever is recorded from a signed-in device is attributed to that account.
 _Avoid_: Utente, user, staff
 
 **Admin**:
@@ -88,7 +88,7 @@ _Avoid_: Titolare, owner, superuser
 ### Movements
 
 **Movimento** (movement):
-One Cesta changing state on one occasion — a Ritiro, Rientro, Svuotamento or Rettifica — recorded against that Cesta with who registered it and when. Six Ceste leaving together are six Movimenti.
+One Cesta changing state on one occasion: a Ritiro, Rientro, Conferimento in frantoio, Svuotamento or Rettifica, recorded against that Cesta with who registered it and when. Six Ceste leaving together are six Movimenti.
 _Avoid_: Transaction, event, operazione, azione
 
 **Ritiro** (pickup):
@@ -98,6 +98,10 @@ _Avoid_: Uscita, consegna, delivery, loan
 **Rientro** (return):
 Ceste come back to the mill loaded with olives. Fuori → Attesa molitura.
 _Avoid_: Restituzione, entrata, dropoff
+
+**Conferimento in frantoio** (olives deposited into baskets at the mill):
+A Cliente brings olives by other means and deposits them into Ceste already at the mill, without taking those Ceste away. Disponibile → Attesa molitura, with the Ceste attributed to that Cliente.
+_Avoid_: Conferimento diretto, Rientro (for Ceste that never left the mill), Rettifica (for this ordinary movement)
 
 **Svuotamento** (emptying):
 The Cesta is tipped out at the mill and its paper tape comes off. Attesa molitura → Disponibile.

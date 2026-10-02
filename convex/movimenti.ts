@@ -87,6 +87,22 @@ async function lastMovimento(
     .first();
 }
 
+/** The latest Rientro or Conferimento in frantoio supplies both date and Cliente. */
+export async function lastArrival(
+  ctx: QueryCtx,
+  cestaId: Id<"ceste">,
+): Promise<Doc<"movimenti"> | null> {
+  const [rientro, conferimento] = await Promise.all([
+    lastMovimento(ctx, cestaId, "rientro"),
+    lastMovimento(ctx, cestaId, "conferimento_in_frantoio"),
+  ]);
+  if (rientro === null) return conferimento;
+  if (conferimento === null) return rientro;
+  return conferimento._creationTime > rientro._creationTime
+    ? conferimento
+    : rientro;
+}
+
 /**
  * The newest Rettifica against a Cesta that says she went out, and nothing
  * where none does.
@@ -153,6 +169,10 @@ export async function fuoriSince(
 const movement = {
   ritiro: { name: "Ritiro", becomes: "fuori" },
   rientro: { name: "Rientro", becomes: "attesa_molitura" },
+  conferimento_in_frantoio: {
+    name: "Conferimento in frantoio",
+    becomes: "attesa_molitura",
+  },
   svuotamento: { name: "Svuotamento", becomes: "disponibile" },
 } as const satisfies Record<
   PlainMovimentoKind,
@@ -231,7 +251,7 @@ async function recordMovimento(
         signatureId?: Id<"_storage">;
         photoId?: Id<"_storage">;
       }
-    | { kind: "rientro"; clienteId: Id<"clienti"> }
+    | { kind: "rientro" | "conferimento_in_frantoio"; clienteId: Id<"clienti"> }
     | { kind: "svuotamento" }
   ),
 ): Promise<null> {
@@ -327,7 +347,7 @@ async function recordMovimento(
   // hands the message to the scheduler and nothing else: whatever a carrier
   // makes of it happens outside this transaction and never at the counter
   // (ADR-0005).
-  if (kind !== "svuotamento" && cliente !== null) {
+  if ((kind === "ritiro" || kind === "rientro") && cliente !== null) {
     await sendMovimentoSms(ctx, {
       kind,
       cliente,
@@ -367,6 +387,14 @@ export const rientro = mutation({
   args: counterArgs,
   returns: v.null(),
   handler: (ctx, args) => recordMovimento(ctx, { ...args, kind: "rientro" }),
+});
+
+/** Olives fill Ceste already at the Frantoio, without a prior Ritiro or Sms. */
+export const conferimentoInFrantoio = mutation({
+  args: counterArgs,
+  returns: v.null(),
+  handler: (ctx, args) =>
+    recordMovimento(ctx, { ...args, kind: "conferimento_in_frantoio" }),
 });
 
 /**
@@ -528,7 +556,7 @@ export const rettifica = mutation({
       becomes === "fuori"
         ? found?._id
         : becomes === "attesa_molitura"
-          ? (await lastMovimento(ctx, cesta._id, "rientro"))?.clienteId
+          ? (await lastArrival(ctx, cesta._id))?.clienteId
           : undefined;
     // Whom the correction concerns: the Cliente it leaves her with, or the one
     // the app believed was holding her — which is where the mill would go

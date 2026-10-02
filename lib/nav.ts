@@ -1,6 +1,7 @@
 import {
   ArchiveIcon,
   CalendarRangeIcon,
+  ContainerIcon,
   ClipboardListIcon,
   FactoryIcon,
   HomeIcon,
@@ -86,8 +87,20 @@ const clienti: NavItem = {
   icon: UsersIcon,
 };
 
-/** The three Movimenti: what the counter is on the app to do. */
-export const movimenti: NavItem[] = [ritiro, rientro, svuotamento];
+const conferimentoInFrantoio: NavItem = {
+  href: "/conferimento-in-frantoio",
+  label: "Conferimento in frantoio",
+  hint: "Le olive riempiono le Ceste già in frantoio.",
+  icon: ContainerIcon,
+};
+
+/** The Movimenti recorded at the counter. */
+export const movimenti: NavItem[] = [
+  ritiro,
+  rientro,
+  conferimentoInFrantoio,
+  svuotamento,
+];
 
 /** The screens that answer where the Ceste are. */
 export const lookups: NavItem[] = [attesaMolitura, recupero, ceste, clienti];

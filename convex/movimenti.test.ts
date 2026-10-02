@@ -96,6 +96,193 @@ const bringBack = async (
   return cesteIds;
 };
 
+describe("Conferimento in frantoio", () => {
+  test.each(["fuori", "attesa_molitura", "dismessa"] as const)(
+    "records a discrepancy for a Cesta %s and preserves Dismessa",
+    async (initialState) => {
+      const t = startApp();
+      const gabriele = await admin(t);
+      await aFleetOfTen(gabriele);
+      const marco = await operatore(t);
+      const { _id: previousCliente } = await marco.mutation(
+        api.clienti.create,
+        { name: "Mario" },
+      );
+      const { _id: clienteId } = await marco.mutation(api.clienti.create, {
+        name: "Giuseppe",
+      });
+      const cesteIds = await takeAway(marco, previousCliente, ["1"]);
+      if (initialState === "attesa_molitura") {
+        await marco.mutation(api.movimenti.rientro, {
+          clienteId: previousCliente,
+          cesteIds,
+        });
+      } else if (initialState === "dismessa") {
+        await gabriele.mutation(api.movimenti.rettifica, {
+          cestaId: cesteIds[0],
+          cause: "persa",
+        });
+      }
+      await marco.mutation(api.movimenti.conferimentoInFrantoio, {
+        clienteId,
+        cesteIds,
+      });
+      const targetState =
+        initialState === "dismessa" ? "dismessa" : "attesa_molitura";
+      expect(
+        await marco.query(api.ceste.byNumero, { numero: "1" }),
+      ).toMatchObject({ state: targetState });
+      const history = await marco.query(api.movimenti.byCesta, {
+        cestaId: cesteIds[0],
+      });
+      expect(history).toContainEqual(
+        expect.objectContaining({
+          kind: "rettifica",
+          rettifica: expect.objectContaining({
+            cause: "discrepanza",
+            believedState: initialState,
+            becomes: targetState,
+          }),
+        }),
+      );
+      expect((await gabriele.query(api.registro.list, {}))[0]).toMatchObject({
+        producedRettifica: true,
+        action: { kind: "conferimento_in_frantoio", numeri: [1] },
+      });
+    },
+  );
+
+  test("requires an authenticated Operatore and at least one Cesta", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe",
+    });
+    const cestaId = await typeNumero(gabriele, "1");
+    await expect(
+      t.mutation(api.movimenti.conferimentoInFrantoio, {
+        clienteId,
+        cesteIds: [cestaId],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      gabriele.mutation(api.movimenti.conferimentoInFrantoio, {
+        clienteId,
+        cesteIds: [],
+      }),
+    ).rejects.toThrow("at least one Cesta");
+    expect(await gabriele.query(api.ceste.attesaMolitura, {})).toEqual([]);
+  });
+
+  test("a first Conferimento has its own date and a later Rientro supersedes it", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe",
+    });
+    const cesteIds = [await typeNumero(gabriele, "1")];
+    await gabriele.mutation(api.movimenti.conferimentoInFrantoio, {
+      clienteId,
+      cesteIds,
+    });
+    const [conferimento] = await gabriele.query(api.movimenti.byCliente, {
+      clienteId,
+    });
+    expect(
+      (await gabriele.query(api.ceste.attesaMolituraByCliente, {}))[0]
+        .oldestRientro,
+    ).toBe(conferimento.at);
+    await gabriele.mutation(api.movimenti.svuotamento, { cesteIds });
+    await bringBack(gabriele, clienteId, ["1"]);
+    const [rientro] = await gabriele.query(api.movimenti.byCliente, {
+      clienteId,
+    });
+    expect(
+      (await gabriele.query(api.ceste.attesaMolituraByCliente, {}))[0]
+        .oldestRientro,
+    ).toBe(rientro.at);
+  });
+
+  test("the latest arrival dates the wait and restores its Cliente after an erroneous Svuotamento", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const { _id: oldCliente } = await gabriele.mutation(api.clienti.create, {
+      name: "Old Cliente",
+    });
+    const { _id: clienteId } = await gabriele.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const cesteIds = await bringBack(gabriele, oldCliente, ["1"]);
+    await gabriele.mutation(api.movimenti.svuotamento, { cesteIds });
+    await gabriele.mutation(api.movimenti.conferimentoInFrantoio, {
+      clienteId,
+      cesteIds,
+    });
+    const [arrival] = await gabriele.query(api.movimenti.byCliente, {
+      clienteId,
+    });
+    expect(
+      await gabriele.query(api.ceste.attesaMolituraByCliente, {}),
+    ).toMatchObject([
+      { cliente: { _id: clienteId }, oldestRientro: arrival.at },
+    ]);
+
+    await gabriele.mutation(api.movimenti.svuotamento, { cesteIds });
+    const [emptying] = await gabriele.query(api.movimenti.byCesta, {
+      cestaId: cesteIds[0],
+    });
+    await gabriele.mutation(api.movimenti.rettifica, {
+      cestaId: cesteIds[0],
+      cause: "errore",
+      corrects: emptying._id,
+      becomes: "attesa_molitura",
+    });
+    expect(
+      await gabriele.query(api.ceste.attesaMolituraByCliente, {}),
+    ).toMatchObject([
+      { cliente: { _id: clienteId }, oldestRientro: arrival.at },
+    ]);
+  });
+
+  test("available Ceste enter Attesa molitura for the Cliente without a discrepancy", async () => {
+    const t = startApp();
+    const gabriele = await admin(t);
+    await aFleetOfTen(gabriele);
+    const marco = await operatore(t);
+    const { _id: clienteId } = await marco.mutation(api.clienti.create, {
+      name: "Giuseppe Amato",
+    });
+    const first = await typeNumero(marco, "1");
+    const second = await typeNumero(marco, "2");
+
+    await marco.mutation(api.movimenti.conferimentoInFrantoio, {
+      clienteId,
+      cesteIds: [first, second, first],
+    });
+
+    expect(await marco.query(api.ceste.attesaMolitura, {})).toMatchObject([
+      { _id: first, cliente: { _id: clienteId } },
+      { _id: second, cliente: { _id: clienteId } },
+    ]);
+    const history = await marco.query(api.movimenti.byCliente, { clienteId });
+    expect(history).toHaveLength(2);
+    expect(
+      history.every((entry) => entry.kind === "conferimento_in_frantoio"),
+    ).toBe(true);
+    expect(await gabriele.query(api.registro.list, {})).toContainEqual(
+      expect.objectContaining({
+        operatore: "Marco",
+        producedRettifica: false,
+        action: { kind: "conferimento_in_frantoio", numeri: [1, 2] },
+        sms: null,
+      }),
+    );
+  });
+});
+
 describe("a Ritiro at the counter", () => {
   test("six Ceste leave as six Movimenti under one Registro row", async () => {
     const t = startApp();

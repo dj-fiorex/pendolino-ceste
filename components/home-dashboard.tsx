@@ -70,7 +70,7 @@ function Figure({
 }
 
 /**
- * The home: the figures first, then the three Movimenti, then the head of the
+ * The home: the figures first, then the Movimenti, then the head of the
  * Lista di recupero. On the phone it is one column under the tab bar; on the
  * PC the same blocks fall into columns, so an Admin reads the day without
  * opening anything (#32).
@@ -131,7 +131,7 @@ export function HomeDashboard({ data }: { data: HomeData }) {
               <Button
                 key={item.href}
                 asChild
-                className="h-14 justify-start gap-3 text-base"
+                className="min-h-14 justify-start gap-3 whitespace-normal text-left text-base"
               >
                 <Link href={item.href}>
                   <Icon className="size-5" aria-hidden="true" />

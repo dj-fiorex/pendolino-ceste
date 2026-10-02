@@ -52,7 +52,7 @@ export const state = v.union(
 );
 
 /**
- * What a Movimento is: one Cesta changing state on one occasion. The three
+ * What a Movimento is: one Cesta changing state on one occasion. The four
  * that happen in the yard, and the Rettifica that says what no Ritiro and no
  * Rientro explains — including the one written against a Movimento here,
  * because an *errore* corrects a movement that did happen (#28).
@@ -60,6 +60,7 @@ export const state = v.union(
 export const plainMovimentoKind = v.union(
   v.literal("ritiro"),
   v.literal("rientro"),
+  v.literal("conferimento_in_frantoio"),
   v.literal("svuotamento"),
 );
 
@@ -89,6 +90,7 @@ export type PlainMovimentoKind = Infer<typeof plainMovimentoKind>;
 export const expectedBefore = {
   ritiro: "disponibile",
   rientro: "fuori",
+  conferimento_in_frantoio: "disponibile",
   svuotamento: "attesa_molitura",
 } as const satisfies Record<PlainMovimentoKind, State>;
 
@@ -708,6 +710,10 @@ export const action = v.union(
     kind: v.literal("rientro"),
     // The Ceste that came back full, by numero. Four of the six that went out
     // is a Rientro of four, and the row says which four.
+    numeri: v.array(v.number()),
+  }),
+  v.object({
+    kind: v.literal("conferimento_in_frantoio"),
     numeri: v.array(v.number()),
   }),
   v.object({

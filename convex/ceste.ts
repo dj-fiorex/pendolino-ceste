@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { asCliente, clienteShape } from "./clienti";
-import { lastMovimentoAt } from "./movimenti";
+import { lastArrival } from "./movimenti";
 import { requireAdmin, requireOperatore } from "./operatori";
 import { writeRegistroRow } from "./registro";
 import { forma, portata, state, type Forma, type Portata } from "./schema";
@@ -410,10 +410,10 @@ export const attesaMolitura = query({
 /**
  * The same Ceste, grouped as the Svuotamento screen empties them: one group
  * per Cliente, because the Cliente is what the paper tape says, and oldest
- * Rientro first, because that is the load that has been waiting longest (#18).
+ * arrival first, whether by Rientro or Conferimento in frantoio (#18).
  *
  * A Cliente whose Ceste came back over several days is one group all the same,
- * dated by the oldest Rientro among them: whoever empties them works from the
+ * dated by the oldest current wait among them: whoever empties them works from the
  * tapes, and the tapes say a name rather than a load. The Ceste inside a group
  * come by numero, which is the order they are stacked and read in.
  */
@@ -422,9 +422,8 @@ export const attesaMolituraByCliente = query({
   returns: v.array(
     v.object({
       cliente: v.union(v.null(), v.object(clienteShape)),
-      // The oldest Rientro in the group: the date on its header. A Cesta that
-      // reached Attesa molitura some other way has none, and a group of only
-      // such Ceste says so rather than inventing a date.
+      // Kept under its existing API name for older clients. Dates both Rientro
+      // and Conferimento in frantoio; no known arrival means no invented date.
       oldestRientro: v.union(v.null(), v.number()),
       ceste: v.array(v.object(waitingCesta)),
     }),
@@ -437,12 +436,12 @@ export const attesaMolituraByCliente = query({
     // Grouped on the Cliente the tape names, which is whose the load is.
     const dated = await Promise.all(
       byCliente(ceste).map(async (group) => {
-        const rientri = await Promise.all(
-          group.ceste.map((cesta) =>
-            lastMovimentoAt(ctx, cesta._id, "rientro"),
-          ),
+        const arrivals = await Promise.all(
+          group.ceste.map((cesta) => lastArrival(ctx, cesta._id)),
         );
-        const known = rientri.filter((at) => at !== null);
+        const known = arrivals.flatMap((arrival) =>
+          arrival === null ? [] : [arrival._creationTime],
+        );
         return {
           cliente:
             group.clienteId === undefined
@@ -454,8 +453,8 @@ export const attesaMolituraByCliente = query({
       }),
     );
 
-    // Longest wait first. A group with no Rientro to date goes last rather than
-    // first, and ties — two Clienti whose Ceste came in on the same Rientro,
+    // Longest wait first. A group with no known arrival goes last rather than
+    // first, and ties — two Clienti whose Ceste arrived at the same time,
     // which one Movimento apart is all it takes — break on the numero the
     // Ceste are read in, so that the screen never reshuffles between reads.
     return dated.sort((one, other) => {

@@ -238,6 +238,8 @@ const whatWasDone = ({ operatore, cliente, action }: RegistroRow): string => {
       return `${operatore} ha registrato un Ritiro di ${cesteCount(action.numeri.length)} a ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
     case "rientro":
       return `${operatore} ha registrato un Rientro di ${cesteCount(action.numeri.length)} da ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
+    case "conferimento_in_frantoio":
+      return `${operatore} ha registrato un Conferimento in frantoio in ${cesteCount(action.numeri.length)} per ${whom(cliente)}: ${numeriInSentence(action.numeri)}.`;
     case "svuotamento":
       return `${operatore} ha svuotato ${cesteCount(action.numeri.length)}: ${numeriInSentence(action.numeri)}.`;
     case "rettifica": {

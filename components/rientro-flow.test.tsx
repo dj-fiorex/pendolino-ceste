@@ -3,7 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { getFunctionName } from "convex/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { RientroFlow } from "./rientro-flow";
+import { IncomingCesteFlow } from "./incoming-ceste-flow";
+
+const RientroFlow = () => <IncomingCesteFlow kind="rientro" />;
 
 const giuseppe = {
   _id: "giuseppe",
